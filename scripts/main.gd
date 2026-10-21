@@ -12,6 +12,18 @@ const SV = preload("res://scripts/save_data.gd")
 const AB = preload("res://scripts/abilities.gd")
 const ZM = preload("res://scripts/zmove.gd")
 const DYN = preload("res://scripts/dynamax.gd")
+const POI = preload("res://scripts/poi.gd")
+const KC = preload("res://scripts/kecleon.gd")
+const RSC = preload("res://scripts/rescue.gd")
+const ALP = preload("res://scripts/alpha.gd")
+const DNC = preload("res://scripts/daynight.gd")
+const HZD = preload("res://scripts/hazard.gd")
+const CVE = preload("res://scripts/cave.gd")
+const INV = preload("res://scripts/invasion.gd")
+const MET = preload("res://scripts/meteor.gd")
+const MEW = preload("res://scripts/mewtwo.gd")
+const ACH = preload("res://scripts/ach.gd")
+const SEC = preload("res://scripts/secret.gd")
 const Aud = preload("res://scripts/audio.gd")
 const L = preload("res://scripts/lang.gd")
 const IC = preload("res://scripts/icons.gd")
@@ -20,9 +32,15 @@ const DSP = preload("res://scripts/display.gd")
 const PAD = preload("res://scripts/pad.gd")
 const PADI = preload("res://scripts/padicons.gd")
 const ARENA = preload("res://scripts/arena.gd")
+const FUS = preload("res://scripts/fusions.gd")
+const FFX = preload("res://scripts/fusion_fx.gd")
+const EVFX = preload("res://scripts/evo_fx.gd")
+const EVAB = preload("res://scripts/evo_abil.gd")
+const TXS = preload("res://scripts/textscale.gd")
 const TW = preload("res://scripts/tileworld.gd")
 const JDM = preload("res://scripts/judgment.gd")
 const PG = preload("res://scripts/progress.gd")
+const CH = preload("res://scripts/challenges.gd")
 const VFX = preload("res://scripts/vfx.gd")
 const PFX = preload("res://scripts/pfx.gd")
 const PAUSEUI = preload("res://scripts/pause_ui.gd")
@@ -30,8 +48,16 @@ const PAUSEUI = preload("res://scripts/pause_ui.gd")
 
 const ENEMY_CAP := 64
 const AIM_REACH := 520.0
+# S35: apuntado manual (opcional, desactivado por defecto)
+var aim_touch := -1
+var aim_o := Vector2.ZERO
+var aim_c := Vector2.ZERO
+var aim_touch_dir := Vector2.ZERO
+var aim_mouse_t := -99.0
+var aim_manual := false
+var aim_ang := 0.0
 const MAX_MOVES := 4
-const ORB_CAP := 420
+const ORB_CAP := 300
 const BASE_MAGNET := 78.0
 const XP_ENEMY := 20.0
 const CHUNK := 768.0
@@ -77,6 +103,7 @@ const TIERS := [
 	{"from": 500, "bst": [530, 620], "hp": 250, "spd": 72, "dmg": 28.0, "xp": 38.0, "cast": 7},
 ]
 # Franjas de jefe: segundo en que salen, PV base, dano, experiencia y rango de stats base.
+const GPM := preload("res://scripts/gachapon.gd")
 const BOSS_SLOTS := [
 	{"at": 180, "hp": 1400, "dmg": 34, "xp": 220, "bst": [490, 545]},
 	{"at": 360, "hp": 3200, "dmg": 42, "xp": 420, "bst": [520, 580]},
@@ -140,8 +167,8 @@ const TOWER_XP_K := 0.65   # en la Torre se sube de nivel mas despacio
 const SHINY_RATE := 1.0 / 4096.0
 
 # Mejoras de estadistica (levelup.js). "w" = peso al sortear la carta.
-const STAT_ICON := {"hp": "heart", "atk": "fist", "spd": "boot", "cd": "clock", "def": "shield", "rgn": "sprout", "mag": "magnet", "xp": "book", "size": "size", "heal": "berry"}
-const STAT_IDS := ["hp", "atk", "spd", "cd", "def", "rgn", "mag", "xp", "size", "heal"]
+const STAT_ICON := {"hp": "heart", "atk": "fist", "spd": "boot", "cd": "clock", "def": "shield", "rgn": "sprout", "mag": "magnet", "xp": "book", "size": "size", "heal": "berry", "mult": "cards", "pierce": "quickclaw", "amp": "star", "lens": "scopelens", "trs": "amuletcoin", "fang": "lifeorb", "edge": "expertbelt", "dstrike": "choiceband"}
+const STAT_IDS := ["hp", "atk", "spd", "cd", "def", "rgn", "mag", "xp", "size", "heal", "mult", "pierce", "amp", "lens", "trs", "fang", "edge", "dstrike"]
 const STATS := {
 	"hp": {"title": "Vigor", "desc": "+20 de vida máxima (y la recupera).", "max": 9999},
 	"atk": {"title": "Potencia", "desc": "+10% de daño con todos los movimientos.", "max": 40},
@@ -153,6 +180,14 @@ const STATS := {
 	"xp": {"title": "Aprendizaje", "desc": "+12% de experiencia ganada.", "max": 8},
 	"size": {"title": "Calibre", "desc": "+12% de tamaño de proyectiles, orbes y áreas.", "max": 6},
 	"heal": {"title": "Baya Zidra", "desc": "Recupera el 45% de tu vida ahora mismo.", "max": 99999},
+	"mult": {"title": "Multiplicador", "desc": "+1 proyectil en movimientos de disparo, cono y bumerán (cada nivel rinde menos).", "max": 99999},
+	"pierce": {"title": "Fuerza Perforante", "desc": "+1 perforación en disparos, conos y ondas (cada nivel rinde menos).", "max": 99999},
+	"amp": {"title": "Amplificador", "desc": "+12% de probabilidad y duración de estados: parálisis, congelación, confusión, quemadura y veneno.", "max": 99999},
+	"lens": {"title": "Lente de Precisión", "desc": "+3% de probabilidad de crítico (3 niveles: +9%; luego rinde menos, tope 30%).", "max": 99999},
+	"trs": {"title": "Imán del Tesoro", "desc": "+8% de Pokémonedas al acabar la partida (rinde menos con cada nivel).", "max": 99999},
+	"fang": {"title": "Colmillo Vampírico", "desc": "Recuperas un 4% del daño que haces (3 niveles: 12%; luego rinde menos, tope 25%).", "max": 99999},
+	"edge": {"title": "Filo Fatal", "desc": "+12% de daño crítico (rinde menos con cada nivel, tope x3).", "max": 99999},
+	"dstrike": {"title": "Golpe Doble", "desc": "+6% de probabilidad de golpear dos veces (rinde menos, tope 45%).", "max": 99999},
 }
 
 var flash_shader: Shader
@@ -178,6 +213,9 @@ var adapt_prev_hp := -1.0
 var z_cd := 0.0   # enfriamiento del Z (se cuenta cuando termina el movimiento)
 var z_state := ""     # "" | "cine" | "fx"
 var z_t := 0.0
+var join_t := -1.0   # cartel "se une a ti" al capturar un Alfa/jefe (segundos desde que empezo; -1 = oculto)
+var join_name := ""
+var join_col := Color.WHITE
 var zfx = null
 var z_req := false
 var dyn = null
@@ -200,7 +238,7 @@ var partner_hp := 1.0
 var partner_max := 1.0
 var partner_inv := 0.0
 var partner_last := Vector2.ZERO
-const TOWER_FLOORS := 30
+const TOWER_FLOORS := 60
 const TOWER_BOSS_AT := 50.0     # segundos de piso hasta que sale el jefe
 var tw_floor := 1
 var tw_t := 0.0                 # tiempo dentro del piso
@@ -210,11 +248,11 @@ var tw_phase := 0               # 0 = combate, 1 = piso de descanso (elige cura/
 # veneno contra jefes: 20% del porcentaje de vida máxima
 const POISON_BOSS_MUL := 0.2
 # Estados de control: duracion base (s) y texto. Los jefes resisten (ver _apply_cc).
-const CC_DUR := {"freeze": 1.8, "para": 3.0, "sleep": 4.0, "conf": 3.0}
-const CC_TEXT := {"freeze": "¡Congelado!", "para": "¡Paralizado!", "sleep": "¡Dormido!", "conf": "¡Confundido!"}
-const CC_COL := {"freeze": "#8fe3ff", "para": "#ffe14d", "sleep": "#b9b6ff", "conf": "#ff7ad9"}
-const CC_SUFFIX := {"freeze": "Puede congelar (%d%%).", "para": "Puede paralizar (%d%%).", "sleep": "Puede dormir (%d%%).", "conf": "Puede confundir (%d%%)."}
-var tw_final := 0               # jefe final del piso 30: Arceus (493)
+const CC_DUR := {"freeze": 1.8, "para": 3.0, "sleep": 4.0, "conf": 3.0, "charm": 20.0}
+const CC_TEXT := {"freeze": "¡Congelado!", "para": "¡Paralizado!", "sleep": "¡Dormido!", "conf": "¡Confundido!", "charm": "¡Enamorado!"}
+const CC_COL := {"freeze": "#8fe3ff", "para": "#ffe14d", "sleep": "#b9b6ff", "conf": "#ff7ad9", "charm": "#ff6fa8"}
+const CC_SUFFIX := {"freeze": "Puede congelar (%d%%).", "para": "Puede paralizar (%d%%).", "sleep": "Puede dormir (%d%%).", "conf": "Puede confundir (%d%%).", "charm": "Puede enamorar (%d%%)."}
+var tw_final := 0               # jefe final del piso 60: Arceus (493)
 var tw_boss2 = null             # segundo jefe (piso 30)
 var tw_init := false
 var tw_shield := 0.0            # escudo para el siguiente piso (se gana en el descanso)
@@ -262,6 +300,19 @@ var tw_clears := 0
 const RIFTS_LIMIT := 480.0   # Contrarreloj de grietas: 8 minutos
 var run_rifts := 0
 var timeup := false
+# --- Retos de 10 minutos (modo "chal") ---
+var ch_inst: Dictionary = {}
+var ch_def: Dictionary = {}
+var ch_m: Dictionary = {}
+var ch_over := false
+var ch_sets: Dictionary = {}      # estado -> {id de enemigo: true}
+var ch_multi: Dictionary = {}     # id de enemigo -> {estado: true}
+var ch_hits: Dictionary = {}      # movimiento -> [fotograma, golpes, contado]
+var ch_src_kills: Dictionary = {}
+var ch_moved_min: Dictionary = {}
+var ch_last_hurt := 0.0
+var ch_check_t := 0.0
+var ch_prev_pos := Vector2.ZERO
 var team: Array = []
 var team_cur := 0
 var team_bonus := 0.0
@@ -275,6 +326,22 @@ var pfx: Node2D
 var player: Player
 var cam: Camera2D
 var jd = null
+var poi = null
+var kec = null
+var rescue = null
+var alpha = null
+var hz = null
+var cave = null
+var inv = null
+var meteor = null
+var mew = null
+var sec = null
+var dn = null
+var balls := 0
+const NORMAL_MOVE_W := 0.15
+const BALL_CAP := 6
+var shop_open := false
+var act_req := false
 var ui_layer: CanvasLayer
 var hud: Hud
 var stick: Stick
@@ -301,6 +368,7 @@ var base_spd := 100.0
 var base_atk := 1.0
 var item := ""
 var reap_kills := 0       # Sed de victoria: derrotas acumuladas (+0,3% de dano cada una)
+var item3 := ""          # tercer objeto (mejora permanente Mochila grande)
 var item2 := ""          # segundo objeto (carta legendaria Doble equipaje)
 var sash_t := -999.0
 var bell_heal := 0.0
@@ -314,9 +382,28 @@ var wx: WeatherFx
 var cast_run: Array = []
 var boss_run: Array = []
 var boss_idx := 0
+# S63: director de hitos de la Normal Run (un solo dueño, banderas de un disparo, cola de pendientes)
+const DIR_MS := [["wave", 30.0], ["rift", 60.0], ["meowth", 120.0], ["boss", 180.0], ["map", 240.0], ["eter", 3600.0]]
+const ETERNATUS_DEX := 890
+const MINI_DEXES := [248, 321, 95, 208, 143, 130, 464, 306, 376, 76, 131, 149]   # Tyranitar, Wailord, Onix, Steelix + v5.3: Snorlax, Gyarados, Rhyperior, Aggron, Metagross, Golem, Lapras, Dragonite
+var dir_done := {}
+var dir_gap := 0.0
+var dir_warned := false
+var dir_finale := false
+var dir_map := false
+var dir_blocked := ""
+var dir_log: Array = []
+var dir_eter = null
+var mini_last := {}
+var mini_chk := 40.0
 var surge_t := 90.0
 var preload_t := 0.0
 var banner_text := ""
+var ffx = null
+var evfx = null
+var evab = null
+var fusion_t := 0.0
+var fusion_name := ""
 var banner_t := 0.0
 var event_id := ""
 var event_t := 0.0
@@ -330,6 +417,10 @@ var ebullets: Array = []
 var player_vel := Vector2.ZERO
 var coins := 0
 var paused := false
+var choose_idle := 0.0
+var ret_cd := 0.0
+var ret_last := 0
+var unfreeze_count := 0
 var pause_ui: CanvasLayer
 var mini: Node2D
 var cam_zoom := 1.65  # campo de vision: ajustable en la pausa (100-200 %), se guarda en Ajustes
@@ -347,6 +438,7 @@ var run_chests := 0
 var perks: Dictionary = {}
 var rerolls := 0
 var revives := 0
+var has_bag3 := false
 var has_bag := false   # mejora permanente Mochila: llevas 2 objetos
 var run_dmg := {}
 var sitrus_t := -999.0
@@ -374,6 +466,8 @@ var trap_sleep_t := 0.0
 var trap_conf_t := 0.0
 var tickets := 0
 var tickets10 := 0
+var gold_gcoins_run := 0
+var gcoins_run := 0   # Gachapon Coins de la partida (las suelta Poltchageist)
 # --- grietas y arenas legendarias ---
 const ARENA_POS := Vector2(60000.0, 60000.0)
 const RIFT_START := 75.0
@@ -388,6 +482,7 @@ var rift_info := {}
 var rift_check := RIFT_START
 var rift_miss := 0
 var arena: Node2D = null
+var cave_type := ""   # mientras se genera la oleada de una cueva: solo Pokemon de ese tipo
 var ainfo := {}
 var bonds := 0
 var bond_ids: Array = []
@@ -399,12 +494,14 @@ func _ready() -> void:
 	randomize()
 	L.apply()
 	PXF.apply()
+	DSP.menu_mode = false
 	DSP.apply(get_tree())
 	DisplayServer.screen_set_keep_on(true)   # que el movil no se apague en plena partida
 	PAD.apply()
 	Aud.setup(self)
 	Aud.music("forest")
 	_add_input_actions()
+	_bind_move_devices(-1)
 	flash_shader = Shader.new()
 	flash_shader.code = FLASH_SHADER
 
@@ -420,6 +517,13 @@ func _ready() -> void:
 	pfx = PFX.new()
 	pfx.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	fx.add_child(pfx)
+	ffx = FFX.new()
+	ffx.main = self
+	fx.add_child(ffx)
+	evfx = EVFX.new()
+	evfx.main = self
+	fx.add_child(evfx)
+	evab = EVAB.new(self)
 
 	_load_data()
 	mode = SV.run_mode
@@ -443,8 +547,10 @@ func _ready() -> void:
 		biome_off = randi() % ground.count()
 		biome_idx = biome_off
 		ground.set_biome(biome_off, true)
-	if mode != "daily" and mode != "party" and mode != "rush" and not SV.run_mods.is_empty():
+	if mode != "daily" and mode != "party" and mode != "rush" and mode != "chal" and not SV.run_mods.is_empty():
 		mods = SV.run_mods.duplicate()
+	if mode == "chal":
+		_ch_setup()
 	_cand_cache = {}
 	if mode == "rifts":
 		rift_check = 20.0
@@ -468,6 +574,7 @@ func _ready() -> void:
 	ab_fx = AB.fx_of(_pdex())
 	z_type = SV.zm_type_for(_pdex())
 	has_bag = SV.up_level("bag") > 0
+	has_bag3 = has_bag and SV.up_level("bag3") > 0
 	# Veto como en el original: los movimientos vetados se eligen en Mejoras (por Pokemon).
 	bans = 0
 	var _bl: Array = SV.ban_list(SV.run_dex)
@@ -482,11 +589,17 @@ func _ready() -> void:
 	var st: Dictionary = _dex_by[sel_dex]
 	player = Player.new()
 	player.setup(sel_dex, _sm(sel_dex), flash_shader)
+	var sh_aura := ShieldAura.new()
+	sh_aura.m = self
+	sh_aura.z_index = 2
+	player.add_child(sh_aura)
 	if SV.owns(sel_dex) and bool(SV.d["owned"][str(sel_dex)]["shiny"]) and bool(SV.d["shiny_on"]):
 		player.set_shiny()
 	player.max_hp = float(st["hp"]) + float(perks["hp"])
 	if _has_mod("frail"):
 		player.max_hp = roundf(player.max_hp * 0.5)
+	if mode == "chal" and _ch_rs("one_hp"):
+		player.max_hp = 1.0
 	player.hp = player.max_hp
 	nh_last = player.hp
 	nh_max = player.max_hp
@@ -500,23 +613,7 @@ func _ready() -> void:
 	for sid in STAT_IDS:
 		stat_lv[sid] = 0
 	player.xp_next = _xp_need(1)
-	var first_move: String = SV.start_move_of(sel_dex)
-	player.moves = [_new_move(first_move, 1)]
-	if int(perks["moves"]) >= 2:
-		var cands: Array = []
-		for mid in MD.ORDER:
-			var md: Dictionary = MD.MOVES[mid]
-			var ty: String = String(md["type"])
-			if mid != first_move and String(md["kind"]) != "buff" and (ty == "normal" or player.types.has(ty)):
-				cands.append(mid)
-		if not cands.is_empty():
-			var okc: Array = []
-			for cid in cands:
-				if not banned.has(cid):
-					okc.append(cid)
-			if okc.is_empty():
-				okc = cands
-			player.moves.append(_new_move(String(okc[randi() % okc.size()]), 1))
+	player.moves = _start_moves(sel_dex, player.types)
 	player.slot = 0
 	_arrange()
 	world.add_child(player)
@@ -536,7 +633,37 @@ func _ready() -> void:
 	add_child(ui)
 	ui_layer = ui
 	jd = JDM.new()
+	poi = POI.new()
+	poi.m = self
+	kec = KC.new()
+	kec.m = self
+	rescue = RSC.new()
+	rescue.m = self
+	rescue.poi = poi
+	alpha = ALP.new()
+	alpha.m = self
+	alpha.poi = poi
+	hz = HZD.new()
+	hz.m = self
+	cave = CVE.new()
+	cave.m = self
+	cave.poi = poi
+	inv = INV.new()
+	inv.m = self
+	inv.poi = poi
+	meteor = MET.new()
+	meteor.m = self
+	meteor.poi = poi
+	mew = MEW.new()
+	mew.m = self
+	mew.poi = poi
+	sec = SEC.new()
+	sec.m = self
+	sec.poi = poi
 	jd.m = self
+	dn = DNC.new()
+	dn.m = self
+	dn.setup()
 	wx = WeatherFx.new()
 	ui.add_child(wx)
 	hud = Hud.new()
@@ -554,11 +681,17 @@ func _ready() -> void:
 	pause_ui.fov_changed.connect(func(_p: int): _apply_fov())
 	pause_ui.stick_fixed_changed.connect(func(on: bool): stick.fixed = on; stick.queue_redraw())
 	pause_ui.quit_run.connect(_abandon)
+	pause_ui.summary_requested.connect(func(): pause_ui.show_summary(pause_summary()))
 	pause_ui.open_settings.connect(_open_settings)
 	stick = Stick.new()
 	stick.radius = [70.0, 90.0, 120.0][clampi(int(SV.setting("stick")), 0, 2)]
 	stick.fixed = bool(SV.d["settings"].get("stick_fixed", false))
 	ui.add_child(stick)
+	var amk := AimMark.new()
+	amk.m = self
+	amk.visible = false
+	amk.z_index = 50
+	world.add_child(amk)
 	slots = Slots.new()
 	ui.add_child(slots)
 	if mode == "team":
@@ -571,6 +704,8 @@ func _ready() -> void:
 	cards.chosen.connect(_on_card_chosen)
 	cards.reroll_pressed.connect(_on_reroll)
 	cards.ban_picked.connect(_on_ban)
+	cards.lock_toggled.connect(_on_lock_toggled)
+	cards.block_pressed.connect(_on_block_pressed)
 
 	# Unos pocos al empezar, para que no se vea vacio al probar.
 	for i in range(3):
@@ -606,16 +741,85 @@ func _add_input_actions() -> void:
 			ev.physical_keycode = k
 			InputMap.action_add_event(action, ev)
 		var b := InputEventJoypadButton.new()
+		b.device = -1   # cualquier mando (en Android TV el mando no siempre es el indice 0)
 		b.button_index = dpad[action]
 		InputMap.action_add_event(action, b)
 		var m := InputEventJoypadMotion.new()
+		m.device = -1
 		m.axis = sticks[action][0]
 		m.axis_value = sticks[action][1]
 		InputMap.action_add_event(action, m)
 
 
+# Con dos mandos (cooperativo) el jugador 1 solo escucha al primero; si no, a cualquiera.
+func _bind_move_devices(dev: int) -> void:
+	for action in ["move_left", "move_right", "move_up", "move_down"]:
+		if not InputMap.has_action(action):
+			continue
+		for ev in InputMap.action_get_events(action):
+			if ev is InputEventJoypadButton or ev is InputEventJoypadMotion:
+				ev.device = dev
+
+
+func _manual_aim_vec() -> Vector2:
+	# Prioridad: stick derecho del mando > dedo en la mitad derecha > raton (si se movio hace poco)
+	var pads: Array = Input.get_connected_joypads()
+	if not pads.is_empty():
+		var rv := Vector2(Input.get_joy_axis(int(pads[0]), JOY_AXIS_RIGHT_X), Input.get_joy_axis(int(pads[0]), JOY_AXIS_RIGHT_Y))
+		if rv.length() > 0.35:
+			return rv.normalized()
+	if aim_touch != -1 and aim_touch_dir != Vector2.ZERO:
+		return aim_touch_dir
+	if aim_touch == -1 and run_time - aim_mouse_t < 3.0 and not DisplayServer.is_touchscreen_available():
+		var sp: Vector2 = player.get_global_transform_with_canvas().origin + Vector2(0.0, -player.body_h * 0.5)
+		var d: Vector2 = get_viewport().get_mouse_position() - sp
+		if d.length() > 18.0:
+			return d.normalized()
+	return Vector2.ZERO
+
+
+func _aim_input(event: InputEvent) -> void:
+	if not bool(SV.d["settings"].get("manual_aim", false)):
+		aim_touch = -1
+		return
+	var half: float = get_viewport().get_visible_rect().size.x * 0.5
+	if event is InputEventMouseMotion:
+		aim_mouse_t = run_time
+	elif event is InputEventScreenTouch:
+		if event.pressed and aim_touch == -1 and event.position.x > half:
+			aim_touch = event.index
+			aim_o = event.position
+			aim_c = event.position
+			aim_touch_dir = Vector2.ZERO
+		elif not event.pressed and event.index == aim_touch:
+			aim_touch = -1
+			aim_touch_dir = Vector2.ZERO
+	elif event is InputEventScreenDrag and event.index == aim_touch:
+		aim_c = event.position
+		var dd: Vector2 = aim_c - aim_o
+		if dd.length() > 70.0:
+			aim_o = aim_c - dd.normalized() * 70.0   # el origen sigue al dedo para girar rapido
+			dd = aim_c - aim_o
+		if dd.length() > 14.0:
+			aim_touch_dir = dd.normalized()
+
+
+func _input(event: InputEvent) -> void:
+	_aim_input(event)
+
+
+func _pad_slot(bi: int) -> int:
+	for i in range(6):
+		if PAD.btn("slot%d" % (i + 1)) == bi:
+			return i
+	return -1
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	if settings_open:
+		return
+	if shop_open:
+		kec.ui_input(event)
 		return
 	var slot := -1
 	var cyc := 0
@@ -634,6 +838,10 @@ func _unhandled_input(event: InputEvent) -> void:
 				slot = 2
 			KEY_4:
 				slot = 3
+			KEY_5:
+				slot = 4
+			KEY_6:
+				slot = 5
 			KEY_Q:
 				cyc = -1
 			KEY_E:
@@ -670,6 +878,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			z_req = true
 		elif bi == PAD.btn("dynamax"):
 			dyn_req = true
+		elif _pad_slot(bi) >= 0:
+			slot = _pad_slot(bi)
 		elif bi == JOY_BUTTON_Y:   # en partida: Y / Triángulo = Movimiento Z (con cartas en pantalla sigue siendo relanzar)
 			z_req = true
 			go = true
@@ -692,7 +902,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			paused = false
 	elif z_state != "":
 		pass
-	elif not choosing:
+	elif not choosing and not shop_open:   # v5.2.1: con la tienda abierta, tocar "Comprar" ya no activa Dynamax/Z debajo
+		if confirm or cyc == 1 or (tpos.x >= 0.0 and hud.act_txt != "" and hud.act_rect().has_point(tpos)):
+			act_req = true
 		if (z_req or (tpos.x >= 0.0 and hud.z_rect().has_point(tpos))) and _z_can():
 			_z_start()
 			z_req = false
@@ -778,7 +990,12 @@ func _finish_run() -> void:
 	var mv_list: Array = []
 	for mv in player.moves:
 		mv_list.append({"id": String(mv["id"]), "name": String(mv["name"]), "lvl": int(mv["lvl"]), "evo": bool(mv["evolved"]),
-			"dmg": int(run_dmg.get(String(mv["id"]), 0.0)), "kills": int(run_kills_by.get(String(mv["id"]), 0))})
+			"dmg": int(run_dmg.get(String(mv["id"]), 0.0)), "kills": int(run_kills_by.get(String(mv["id"]), 0)),
+			"desc": String(mv.get("desc", ""))})
+	var item_list: Array = []
+	for iid in [item, item2, item3]:
+		if String(iid) != "":
+			item_list.append(String(iid))
 	if mode == "party":
 		SV.last_run = {}
 		PG.off = false
@@ -800,6 +1017,7 @@ func _finish_run() -> void:
 	if _has_item("amuletcoin"):
 		mul *= 1.5   # Moneda Amuleto: +50% de Pokemonedas al acabar la run
 	mul *= 1.0 + _abn("coin")
+	mul *= _treasure_k()   # Iman del Tesoro: solo el botin normal de fin de partida (no los premios unicos de los retos)
 	if mode == "type":
 		mul += 0.5
 		extra = " · " + L.t("Supervivencia: %s") % L.t(String(MD.TYPE_NAME.get(SV.run_type, SV.run_type)))
@@ -853,8 +1071,8 @@ func _finish_run() -> void:
 		for md_id in mods:
 			st2["mb_" + String(md_id)] = maxi(int(st2.get("mb_" + String(md_id), 0)), rmin)
 	SV.finish_run({"judge": js, "time": run_time, "kills": kills, "level": player.level, "bosses": run_bosses,
-		"chests": run_chests, "coins": coins, "tickets": tickets, "tickets10": tickets10, "dex": SV.run_dex,
-		"dead": player.dead and not timeup, "moves": mv_list, "mul": mul, "extra": extra,
+		"chests": run_chests, "coins": coins, "tickets": tickets, "tickets10": tickets10, "gcoins": gcoins_run, "gold_gcoins": gold_gcoins_run, "dex": SV.run_dex,
+		"dead": player.dead and not timeup, "moves": mv_list, "items": item_list, "mul": mul, "extra": extra,
 		"other_dmg": int(run_dmg.get("_other", 0.0)), "other_kills": int(run_kills_by.get("_other", 0)),
 		"ally_dmg": int(ally_dmg), "ally_kills": ally_kills})
 	PG.event("runEnd", {"time": run_time, "level": player.level, "coins": coins, "types": player.types, "group": false, "mode": mode, "nmods": (0 if mode == "daily" else mods.size()), "bosses": run_bosses, "rifts": run_rifts, "floor": tw_clears})
@@ -876,6 +1094,7 @@ func _on_reroll() -> void:
 	var heading: String = cards.title
 	var head: String = cards.headline
 	cards.show_cards(picks, heading, head, true)
+	cards.age = cards.GRACE   # un cambio o un veto deliberado no vuelve a bloquear las cartas
 	cards.rerolls = rerolls
 	cards.bans = bans
 
@@ -891,6 +1110,7 @@ func _on_ban(idx: int) -> void:
 	var heading: String = cards.title
 	var head: String = cards.headline
 	cards.show_cards(picks, heading, head, true)
+	cards.age = cards.GRACE   # un cambio o un veto deliberado no vuelve a bloquear las cartas
 	cards.rerolls = rerolls
 	cards.bans = bans
 
@@ -898,12 +1118,12 @@ func _on_ban(idx: int) -> void:
 func _fx_cap() -> int:
 	match quality:
 		1:
-			return 600
+			return 200
 		2:
-			return 160
+			return 60
 		3:
-			return 50
-	return int(600.0 * q_auto) if q_auto > 0.2 else 50
+			return 20
+	return int(200.0 * q_auto) if q_auto > 0.2 else 20
 
 
 func _process(delta: float) -> void:
@@ -942,6 +1162,31 @@ func _process(delta: float) -> void:
 			if ch is Fx and not ch.is_queued_for_deletion():
 				ch.queue_free()
 				over -= 1
+	# S62.7: cuenta atras 3-2-1 al volver de una grieta (el mundo hostil queda en pausa, sin dejar time_scale alterado)
+	if ret_cd > 0.0 and not paused and not player.dead:
+		ret_cd -= delta
+		player.invuln = maxf(player.invuln, 0.3)
+		var rn: int = ceili(maxf(ret_cd, 0.0))
+		if rn != ret_last and rn >= 1:
+			ret_last = rn
+			add_text(player.position + Vector2(0.0, -player.body_h - 34.0), str(rn), Color("#ffd23f"), 40)
+			Aud.sfx("select")
+	elif player.dead:
+		ret_cd = 0.0
+	# S59: redes de seguridad contra el "mundo congelado" (choosing/time_scale atascados sin que haya nada en pantalla).
+	if choosing and not cards.open:
+		choose_idle += delta
+		if choose_idle > 1.0:
+			choosing = false
+			choose_idle = 0.0
+			unfreeze_count += 1
+			push_warning("S59 watchdog: choosing sin cartas visibles; liberado (%d)" % unfreeze_count)
+	else:
+		choose_idle = 0.0
+	if not player.dead and Engine.time_scale != 1.0:
+		Engine.time_scale = 1.0
+		unfreeze_count += 1
+		push_warning("S59 watchdog: time_scale restaurado (%d)" % unfreeze_count)
 	if player.dead:
 		death_t += delta
 		# Game Over solo cuando la animacion de muerte termina completa (con tope de seguridad)
@@ -961,8 +1206,10 @@ func _process(delta: float) -> void:
 		_z_cine(delta)
 	elif jd.cinematic() and not paused:
 		jd.cine_tick(delta)
-	elif not choosing and not paused:
+	elif not choosing and not paused and not shop_open and ret_cd <= 0.0:
 		run_time += delta
+		if mode == "chal":
+			_ch_tick(delta)
 		if mode == "rifts" and run_time >= RIFTS_LIMIT and arena == null and not timeup:
 			timeup = true
 			hud.timeup = true
@@ -1003,23 +1250,46 @@ func _process(delta: float) -> void:
 			_update_biome()
 			_update_spawner(delta)
 			_update_rift(delta)
+			poi.update(delta)
+			kec.update(delta)
+			rescue.update(delta)
+			alpha.update(delta)
+			hz.update(delta)
+			cave.update(delta)
+			inv.update(delta)
+			meteor.update(delta)
+			mew.update(delta)
+			sec.update(delta)
 			jd.update(delta)
 			if run_time >= JDM.ARC_AT and not jd.done and pending_levels == 0 and mode != "rush" and mode != "tower":
 				jd.begin()
 		else:
 			_update_arena(delta)
+			if bool(ainfo.get("cave", false)):
+				if String(ainfo.get("owner", "cave")) == "lab":
+					mew.update_inside(delta)
+				else:
+					cave.update_inside(delta)
 			if jd.active():
 				jd.update(delta)
+		dn.update(delta)
 		_update_weather(delta)
 		_update_enemies(delta)
 		_update_hazards(delta)
 		_update_ebullets(delta)
 		_update_fields(delta)
+		ffx.step(delta)
+		evfx.step(delta)
+		_upd_pats(delta)
+		_upd_legend(delta)
+		_sample_dmg(delta)
 		_update_bullets(delta)
 		_update_orbs(delta)
 		_cleanup_enemies()
 		if pending_levels > 0 and not choosing:
 			_open_cards()
+		elif _fuse_ready() and not choosing:
+			_do_fuse()
 		elif bonds > 0 and not choosing and (arena == null or _arena_bond_ready()):
 			_offer_bond(true)
 	ground.center = player.position
@@ -1030,15 +1300,18 @@ func _process(delta: float) -> void:
 	hud.z_dim = _z_dim()
 	hud.z_state = z_state
 	hud.z_t = z_t
+	hud.join_t = join_t
+	hud.join_name = join_name
+	hud.join_col = join_col
 	hud.z_name = L.t(String(ZM.DEF[z_type]["name"])) if z_type != "" else ""
 	hud.z_type = z_type
-	hud.z_btn = 0 if (mode == "tower" or z_type == "" or z_state != "") else (3 if z_used else (2 if player.level >= ZM.MIN_LEVEL else 0))
+	hud.z_btn = 0 if (mode == "tower" or z_type == "" or z_state != "") else (3 if z_used else (2 if run_time >= ZM.MIN_TIME else 0))
 	hud.z_cd = z_cd
 	hud.adapt_pct = roundi(adapt_k * 100.0) if _adapt_on() else 0
 	hud.dyn_left = maxf(0.0, dyn.t) if _dyn_on() else -1.0
 	hud.dyn_flash = dyn_flash if dyn != null else 99.0
 	hud.dyn_type = String(player.types[0])
-	hud.dyn_btn = 0 if (mode == "tower" or not DYN.unlocked(SV.d["stats"]) or _dyn_on()) else (3 if dyn_used else (2 if player.level >= DYN.MIN_LEVEL else 0))
+	hud.dyn_btn = 0 if (mode == "tower" or not DYN.unlocked(SV.d["stats"]) or _dyn_on()) else (3 if dyn_used else (2 if run_time >= DYN.MIN_TIME else 0))
 	hud.dyn_cd = dyn_cd
 	hud.ab_name = L.t(String(AB.FX[AB.of(_pdex())]["name"]))
 	hud.show_stats = bool(SV.setting("stats_box"))
@@ -1060,7 +1333,8 @@ func _process(delta: float) -> void:
 	hud.down = down
 	hud.down_left = maxf(0.0, DOWN_REVIVE_T - down_t)
 	hud.pbar = clampf(partner_hp / maxf(1.0, partner_max), 0.0, 1.0)
-	hud.limit = RIFTS_LIMIT if mode == "rifts" else 0.0
+	hud.limit = RIFTS_LIMIT if mode == "rifts" else (CH.CH_TIME if mode == "chal" else 0.0)
+	hud.ch_mode = mode == "chal"
 	hud.tower_floor = tw_floor if mode == "tower" else 0
 	hud.tower_risk = tw_risk.size()
 	hud.reap_pct = 0.3 * float(reap_kills) if tw_risk.has("l_reap") else -1.0
@@ -1073,13 +1347,22 @@ func _process(delta: float) -> void:
 	hud.xp_next = player.xp_next
 	hud.buff_text = (_buff_text() + "  " + _power_text()).strip_edges()
 	hud.power_id = power_kind
+	_items_hud_t -= delta
+	if _items_hud_t <= 0.0:
+		_items_hud_t = 0.2
+		hud.items_hud = _build_items_hud()
 	hud.item_name = _item_name()
 	hud.item_id = item
 	hud.item2_name = _item_name_of(item2)
 	hud.item2_id = item2
+	hud.item3_name = _item_name_of(item3)
+	hud.item3_id = item3
 	hud.weather_text = _weather_text()
 	hud.banner = banner_text if banner_t > 0.0 else _weather_banner()
+	hud.fusion_t = fusion_t
+	hud.fusion_name = fusion_name
 	hud.coins = coins
+	hud.balls = balls
 	hud.tickets = tickets
 	hud.tickets10 = tickets10
 	_update_rift_hud()
@@ -1102,7 +1385,7 @@ func _refresh_slots() -> void:
 			"max": _max_lvl(m),
 			"frac": clampf(1.0 - maxf(0.0, _f(m, "t")) / cdm, 0.0, 1.0),
 			"evo": bool(m["evolved"]),
-			"icon": ("evo:" if bool(m["evolved"]) else "move:") + String(m["id"]),
+			"icon": ("evo:" if bool(m["evolved"]) else "move:") + String(m.get("recipe", m["id"])),
 			"n": g.size(),
 		})
 	slots.info = info
@@ -1123,7 +1406,44 @@ func _buff_mul(stat: String) -> float:
 
 
 func _has_item(id: String) -> bool:
-	return item == id or (item2 != "" and item2 == id)
+	return item == id or (item2 != "" and item2 == id) or (item3 != "" and item3 == id)
+
+
+var _items_hud_t := 0.0
+
+
+# Cooldown real de los objetos activos (Seccion 41): [restante, total]; null si el objeto no tiene recarga.
+func _item_cd(id: String) -> Variant:
+	if id == "sitrusberry":
+		return [maxf(0.0, 90.0 - (run_time - sitrus_t)), 90.0, false]
+	if id == "focussash":
+		return [maxf(0.0, 60.0 - (run_time - sash_t)), 60.0, false]
+	if id == "weaknesspolicy":
+		return [wp_t, 8.0, true]   # efecto activo: muestra el tiempo que le queda
+	return null
+
+
+# Caja compacta del HUD (Seccion 39): objetos equipados y mejoras con nivel; si hay mas de 4 se pagina sola.
+func _build_items_hud() -> Array:
+	var out: Array = []
+	for id in [item, item2, item3]:
+		if String(id) == "":
+			continue
+		var e := {"icon": String(id), "name": _item_name_of(String(id)), "lv": 0, "cd": -1.0, "cdmax": 0.0}
+		var c = _item_cd(String(id))
+		if c != null:
+			e["cd"] = float(c[0])
+			e["cdmax"] = float(c[1])
+			e["act"] = bool(c[2])
+		out.append(e)
+	var ups: Array = []
+	for sid in STAT_IDS:
+		var lv: int = int(stat_lv.get(sid, 0))
+		if lv > 0:
+			ups.append({"icon": String(STAT_ICON[sid]), "name": String(STATS[sid]["title"]), "lv": lv, "cd": -1.0, "cdmax": 0.0})
+	ups.sort_custom(func(a, b): return int(a["lv"]) > int(b["lv"]))
+	out.append_array(ups)
+	return out
 
 
 func _item_name_of(id: String) -> String:
@@ -1240,7 +1560,7 @@ func _cooldowns(delta: float) -> void:
 
 
 func _z_can() -> bool:
-	return mode != "tower" and z_type != "" and not z_used and z_state == "" and player.level >= ZM.MIN_LEVEL and not player.dead and not down and not paused and not choosing and arena == null and not jd.active() and not timeup
+	return mode != "tower" and z_type != "" and not z_used and z_state == "" and run_time >= ZM.MIN_TIME and not player.dead and not down and not paused and not choosing and arena == null and not jd.active() and not timeup
 
 
 # Gatillo derecho del mando (ademas del boton configurable).
@@ -1264,7 +1584,7 @@ func _dyn_on() -> bool:
 
 
 func _dyn_can() -> bool:
-	return mode != "tower" and DYN.unlocked(SV.d["stats"]) and not dyn_used and not _dyn_on() and z_state != "cine" and player.level >= DYN.MIN_LEVEL and not player.dead and not down and not paused and not choosing and not jd.active() and not timeup
+	return mode != "tower" and DYN.unlocked(SV.d["stats"]) and not dyn_used and not _dyn_on() and z_state != "cine" and run_time >= DYN.MIN_TIME and not player.dead and not down and not paused and not choosing and not jd.active() and not timeup
 
 
 func _dyn_start() -> void:
@@ -1349,8 +1669,10 @@ func _atk() -> float:
 
 
 func _spd() -> float:
-	var k: float = 1.35 if _has_item("choicescarf") else 1.0
-	return base_spd * pow(1.07, float(_lv("spd"))) * (1.0 + _buff_mul("spd")) * k * (1.4 if _pw("haste") else 1.0) * _rk("spd") * (1.0 + _abn("spd") + _ab_wspd()) * (DYN.STAT_K if _dyn_on() else 1.0)
+	if mode == "chal" and _ch_rs("no_move"):
+		return 0.0
+	var k: float = (1.35 if _has_item("choicescarf") else 1.0) * (1.1 if _has_item("ti_flying") else 1.0)
+	return base_spd * pow(1.07, float(_lv("spd"))) * (1.0 + _buff_mul("spd")) * k * (1.4 if _pw("haste") else 1.0) * (0.8 if _has_mod("slow") else 1.0) * _rk("spd") * (1.0 + _abn("spd") + _ab_wspd()) * (DYN.STAT_K if _dyn_on() else 1.0) * (kec.spd_mul() if kec != null else 1.0)
 
 
 func _cd_mul() -> float:
@@ -1359,26 +1681,26 @@ func _cd_mul() -> float:
 
 func _cd_mul_raw() -> float:
 	var k: float = 0.8 if _has_item("quickclaw") else 1.0
-	return pow(0.92, float(_lv("cd"))) * k * float(perks["cd"]) * (0.65 if _pw("frenzy") else 1.0) * _rk("cd") * (1.0 - _abn("cd")) / (DYN.STAT_K if _dyn_on() else 1.0)
+	return pow(0.92, float(_lv("cd"))) * k * float(perks["cd"]) * (0.65 if _pw("frenzy") else 1.0) * _rk("cd") * (1.0 - _abn("cd")) / (DYN.STAT_K if _dyn_on() else 1.0) * (kec.cd_mul() if kec != null else 1.0)
 
 
 func _reduction() -> float:
-	var vest: float = 0.2 if _has_item("assaultvest") else 0.0
-	return minf(0.8, minf(0.7, 0.06 * float(_lv("def"))) + vest + float(perks["def"]) + _buff_mul("def") + _rk_add("def") + _abn("taken") + (0.4 if _pw("aegis") else 0.0) + (DYN.TAKEN if _dyn_on() else 0.0))
+	var vest: float = (0.2 if _has_item("assaultvest") else 0.0) + (0.08 if _has_item("ti_rock") else 0.0)
+	return minf(0.8, minf(0.7, 0.06 * float(_lv("def"))) + vest + float(perks["def"]) + _buff_mul("def") + _rk_add("def") + _abn("taken") + (kec.def_add() if kec != null else 0.0) + (0.4 if _pw("aegis") else 0.0) + (DYN.TAKEN if _dyn_on() else 0.0))
 
 
 func _regen() -> float:
 	var left: float = player.max_hp * 0.015 if _has_item("leftovers") else 0.0
-	return 0.9 * float(_lv("rgn")) + float(perks["regen"]) + _buff_mul("regen") + left + player.max_hp * _abn("regen") + _rk_add("regen")
+	return 0.9 * float(_lv("rgn")) + float(perks["regen"]) + _buff_mul("regen") + left + (1.0 if _has_item("ti_grass") else 0.0) + player.max_hp * _abn("regen") + _rk_add("regen")
 
 
 func _magnet() -> float:
-	return BASE_MAGNET * pow(1.30, float(_lv("mag"))) * float(perks["magnet"]) * (1.0 + _abn("magnet"))
+	return BASE_MAGNET * pow(1.30, float(_lv("mag"))) * float(perks["magnet"]) * (1.0 + _abn("magnet")) * (kec.mag_mul() if kec != null else 1.0)
 
 
 func _xp_mul() -> float:
 	var k: float = 1.3 if _has_item("luckyegg") else 1.0
-	return pow(1.12, float(_lv("xp"))) * k * float(perks["xp"]) * _rk("xp") * (1.0 + _abn("xp"))
+	return pow(1.12, float(_lv("xp"))) * k * (1.5 if _has_mod("brainy") else 1.0) * float(perks["xp"]) * _rk("xp") * (1.0 + _abn("xp")) * (kec.xp_mul() if kec != null else 1.0)
 
 
 func _buff_text() -> String:
@@ -1396,7 +1718,7 @@ func _buff_text() -> String:
 # ---------------------------------------------------------------
 # Multiplicador de tamano: mejora permanente Calibre x carta Calibre x objeto Esfera Colosal.
 func _size_k() -> float:
-	return float(perks.get("size", 1.0)) * pow(1.12, float(_lv("size"))) * (1.3 if _has_item("bigorb") else 1.0)
+	return float(perks.get("size", 1.0)) * pow(1.12, float(_lv("size"))) * (1.3 if _has_item("bigorb") else 1.0) * (kec.range_mul() if kec != null else 1.0)
 
 
 const SIZE_AREA := ["aura", "melee", "mine", "meteor", "cone", "chain", "trail", "beam", "boomerang", "dash"]
@@ -1404,13 +1726,17 @@ const SIZE_AREA := ["aura", "melee", "mine", "meteor", "cone", "chain", "trail",
 
 func _f(m: Dictionary, key: String, def: float = 0.0) -> float:
 	var v: float = float(m.get(key, def))
+	if key == "burn" and v > 0.0 and m.has("burnp") and randf() >= float(m["burnp"]):
+		return 0.0   # quemadura con probabilidad (p. ej. Escaldar, como en los juegos)
 	if key == "knock" and MD.KNOCK_LV.has(String(m.get("id", ""))):
 		var kl: int = int(m.get("lvl", 1))
-		var kv: float = 0.0 if kl < 2 else float(MD.KNOCK_LV[String(m["id"])]) * (1.0 + 0.5 * float(kl - 2)) + v
+		var kv: float = float(MD.KNOCK_BASE.get(String(m["id"]), 0.0)) if kl < 2 else float(MD.KNOCK_LV[String(m["id"])]) * (1.0 + 0.5 * float(kl - 2)) + v
 		return kv * (1.5 if bool(m.get("evolved", false)) else 1.0)   # la evolucion empuja un 50% mas
 	if key == "radius":
-		if item == "widelens" or item2 == "widelens":
+		if item == "widelens" or item2 == "widelens" or item3 == "widelens":
 			v *= 1.2   # Lente Amplia
+		if String(m.get("type", "")) == "ground" and _has_item("ti_ground"):
+			v *= 1.2   # Arena Fina
 		# El tamano tambien agranda las areas: escudos y auras, golpes, minas, meteoros y conos (los orbes, la mitad)
 		var kd: String = String(m.get("kind", ""))
 		if SIZE_AREA.has(kd):
@@ -1419,7 +1745,72 @@ func _f(m: Dictionary, key: String, def: float = 0.0) -> float:
 			v *= 1.0 + (_size_k() - 1.0) * 0.5
 	elif key == "size" or key == "width":
 		v *= _size_k()   # proyectiles, orbes, bumeranes y rayos
+	elif key == "count":
+		var kc: String = String(m.get("kind", ""))
+		if kc == "projectile" or kc == "cone" or kc == "boomerang":
+			v = minf(v + float(_mult_extra()), 16.0)   # Multiplicador (con tope por rendimiento)
+	elif key == "pierce":
+		var kp: String = String(m.get("kind", ""))
+		if kp == "projectile" or kp == "cone" or kp == "nova":
+			v += float(_pierce_extra())   # Fuerza Perforante
 	return v
+
+
+# ---------------------------------------------------------------
+# Objetos mejorables nuevos (Secciones 42-49): rendimientos decrecientes, sin tope de nivel.
+# dim(lv, primero, tope) = tope * (1 - e^(-lv * primero / tope)): el primer nivel da ~"primero" y nunca pasa de "tope".
+# ---------------------------------------------------------------
+static func _dim(lv: int, first: float, cap: float) -> float:
+	if lv <= 0:
+		return 0.0
+	return cap * (1.0 - exp(-float(lv) * first / cap))
+
+
+func _mult_extra() -> int:
+	return int(_dim(_lv("mult"), 0.6, 5.0) + 0.5)
+
+
+func _pierce_extra() -> int:
+	return int(_dim(_lv("pierce"), 0.7, 6.0) + 0.5)
+
+
+func _amp_k() -> float:
+	return 1.0 + _dim(_lv("amp"), 0.12, 0.8)
+
+
+func _lens_add() -> float:
+	var lv: int = _lv("lens")
+	if lv <= 3:
+		return 0.03 * float(lv)
+	return 0.09 + _dim(lv - 3, 0.03, 0.21)   # tope total 30 %
+
+
+func _fang_pct() -> float:
+	var lv: int = _lv("fang")
+	if lv <= 3:
+		return 0.04 * float(lv)
+	return 0.12 + _dim(lv - 3, 0.04, 0.13)   # tope total 25 %
+
+
+func _edge_mul() -> float:
+	return 1.5 + _dim(_lv("edge"), 0.12, 1.5)   # critico base x1,5; tope x3
+
+
+func _dstrike_p() -> float:
+	return _dim(_lv("dstrike"), 0.06, 0.45)
+
+
+func _treasure_k() -> float:
+	return 1.0 + _dim(_lv("trs"), 0.08, 1.0)
+
+
+# Cura real (sin sobrecuracion). Devuelve lo recuperado.
+func _heal_real(amount: float) -> float:
+	if amount <= 0.0 or player.dead:
+		return 0.0
+	var before: float = player.hp
+	player.hp = minf(player.max_hp, player.hp + amount)
+	return player.hp - before
 
 
 # Pokemon que lleva el jugador ahora (en Modo Equipo cambia al cambiar de Pokemon).
@@ -1436,6 +1827,9 @@ func _item_ok_for(id: String) -> bool:
 		return [172, 25, 26].has(dx)
 	if id == "thickclub":
 		return [104, 105].has(dx)
+	for it in TD.ITEMS:
+		if String(it["id"]) == id and it.has("tp"):
+			return (player.types as Array).has(String(it["tp"]))   # objetos de tipo: solo para Pokemon de ese tipo
 	return true
 
 
@@ -1501,12 +1895,12 @@ func _evo_infos(m: Dictionary) -> Array:
 	if MD.EVO.has(id) and MD.EVO_MODS.has(kind):
 		var e: Array = MD.EVO[id]
 		var needs: String = String(e[1])
-		out.append({"name": String(e[0]), "needs": needs, "need_name": String(MD.NEED_NAME[needs]), "text": String(MD.EVO_MODS[kind]["t"]),
-			"ready": _lv(needs) > 0, "alt": false})
+		out.append({"name": String(e[0]), "needs": needs, "need_name": String(MD.NEED_NAME[needs]), "text": String(MD.EVO_MODS[kind]["t"]) + (L.t(" · %d%% de probabilidad de quemar") % roundi(float(MD.EVO_EXTRA[id]["burnp"]) * 100.0) if MD.EVO_EXTRA.has(id) and MD.EVO_EXTRA[id].has("burnp") else ""),
+			"ready": true, "alt": false})
 	if MD.EVO_ALT.has(id):
 		var a: Array = MD.EVO_ALT[id]
 		var n2: String = String(a[1])
-		out.append({"name": String(a[0]), "needs": n2, "need_name": String(MD.NEED_NAME[n2]), "text": String(a[2]), "ready": (_has_item(n2) if n2 == "bigorb" else _lv(n2) > 0), "alt": true})
+		out.append({"name": String(a[0]), "needs": n2, "need_name": String(MD.NEED_NAME[n2]), "text": String(a[2]), "ready": true, "alt": true})
 	return out
 
 
@@ -1514,10 +1908,13 @@ func _evolve(m: Dictionary, alt: bool = false) -> void:
 	var id: String = String(m["id"])
 	if bool(m["evolved"]):
 		return
+	if _ch_on():
+		ch_m["evolves"] = int(ch_m["evolves"]) + 1
 	if alt and MD.EVO_ALT.has(id):
 		var a: Array = MD.EVO_ALT[id]
 		_apply_mods(m, a[3])
 		m["name"] = String(a[0])
+		m["alt"] = true
 	else:
 		if not MD.EVO.has(id):
 			return
@@ -1529,6 +1926,7 @@ func _evolve(m: Dictionary, alt: bool = false) -> void:
 	m["evolved"] = true
 	PG.event("evolve", {"move": String(m["id"])})
 	_ring(player.position, 8.0, 120.0, Color("#ffd23f"), 0.8)
+	evfx.evolve_burst(m)
 	shake = 6.0
 
 
@@ -1566,6 +1964,9 @@ func _update_player(delta: float) -> void:
 		v = v.normalized()
 	var moving: bool = v.length() > 0.05
 	var spd: float = _spd() * _player_terrain(delta) * (0.55 if trap_slow_t > 0.0 else 1.0)
+	if root_t > 0.0:
+		root_t -= delta
+		spd = 0.0
 	if trap_freeze_t > 0.0:
 		spd = 0.0
 	elif trap_para_t > 0.0:
@@ -1589,18 +1990,29 @@ func _update_player(delta: float) -> void:
 		player.hp = minf(player.max_hp, player.hp + reg * delta)
 	player.attack_face = maxf(0.0, player.attack_face - delta)
 	# Los potenciadores caducan.
+	# Cada acumulacion tiene su propio temporizador: caducan de una en una, no todas a la vez.
 	for k in player.buffs:
 		var b: Dictionary = player.buffs[k]
-		if int(b["n"]) > 0:
-			b["t"] = float(b["t"]) - delta
-			if float(b["t"]) <= 0.0:
-				b["n"] = 0
+		var ts: Array = b["ts"]
+		if not ts.is_empty():
+			for i in range(ts.size() - 1, -1, -1):
+				ts[i] = float(ts[i]) - delta
+				if float(ts[i]) <= 0.0:
+					ts.remove_at(i)
+			b["n"] = ts.size()
 
 	target = _nearest_enemy(player.position, AIM_REACH)
 	if target != null:
 		player.aim = (target.position - player.position).angle()
 	elif moving:
 		player.aim = v.angle()
+	aim_manual = false
+	if bool(SV.d["settings"].get("manual_aim", false)) and not player.dead:
+		var ma: Vector2 = _manual_aim_vec()
+		if ma != Vector2.ZERO:
+			aim_manual = true
+			aim_ang = ma.angle()
+			player.aim = aim_ang
 
 	var face: float = player.aim
 	if moving and player.attack_face <= 0.0:
@@ -1660,6 +2072,7 @@ func _setup_partner() -> void:
 	partner_lvl = 0
 	var pads: Array = Input.get_connected_joypads()
 	partner_pad = int(pads[1]) if pads.size() >= 2 else -1
+	_bind_move_devices(int(pads[0]) if pads.size() >= 2 else -1)
 
 
 func _update_partner(delta: float) -> void:
@@ -1669,7 +2082,10 @@ func _update_partner(delta: float) -> void:
 	if arena != null or player.dead:
 		return
 	var pads: Array = Input.get_connected_joypads()
-	partner_pad = int(pads[1]) if pads.size() >= 2 else -1
+	var np: int = int(pads[1]) if pads.size() >= 2 else -1
+	if np != partner_pad:
+		_bind_move_devices(int(pads[0]) if pads.size() >= 2 else -1)
+	partner_pad = np
 	var v := Vector2.ZERO
 	if partner_pad >= 0:
 		v = Vector2(Input.get_joy_axis(partner_pad, JOY_AXIS_LEFT_X), Input.get_joy_axis(partner_pad, JOY_AXIS_LEFT_Y))
@@ -1730,6 +2146,28 @@ func _update_partner(delta: float) -> void:
 		pfx.spark(partner.position + Vector2(0.0, -18.0) + Vector2.from_angle(partner.aim) * partner.radius, _col(m), Vector2.from_angle(partner.aim), 3)
 
 
+# Movimientos con los que empieza un Pokemon: su movimiento inicial y, con la mejora Repertorio, un segundo al azar de sus tipos.
+func _start_moves(dex: int, types: Array) -> Array:
+	var first_move: String = SV.start_move_of(dex)
+	var out: Array = [_new_move(first_move, 1)]
+	if int(perks["moves"]) >= 2:
+		var cands: Array = []
+		for mid in MD.ORDER:
+			var md: Dictionary = MD.MOVES[mid]
+			var ty: String = String(md["type"])
+			if mid != first_move and String(md["kind"]) != "buff" and GPM.playable(String(mid)) and (ty == "normal" or types.has(ty)):
+				cands.append(mid)
+		if not cands.is_empty():
+			var okc: Array = []
+			for cid in cands:
+				if not banned.has(cid):
+					okc.append(cid)
+			if okc.is_empty():
+				okc = cands
+			out.append(_new_move(String(okc[randi() % okc.size()]), 1))
+	return out
+
+
 func _setup_team() -> void:
 	team = []
 	team_cur = 0
@@ -1739,7 +2177,12 @@ func _setup_team() -> void:
 		var b: float = float(st2["hp"]) + float(perks["hp"])
 		if _has_mod("frail"):
 			b = roundf(b * 0.5)
-		team.append({"dex": d, "name": L.t(String(st2["name"])), "base": b, "hp": b, "types": st2["types"], "spd": float(st2["spd"]), "atk": float(st2["atk"])})
+		# Cada Pokemon del equipo guarda SUS movimientos, hueco activo y vinculo (el primero usa los del jugador en vivo).
+		var tm: Array = []
+		if team.size() > 0:
+			tm = _start_moves(d, st2["types"])
+		team.append({"dex": d, "name": L.t(String(st2["name"])), "base": b, "hp": b, "types": st2["types"], "spd": float(st2["spd"]), "atk": float(st2["atk"]),
+			"moves": tm, "slot": 0, "bond_ids": [], "bond_first": ""})
 	team_bonus = 0.0
 
 
@@ -1763,6 +2206,10 @@ func _swap_team(i: int, auto: bool = false) -> void:
 		return
 	var cur: Dictionary = team[team_cur]
 	cur["hp"] = maxf(0.0, player.hp)
+	cur["moves"] = player.moves
+	cur["slot"] = player.slot
+	cur["bond_ids"] = bond_ids
+	cur["bond_first"] = bond_first
 	team_bonus = maxf(0.0, player.max_hp - float(cur["base"]))
 	var nx: Dictionary = team[i]
 	team_cur = i
@@ -1773,6 +2220,14 @@ func _swap_team(i: int, auto: bool = false) -> void:
 	player.max_hp = float(nx["base"]) + team_bonus
 	player.hp = minf(player.max_hp, float(nx["hp"]))
 	player.types = nx["types"]
+	# Los movimientos son los del Pokemon que entra, no los del que sale.
+	_clear_orbit_orbs()
+	player.moves = nx["moves"] if not (nx["moves"] as Array).is_empty() else _start_moves(dx, nx["types"])
+	player.slot = clampi(int(nx["slot"]), 0, maxi(0, _slot_list_of(player.moves, nx["bond_ids"]).size() - 1))
+	bond_ids = nx["bond_ids"]
+	bond_first = String(nx["bond_first"])
+	for mv in player.moves:
+		mv["t"] = minf(_f(mv, "t"), _f(mv, "cd") * 0.35)
 	player.spd = float(nx["spd"])
 	player.atk = float(nx["atk"])
 	base_spd = player.spd * float(perks["spd"])
@@ -1812,6 +2267,10 @@ func _hurt_player(amount: float, atk_type: String = "", pure: bool = false) -> v
 		return
 	if player.invuln > 0.0:
 		return
+	if kec.dodge():
+		player.invuln = 0.3
+		add_text(player.position + Vector2(0.0, -player.body_h - 4.0), L.t("¡Esquivado!"), Color("#7fe0ff"), 18)
+		return
 	var eff: String = ""
 	if atk_type != "":
 		var tk: float = _types_mult(atk_type, player.types, true)
@@ -1844,6 +2303,8 @@ func _hurt_player(amount: float, atk_type: String = "", pure: bool = false) -> v
 			add_text(player.position + Vector2(0.0, -player.body_h - 4.0), L.t("Escudo"), Color("#7fe0ff"), 18)
 			return
 	player.hp -= d
+	kec.on_hurt()
+	ch_last_hurt = run_time
 	if mode == "tower" and (tw_boss != null or tw_boss2 != null):
 		tw_fight_dmg += d
 	player.invuln = 0.45
@@ -1882,6 +2343,8 @@ func _hurt_player(amount: float, atk_type: String = "", pure: bool = false) -> v
 		player.invuln = 1.2
 		add_text(player.position + Vector2(0.0, -player.body_h - 20.0), L.t("¡Robustez!"), Color("#c9b27a"), 24)
 		_ring(player.position, 6.0, 70.0, Color("#c9b27a"), 0.5)
+	if player.hp <= 0.0 and kec.try_phoenix():
+		return
 	# Segunda oportunidad: un corazon se gasta y revives con la vida completa.
 	if player.hp <= 0.0 and revives > 0:
 		revives -= 1
@@ -1901,6 +2364,12 @@ func _hurt_player(amount: float, atk_type: String = "", pure: bool = false) -> v
 		if nxt >= 0:
 			_swap_team(nxt, true)
 			return
+	if player.hp <= 0.0 and arena != null and String(ainfo.get("phase", "")) != "fight":
+		# Fuera de la pelea (intro, caida, expulsion, victoria): nunca hay Game Over dentro de una grieta
+		if String(ainfo.get("phase", "")) != "down":
+			player.hp = 1.0
+			player.invuln = maxf(player.invuln, 2.0)
+		return
 	if player.hp <= 0.0 and arena != null and String(ainfo.get("phase", "")) == "fight":
 		# En la grieta no hay Game Over: el jugador cae (animacion de desmayo) y la grieta lo expulsa
 		player.hp = 0.0
@@ -1923,6 +2392,8 @@ func _hurt_player(amount: float, atk_type: String = "", pure: bool = false) -> v
 
 func _player_final_death() -> void:
 	_dyn_stop()
+	if mode == "chal" and not ch_over:
+		ch_m["dead"] = true
 	down = false
 	player.visible = true
 	player.hp = 0.0
@@ -2004,6 +2475,9 @@ func _hurt_partner(amount: float, atk_type: String, pure: bool) -> void:
 	add_text(partner.position + Vector2(0.0, -partner.body_h - 4.0), "-" + str(roundi(d)), Color("#ff3048") if eff == "super" else Color("#ff6b7a"), 20)
 	if partner_hp <= 0.0:
 		partner_hp = 0.0
+		if arena != null:
+			partner_hp = 1.0   # dentro de una grieta no hay Game Over
+			return
 		_player_final_death()
 
 
@@ -2029,7 +2503,30 @@ func _reach(m: Dictionary) -> float:
 	return 520.0
 
 
+# S62.1: opacidad de los efectos de los movimientos del jugador (Ajustes > Graficos). No afecta a avisos ni a enemigos.
+func _fx_alpha() -> float:
+	var a: Array = [1.0, 0.75, 0.5, 0.3]
+	return float(a[clampi(int(SV.d["settings"].get("fx_op", 1)), 0, 3)])
+
+
+func caves_active() -> bool:
+	return cave != null and cave.active()
+
+
+func ach_event(ev: String, data: Dictionary = {}) -> void:
+	ACH.event(ev, data)
+	while not ACH.pending.is_empty():
+		var id: String = String(ACH.pending.pop_front())
+		var df: Array = ACH.def_of(id)
+		if not df.is_empty():
+			_say(L.t("¡Medalla!") + " " + L.t(String(df[2])), 3.0)
+			Aud.sfx("shinyGet")
+		SV.save()
+
+
 func _cut_by_move(m: Dictionary, kind: String) -> void:
+	if arena == null and sec != null and ["melee", "aura", "nova", "dash", "buff"].has(kind):
+		sec.hit(player.position, minf(220.0, maxf(40.0, _f(m, "radius"))), String(m.get("type", "")))
 	if arena != null:
 		return
 	if ["melee", "aura", "nova", "dash", "buff"].has(kind):
@@ -2044,19 +2541,27 @@ func _cut_by_move(m: Dictionary, kind: String) -> void:
 
 
 func _tick_move(m: Dictionary, delta: float) -> void:
+	if m.has("parts"):
+		for pm in m["parts"]:
+			pm["lite"] = true       # las mitades solo golpean base: el efecto es el ataque unico de la fusion
+			_tick_move(pm, delta)
+		ffx.tick(m, delta)      # ...y ademas su ataque especial con animacion propia
+		return
 	var kind: String = String(m["kind"])
 	if kind == "orbit":
 		_orbit(m, delta)
+		if bool(m.get("evolved", false)) and not bool(m.get("lite", false)):
+			evab.cast(m)
 		return
 	m["t"] = _f(m, "t") - delta
 	if _f(m, "t") > 0.0:
 		return
 	# Los ataques con blanco esperan a tenerlo a tiro.
-	if TARGETED.has(kind):
+	if TARGETED.has(kind) and not aim_manual:   # con apuntado manual el Pokémon ataca hacia donde apuntas aunque no haya blanco
 		if target == null or player.position.distance_to(target.position) > _reach(m):
 			m["t"] = 0.05
 			return
-	var cd: float = maxf(0.05, _f(m, "cd") * _cd_mul())
+	var cd: float = maxf(0.05, _f(m, "cd") * _cd_mul() * (0.92 if (String(m["type"]) == "steel" and _has_item("ti_steel")) else 1.0))
 	m["t"] = cd
 	if _has_item("lifeorb") and kind != "trail":
 		player.hp = maxf(1.0, player.hp - maxf(1.0, player.max_hp * 0.01))
@@ -2067,6 +2572,12 @@ func _tick_move(m: Dictionary, delta: float) -> void:
 		player.play_attack(String(ANIM_FOR.get(kind, "Shoot")), maxf(0.12, cd))
 	Aud.shot(kind, String(m.get("type", "normal")))
 	_cut_by_move(m, kind)
+	if bool(m.get("evolved", false)) and not bool(m.get("lite", false)):
+		evfx.cast(m)
+		evab.cast(m)
+	if m.has("pat"):
+		_pat(String(m["pat"]), m)
+		return
 	match kind:
 		"projectile":
 			_fire_projectiles(m)
@@ -2100,6 +2611,7 @@ func _tick_move(m: Dictionary, delta: float) -> void:
 
 func _make_bullet(m: Dictionary, pos: Vector2, vel: Vector2, life: float, pierce: int) -> Bullet:
 	var b := Bullet.new()
+	b.modulate.a = _fx_alpha()
 	b.position = pos
 	b.ppos = pos
 	b.vel = vel
@@ -2123,6 +2635,8 @@ func _make_bullet(m: Dictionary, pos: Vector2, vel: Vector2, life: float, pierce
 	b.trail = String(vv.get("trail", ""))
 	fx.add_child(b)
 	bullets.append(b)
+	if bool(m.get("evolved", false)):
+		evfx.track(b, m)
 	return b
 
 
@@ -2170,6 +2684,596 @@ func _boomerang(m: Dictionary) -> void:
 		var b: Bullet = _make_bullet(m, player.position, d * _f(m, "speed"), out * 4.0 + 1.5, 999)
 		b.boom = out
 		b.bsp = _f(m, "speed") * 1.1
+
+
+# ---------------------------------------------------------------
+# Patrones de ataque propios de los movimientos nuevos (v5.0).
+# Cada movimiento nuevo tiene un "pat" distinto: ninguno repite el patron de otro.
+# ---------------------------------------------------------------
+var _sched: Array = []
+var _zones: Array = []
+var _waves: Array = []
+var _leeches: Array = []
+var root_t := 0.0
+
+
+func _later(t: float, f: Callable) -> void:
+	_sched.append({"t": t, "f": f})
+
+
+func _pk(m: Dictionary, k: float = 1.0) -> float:
+	return _f(m, "dmg") * _atk() * k
+
+
+func _vis(m: Dictionary) -> Dictionary:
+	return VFX.for_move(String(m["id"]), String(m["type"]))
+
+
+func _p_targets(n: int, reach: float) -> Array:
+	var arr: Array = []
+	for e in enemies:
+		if not e.dead and e.position.distance_to(player.position) <= reach:
+			arr.append(e)
+	arr.sort_custom(func(a, b): return a.position.distance_squared_to(player.position) < b.position.distance_squared_to(player.position))
+	return arr.slice(0, n)
+
+
+func _p_target_pos(reach: float, fallback: Vector2) -> Vector2:
+	var ts: Array = _p_targets(1, reach)
+	if ts.size() > 0:
+		return ts[0].position
+	return fallback
+
+
+func _p_hit_circle(c: Vector2, r: float, m: Dictionary, k: float = 1.0, fx_on: bool = true) -> int:
+	var n := 0
+	for e in enemies:
+		if e.dead:
+			continue
+		if e.position.distance_to(c) <= r + e.radius * 0.5:
+			_hit_move(e, _pk(m, k), e.position - c, m)
+			n += 1
+	if fx_on:
+		_ring(c, r * 0.3, r, _col(m), 0.28)
+		pfx.burst(c + Vector2(0.0, -6.0), _col(m), 8, 130.0)
+	return n
+
+
+func _p_hit_line(a: Vector2, ang: float, ln: float, w: float, m: Dictionary, k: float = 1.0) -> void:
+	var d: Vector2 = Vector2.from_angle(ang)
+	var b: Vector2 = a + d * ln
+	for e in enemies:
+		if e.dead:
+			continue
+		var cp: Vector2 = Geometry2D.get_closest_point_to_segment(e.position, a, b)
+		var rr: float = w * 0.5 + e.radius
+		if cp.distance_squared_to(e.position) <= rr * rr:
+			_hit_move(e, _pk(m, k), d, m)
+
+
+func _p_hit_arc(ang: float, rad: float, arc: float, m: Dictionary, k: float = 1.0) -> void:
+	pfx.slash(player.position + Vector2(0.0, -LIFT * 0.5), ang, rad, arc, _vis(m))
+	for e in enemies:
+		if e.dead:
+			continue
+		if e.position.distance_to(player.position) > rad + e.radius * 0.5:
+			continue
+		if not _in_arc(player.position, e.position, ang, minf(arc, TAU) * 0.5):
+			continue
+		_hit_move(e, _pk(m, k), e.position - player.position, m)
+
+
+func _p_beam(m: Dictionary, ang: float, ln: float, w: float, k: float = 1.0) -> void:
+	var d: Vector2 = Vector2.from_angle(ang)
+	pfx.beam(player.position + Vector2(0.0, -LIFT), ang, ln, w, _vis(m))
+	shake = maxf(shake, 1.5)
+	for e in enemies:
+		if e.dead:
+			continue
+		var rel: Vector2 = e.position - player.position
+		var along: float = rel.dot(d)
+		if along < -e.radius or along > ln + e.radius:
+			continue
+		if absf(-rel.x * d.y + rel.y * d.x) <= w * 0.5 + e.radius:
+			_hit_move(e, _pk(m, k), d, m)
+
+
+func _p_warn(a: Vector2, ang: float, ln: float, m: Dictionary) -> void:
+	pfx.beam(a + Vector2(0.0, -LIFT), ang, ln, 4.0, {"pal": String(_vis(m)["pal"]), "beam": "streak"})
+
+
+func _p_bullet(m: Dictionary, ang: float, speed: float, life: float, pierce: int, size: float, k: float = 1.0, pos: Vector2 = Vector2.INF) -> Bullet:
+	var p0: Vector2 = player.position if pos == Vector2.INF else pos
+	var d: Vector2 = Vector2.from_angle(ang)
+	var b: Bullet = _make_bullet(m, p0 + d * 3.0, d * speed, life, pierce)
+	b.dmg = _pk(m, k)
+	b.r = size
+	b.bm = m
+	return b
+
+
+func _p_radial(m: Dictionary, c: Vector2, n: int, speed: float, life: float, k: float) -> void:
+	var a0: float = randf() * TAU
+	for i in range(n):
+		_p_bullet(m, a0 + float(i) / float(n) * TAU, speed, life, 1, 5.0, k, c)
+
+
+func _p_zone(c: Vector2, r: float, life: float, tick: float, m: Dictionary, k: float, pull: float = 0.0) -> void:
+	if _zones.size() > 26:
+		_zones.remove_at(0)
+	_zones.append({"c": c, "r": r, "life": life, "t": 0.0, "tick": tick, "tt": 0.05, "m": m, "k": k, "pull": pull, "fx": 0.0})
+	_ring(c, r * 0.4, r, _col(m), 0.3)
+
+
+func _p_wave(m: Dictionary, r0: float, r1: float, dur: float, th: float, k: float, follow: bool = true) -> void:
+	_waves.append({"c": player.position, "follow": follow, "r0": r0, "r1": r1, "dur": dur, "t": 0.0, "th": th, "k": k, "m": m, "hit": {}})
+
+
+func _p_tele(c: Vector2, r: float, m: Dictionary, dur: float) -> void:
+	_ring(c, r, r * 0.35, _col(m), dur, 2.0)
+
+
+func _p_dash_path(m: Dictionary, pts: Array, w: float, k: float, drag: float = 0.0) -> void:
+	var vis: Dictionary = _vis(m)
+	var seen := {}
+	for s in range(pts.size() - 1):
+		var a: Vector2 = pts[s]
+		var b: Vector2 = pts[s + 1]
+		var ang: float = (b - a).angle()
+		for q in range(0, int(a.distance_to(b)) + 1, 22):
+			pfx.sp(String(vis.get("proj", "streak")), String(vis["pal"]), a + Vector2.from_angle(ang) * float(q) + Vector2(0.0, -LIFT * 0.6), {"life": 0.24, "angle": ang})
+		for e in enemies:
+			if e.dead or seen.has(e):
+				continue
+			var cp: Vector2 = Geometry2D.get_closest_point_to_segment(e.position, a, b)
+			var rr: float = w * 0.5 + e.radius
+			if cp.distance_squared_to(e.position) <= rr * rr:
+				seen[e] = true
+				_hit_move(e, _pk(m, k), Vector2.from_angle(ang), m)
+				if drag > 0.0 and not e.boss:
+					e.position += Vector2.from_angle(ang) * drag
+	player.position = pts[pts.size() - 1]
+	player.invuln = maxf(player.invuln, _f(m, "iframes", 0.3))
+	pfx.slash(player.position + Vector2(0.0, -LIFT * 0.5), (pts[pts.size() - 1] - pts[pts.size() - 2]).angle(), 34.0, 2.2, vis)
+	shake = maxf(shake, 3.0)
+
+
+func _upd_pats(delta: float) -> void:
+	for i in range(_sched.size() - 1, -1, -1):
+		_sched[i]["t"] = float(_sched[i]["t"]) - delta
+		if float(_sched[i]["t"]) <= 0.0:
+			var f: Callable = _sched[i]["f"]
+			_sched.remove_at(i)
+			f.call()
+	for i in range(_zones.size() - 1, -1, -1):
+		var z: Dictionary = _zones[i]
+		z["t"] = float(z["t"]) + delta
+		if float(z["t"]) >= float(z["life"]):
+			_zones.remove_at(i)
+			continue
+		var zm: Dictionary = z["m"]
+		var c: Vector2 = z["c"]
+		var zr: float = float(z["r"])
+		if float(z["pull"]) > 0.0:
+			for e in enemies:
+				if e.dead or e.boss:
+					continue
+				var dd: float = e.position.distance_to(c)
+				if dd < zr * 1.5 and dd > 6.0:
+					e.position += (c - e.position).normalized() * float(z["pull"]) * delta
+		z["tt"] = float(z["tt"]) - delta
+		if float(z["tt"]) <= 0.0:
+			z["tt"] = float(z["tick"])
+			_p_hit_circle(c, zr, zm, float(z["k"]), false)
+		z["fx"] = float(z["fx"]) - delta
+		if float(z["fx"]) <= 0.0:
+			z["fx"] = 0.35
+			_ring(c, zr * 0.75, zr, _col(zm), 0.35, 2.0)
+			var v: Dictionary = _vis(zm)
+			pfx.sp(String(v["proj"]), String(v["pal"]), c + Vector2(randf_range(-zr, zr) * 0.6, randf_range(-zr, zr) * 0.3), {"v": Vector2(0.0, -34.0), "life": 0.5})
+	for i in range(_waves.size() - 1, -1, -1):
+		var w: Dictionary = _waves[i]
+		w["t"] = float(w["t"]) + delta
+		var kk: float = float(w["t"]) / float(w["dur"])
+		if kk >= 1.0:
+			_waves.remove_at(i)
+			continue
+		if bool(w["follow"]):
+			w["c"] = player.position
+		var rad: float = lerpf(float(w["r0"]), float(w["r1"]), kk)
+		var wc: Vector2 = w["c"]
+		var wm: Dictionary = w["m"]
+		_ring(wc, rad * 0.94, rad, _col(wm), 0.12, 3.0)
+		for e in enemies:
+			if e.dead or (w["hit"] as Dictionary).has(e.get_instance_id()):
+				continue
+			if absf(e.position.distance_to(wc) - rad) <= float(w["th"]) + e.radius * 0.5:
+				(w["hit"] as Dictionary)[e.get_instance_id()] = true
+				_hit_move(e, _pk(wm, float(w["k"])), e.position - wc, wm)
+	for i in range(_leeches.size() - 1, -1, -1):
+		var lc: Dictionary = _leeches[i]
+		var le = lc["e"]
+		lc["t"] = float(lc["t"]) - delta
+		if not is_instance_valid(le) or le.dead or float(lc["t"]) <= 0.0:
+			_leeches.remove_at(i)
+			continue
+		lc["tk"] = float(lc["tk"]) - delta
+		if float(lc["tk"]) <= 0.0:
+			lc["tk"] = 0.5
+			var lm: Dictionary = lc["m"]
+			_hit_move(le, _pk(lm, 0.5), le.position - player.position, lm)
+			if not player.dead:
+				var hl: float = _heal_real(maxf(1.0, player.max_hp * 0.012))
+				if hl > 0.0:
+					add_text(player.position + Vector2(randf_range(-10.0, 10.0), -player.body_h - 8.0), "+%d" % maxi(1, roundi(hl)), Color("#7dffb0"), 14)
+			var v2: Dictionary = _vis(lm)
+			pfx.sp("seed", String(v2["pal"]), le.position + Vector2(0.0, -le.body_h * 0.6), {"v": Vector2(0.0, -30.0), "life": 0.4})
+			pfx.beam(le.position + Vector2(0.0, -LIFT), (player.position - le.position).angle(), le.position.distance_to(player.position), 3.0, {"pal": String(v2["pal"]), "beam": ""})
+
+
+func _pat(p: String, m: Dictionary) -> void:
+	var aim: float = player.aim
+	var d: Vector2 = Vector2.from_angle(aim)
+	var pos: Vector2 = player.position
+	var col: Color = _col(m)
+	var vis: Dictionary = _vis(m)
+	var rad: float = _f(m, "radius")
+	var arc: float = _f(m, "arc", 1.6)
+	match p:
+		"splitorb":   # Bola Voltio: orbe lento que al chocar se parte en chispas
+			var b: Bullet = _p_bullet(m, aim, _f(m, "speed"), _f(m, "life", 1.6), 0, _f(m, "size", 11.0))
+			b.burst = 5
+		"ringmines":   # Electrotela: anillo de 6 minas alrededor
+			for i in range(6):
+				var a: float = aim + float(i) / 6.0 * TAU
+				var f: Field = _new_field("mine", m, pos + Vector2(cos(a) * 72.0, sin(a) * 58.0))
+				f.arm = 0.35
+				f.life = _f(m, "dur", 7.0)
+				f.r = rad
+			_trim_fields("mine", 14)
+			_ring(pos, 10.0, 80.0, col, 0.35)
+		"zigzag":   # Pico Trueno: embestida en zigzag
+			var p1: Vector2 = pos + Vector2.from_angle(aim + 0.7) * rad * 0.5
+			var p2: Vector2 = p1 + Vector2.from_angle(aim - 0.7) * rad * 0.5
+			_p_dash_path(m, [pos, p1, p2], _f(m, "width", 30.0), 1.0)
+		"charged":   # Canon Zap: avisa y dispara tras cargar
+			for i in range(3):
+				_later(0.05 + 0.22 * float(i), func(): _p_warn(player.position, aim, rad, m))
+			_later(0.75, func(): _p_beam(m, aim, rad, _f(m, "width", 36.0), 1.0))
+		"pulsewave":   # Onda Trueno: tres ondas expansivas seguidas
+			for i in range(3):
+				_later(0.22 * float(i), func(): _p_wave(m, 8.0, rad, 0.42, 14.0, 1.0))
+		"volley":   # Dracoflechas: dardos secuenciales a blancos distintos
+			var n: int = maxi(2, int(_f(m, "count", 4.0)))
+			for i in range(n):
+				_later(0.07 * float(i), func():
+					if player.dead:
+						return
+					var ts: Array = _p_targets(n, 340.0)
+					var a: float = player.aim
+					if ts.size() > 0:
+						a = (ts[i % ts.size()].position - player.position).angle()
+					var bb: Bullet = _p_bullet(m, a + randf_range(-0.04, 0.04), _f(m, "speed"), _f(m, "life", 0.7), int(_f(m, "pierce")), _f(m, "size", 5.0))
+					bb.homing = 3.0)
+		"sweep":   # Dragoaliento: chorro continuo que barre de lado a lado
+			var s: float = 1.0 if randf() < 0.5 else -1.0
+			for i in range(8):
+				var a2: float = aim + s * (float(i) / 7.0 - 0.5) * arc * 1.6
+				_later(0.06 * float(i), func(): _p_bullet(m, a2, _f(m, "speed"), _f(m, "life", 0.5), int(_f(m, "pierce")), _f(m, "size", 7.0), 0.8, player.position))
+		"spiral":   # Dracoenergia: espiral que sale en 0.7 s
+			for i in range(14):
+				var a3: float = aim + float(i) * 0.9
+				_later(0.05 * float(i), func(): _p_bullet(m, a3, _f(m, "speed"), _f(m, "life", 1.0), int(_f(m, "pierce")), 6.0, 0.8, player.position))
+			_ring(pos, 6.0, 50.0, col, 0.7)
+		"rampage":   # Enfado: tres golpes furiosos en puntos al azar a tu alrededor
+			if m.has("recoil") and not player.dead:
+				player.hp = maxf(1.0, player.hp - player.max_hp * float(m["recoil"]))
+			for i in range(3):
+				_later(0.28 * float(i), func():
+					var c: Vector2 = player.position + Vector2.from_angle(randf() * TAU) * randf_range(10.0, rad * 0.65)
+					_p_hit_circle(c, rad * 0.5, m, 1.0)
+					shake = maxf(shake, 2.5))
+		"trio":   # Canon Floral: tres rayos en abanico tras cargar
+			var angs: Array = [aim, aim - 0.5, aim + 0.5]
+			for an in angs:
+				_later(0.05, func(): _p_warn(player.position, an, rad, m))
+				_later(0.3, func(): _p_warn(player.position, an, rad, m))
+				_later(0.6, func(): _p_beam(m, an, rad, _f(m, "width", 38.0) * 0.7, 0.55))
+		"flurry":   # Carantona: tres zarpazos seguidos en zig
+			var seq: Array = [aim - 0.55, aim + 0.55, aim]
+			for i in range(3):
+				_later(0.11 * float(i), func(): _p_hit_arc(seq[i], rad, 1.4, m, 0.55))
+		"slam":   # Pata Hacha: patada descendente con aviso, area delante
+			var c2: Vector2 = pos + d * 58.0
+			_p_tele(c2, 52.0, m, 0.3)
+			_later(0.3, func():
+				_p_hit_circle(c2, 52.0, m, 1.0)
+				shake = maxf(shake, 4.0))
+		"leap":   # Patada Salto Alta: saltas lejos y aterrizas con onda
+			var dest: Vector2 = pos + d * rad
+			for q in range(0, int(rad) + 1, 26):
+				pfx.sp("kick", String(vis["pal"]), pos + d * float(q) + Vector2(0.0, -LIFT - 14.0 * sin(PI * float(q) / maxf(rad, 1.0))), {"life": 0.3, "angle": aim})
+			player.position = dest
+			player.invuln = maxf(player.invuln, 0.6)
+			_later(0.25, func():
+				_p_hit_circle(dest, 62.0, m, 1.0)
+				shake = maxf(shake, 5.0))
+		"doublesmash":   # Machada: dos martillazos, el segundo mas fuerte
+			_p_hit_arc(aim, rad, arc, m, 0.5)
+			_later(0.3, func():
+				_p_hit_arc(player.aim, rad + 10.0, arc, m, 1.0)
+				shake = maxf(shake, 5.0))
+		"thrust":   # Espada Santa: estocada larguisima y fina
+			_p_hit_line(pos, aim, rad, 22.0, m, 1.0)
+			pfx.beam(pos + Vector2(0.0, -LIFT), aim, rad, 22.0, {"pal": String(vis["pal"]), "beam": "blade"})
+			shake = maxf(shake, 2.0)
+		"flamepath":   # Patada Ignea: embestida que deja un camino de brasas
+			var ln: float = rad
+			_p_dash_path(m, [pos, pos + d * ln], _f(m, "width", 36.0), 1.0)
+			for q in range(40, int(ln) + 1, 38):
+				_p_zone(pos + d * float(q), 28.0, 2.2, 0.5, m, 0.3)
+		"volcano":   # Estallido: erupcion con aviso, sobre el enemigo mas cercano
+			var c3: Vector2 = _p_target_pos(300.0, pos + d * 110.0)
+			var r3: float = rad
+			_p_tele(c3, r3, m, 0.55)
+			_later(0.55, func():
+				_p_hit_circle(c3, r3, m, 1.0)
+				_p_radial(m, c3, 6, 220.0, 0.5, 0.4)
+				_p_zone(c3, r3 * 0.8, 2.0, 0.5, m, 0.25)
+				shake = maxf(shake, 5.0))
+		"lashspin":   # Latigazo Igneo: el latigo gira 360 grados
+			for i in range(4):
+				_later(0.09 * float(i), func(): _p_hit_arc(aim + float(i) * 1.6, rad, 1.6, m, 0.5))
+		"pools":   # Lluvia Ignea: 3 charcos de magma a tu alrededor
+			var a0: float = randf() * TAU
+			for i in range(3):
+				var c4: Vector2 = pos + Vector2.from_angle(a0 + float(i) * TAU / 3.0) * randf_range(rad * 0.45, rad * 0.95)
+				_p_zone(c4, 36.0, 3.4, 0.4, m, 1.0)
+		"curve":   # Fuego Mistico: 3 llamas que se curvan hacia el centro
+			for s2 in [-1.0, 0.0, 1.0]:
+				var bc: Bullet = _p_bullet(m, aim + s2 * 0.9, _f(m, "speed"), _f(m, "life", 1.5), int(_f(m, "pierce")), _f(m, "size", 8.0))
+				bc.turn = -s2 * 1.7
+		"loops":   # Aire Afilado: cuchillas que dibujan bucles
+			for s3 in [-1.0, 1.0]:
+				var bl: Bullet = _p_bullet(m, aim, _f(m, "speed"), 2.1, 9999, _f(m, "size", 7.0))
+				bl.turn = s3 * 3.0
+		"lanes":   # Tajo Aereo: 5 carriles paralelos
+			var o: Vector2 = d.orthogonal()
+			for i in range(5):
+				_p_bullet(m, aim, _f(m, "speed"), _f(m, "life", 0.55), int(_f(m, "pierce")), _f(m, "size", 6.0), 1.0, pos + o * (float(i) - 2.0) * 20.0)
+		"regen":   # Batido: curacion gradual en 5 pulsos
+			for i in range(5):
+				_later(0.9 * float(i), func():
+					if player.dead:
+						return
+					var hl: float = _heal_real(player.max_hp * _f(m, "amount", 0.18) / 5.0)
+					if hl > 0.0:
+						add_text(player.position + Vector2(randf_range(-10.0, 10.0), -player.body_h - 8.0), "+%d" % maxi(1, roundi(hl)), Color("#7dffb0"), 14)
+					pfx.sp("plus", String(vis["pal"]), player.position + Vector2(randf_range(-14.0, 14.0), -player.body_h * 0.6), {"v": Vector2(0.0, -50.0), "life": 0.6}))
+		"bonezone":   # Hueso Sombrio: huesos que caen y giran sobre el suelo
+			var tg: Array = _p_targets(2, 320.0)
+			var spots: Array = []
+			for q in tg:
+				spots.append(q.position)
+			while spots.size() < 2:
+				spots.append(pos + d * (90.0 + 70.0 * float(spots.size())))
+			for sp in spots:
+				_p_tele(sp, 36.0, m, 0.4)
+				_later(0.4, func():
+					_p_hit_circle(sp, 36.0, m, 0.6)
+					_p_zone(sp, 36.0, 2.6, 0.35, m, 0.4))
+		"leech":   # Drenadoras: semilla que se agarra a un enemigo y te cura
+			var cap: int = maxi(1, int(_f(m, "count", 1.0)))
+			if _leeches.size() < cap:
+				for q in _p_targets(4, 280.0):
+					var used := false
+					for lc in _leeches:
+						if lc["e"] == q:
+							used = true
+					if not used:
+						_leeches.append({"e": q, "t": _f(m, "dur", 6.0), "tk": 0.1, "m": m})
+						pfx.sp("seed", String(vis["pal"]), q.position + Vector2(0.0, -q.body_h * 0.6), {"life": 0.5})
+						break
+		"sweepbeam":   # Rayo Solar: carga y barre un arco con el rayo
+			_ring(pos, 40.0, 8.0, col, 0.5, 3.0)
+			var s4: float = 1.0 if randf() < 0.5 else -1.0
+			for i in range(7):
+				var a4: float = aim - s4 * 0.75 + s4 * 1.5 * float(i) / 6.0
+				_later(0.5 + 0.07 * float(i), func(): _p_beam(m, a4, rad, _f(m, "width", 40.0) * 0.55, 0.45))
+		"lobpuddle":   # Bomba Acida: bombas que dejan un charco venenoso
+			var ts: Array = _p_targets(maxi(1, int(_f(m, "count", 3.0))), 300.0)
+			var spots2: Array = []
+			for q in ts:
+				spots2.append(q.position)
+			if spots2.is_empty():
+				spots2.append(pos + d * 110.0)
+			for i in range(spots2.size()):
+				var sp2: Vector2 = spots2[i]
+				_p_tele(sp2, rad, m, 0.55 + 0.1 * float(i))
+				_later(0.55 + 0.1 * float(i), func():
+					_p_hit_circle(sp2, rad, m, 1.0)
+					_p_zone(sp2, rad * 0.9, 3.0, 0.5, m, 0.25))
+		"xcut":   # Veneno X: dos cortes en cruz delante de ti
+			var cc: Vector2 = pos + d * 70.0
+			for sg in [0.78, -0.78]:
+				var dd: Vector2 = Vector2.from_angle(aim + sg)
+				_p_hit_line(cc - dd * 75.0, aim + sg, 150.0, 18.0, m, 1.0)
+				pfx.beam(cc - dd * 75.0 + Vector2(0.0, -LIFT), aim + sg, 150.0, 10.0, {"pal": String(vis["pal"]), "beam": "blade"})
+			pfx.sp("xmark", String(vis["pal"]), cc + Vector2(0.0, -LIFT), {"life": 0.3, "scale": 2.4, "fade": true})
+		"jabs":   # Garra Venenosa: tres pinchazos rapidisimos
+			for i in range(3):
+				_later(0.1 * float(i), func():
+					_p_hit_line(player.position, player.aim, rad, 16.0, m, 0.5)
+					pfx.beam(player.position + Vector2(0.0, -LIFT), player.aim, rad, 8.0, {"pal": String(vis["pal"]), "beam": "dart"}))
+		"wall":   # Onda Toxica: muro de lodo que avanza
+			var o2: Vector2 = d.orthogonal()
+			for i in range(7):
+				_p_bullet(m, aim, _f(m, "speed", 190.0), 1.4, 3, 9.0, 0.8, pos + o2 * (float(i) - 3.0) * 17.0)
+		"drilldash":   # Taladradora: embestida que arrastra enemigos y taladra 3 veces
+			var ln2: float = rad
+			_p_dash_path(m, [pos, pos + d * ln2], _f(m, "width", 32.0), 0.6, 55.0)
+			for i in range(2):
+				_later(0.1 * float(i + 1), func(): _p_hit_line(pos, aim, ln2, _f(m, "width", 32.0), m, 0.6))
+		"sandmound":   # Arenas Ardientes: montones de arena ardiente sobre los enemigos
+			var ts3: Array = _p_targets(3, 300.0)
+			if ts3.is_empty():
+				_p_zone(pos + d * 90.0, rad, 3.4, 0.4, m, 0.6)
+			for q in ts3:
+				_p_zone(q.position, rad, 3.4, 0.4, m, 0.6)
+		"magwave":   # Magnitud: onda de potencia variable (4 a 10)
+			var mg: int = [4, 5, 5, 6, 6, 7, 7, 8, 9, 10][randi() % 10]
+			var kk: float = lerpf(0.5, 2.6, float(mg - 4) / 6.0)
+			_p_wave(m, 10.0, rad * (0.6 + 0.1 * float(mg - 4)), 0.38, 18.0, kk)
+			shake = maxf(shake, 1.0 + float(mg) * 0.5)
+			add_text(pos + Vector2(0.0, -player.body_h - 22.0), "%d" % mg, col, 16)
+		"track":   # Rayo Aurora: 5 pulsos que siguen al enemigo
+			for i in range(5):
+				_later(0.13 * float(i), func():
+					var a5: float = player.aim
+					var tt: Array = _p_targets(1, rad)
+					if tt.size() > 0:
+						a5 = (tt[0].position - player.position).angle()
+					_p_beam(m, a5, rad, _f(m, "width", 30.0) * 0.6, 0.35))
+		"shatter":   # Liofilizacion: cristal que se clava y estalla en esquirlas
+			var tg2: Array = _p_targets(1, 320.0)
+			if tg2.is_empty():
+				return
+			var en = tg2[0]
+			var last: Vector2 = en.position
+			pfx.sp("flake", String(vis["pal"]), en.position + Vector2(0.0, -en.body_h * 0.6), {"life": 0.9, "scale": 1.6, "spin": 4.0, "fade": false})
+			_later(0.9, func():
+				var c5: Vector2 = en.position if (is_instance_valid(en) and not en.dead) else last
+				_p_hit_circle(c5, 44.0, m, 0.6)
+				_p_radial(m, c5, 6, 270.0, 0.45, 0.5))
+		"ricochet":   # Bola Hielo: rebota de enemigo en enemigo
+			var br: Bullet = _p_bullet(m, aim, _f(m, "speed"), _f(m, "life", 1.6), 0, _f(m, "size", 9.0))
+			br.ric = 4
+		"collapse":   # Llama Gelida: la onda se cierra hacia ti
+			_p_wave(m, rad, 12.0, 0.5, 20.0, 1.0)
+		"slamring":   # Martillo Hielo: golpe y onda helada
+			_p_hit_arc(aim, rad, arc, m, 0.9)
+			_later(0.1, func(): _p_wave(m, 14.0, rad * 1.7, 0.3, 16.0, 0.5))
+		"converge":   # Lanza Carambano: carambanos que convergen sobre el enemigo
+			var c6: Vector2 = _p_target_pos(300.0, pos + d * 130.0)
+			var a6: float = randf() * TAU
+			for i in range(5):
+				var an2: float = a6 + float(i) / 5.0 * TAU
+				var st: Vector2 = c6 + Vector2.from_angle(an2) * 90.0
+				_later(0.06 * float(i), func(): _p_bullet(m, an2 + PI, 330.0, 0.32, int(_f(m, "pierce")), _f(m, "size", 6.0), 1.0, st))
+		"bouncepath":   # Bomba Huevo: huevo que bota tres veces y crece
+			var dist: Array = [60.0, 115.0, 175.0]
+			var rs: Array = [0.6, 0.8, 1.0]
+			var ks: Array = [0.7, 0.9, 1.2]
+			for i in range(3):
+				var c7: Vector2 = pos + d * float(dist[i])
+				var r7: float = rad * float(rs[i])
+				_later(0.2 + 0.25 * float(i), func():
+					_p_hit_circle(c7, r7, m, float(ks[i]))
+					pfx.sp("bomb", String(vis["pal"]), c7 + Vector2(0.0, -10.0), {"v": Vector2(0.0, -80.0), "life": 0.3, "grav": 400.0}))
+				_p_tele(c7, r7, m, 0.2 + 0.25 * float(i))
+		"scatter":   # Dia de Pago: lluvia de monedas desordenada
+			for i in range(8):
+				_p_bullet(m, aim + randf_range(-0.65, 0.65), _f(m, "speed") * randf_range(0.6, 1.1), 0.5, 0, 5.0, 0.55)
+		"claws":   # Cuchillada: tres tajos en abanico
+			var offs: Array = [-0.35, 0.0, 0.35]
+			for i in range(3):
+				_later(0.06 * float(i), func():
+					var ca: float = player.aim + float(offs[i])
+					_p_hit_line(player.position, ca, rad, 12.0, m, 0.7)
+					pfx.beam(player.position + Vector2(0.0, -LIFT), ca, rad, 8.0, {"pal": String(vis["pal"]), "beam": "blade"}))
+		"blink":   # Golpe Bajo: te teletransportas detras del enemigo y golpeas
+			var tt2: Array = _p_targets(1, _reach(m))
+			if tt2.is_empty():
+				_p_dash_path(m, [pos, pos + d * 80.0], 40.0, 1.0)
+			else:
+				var en2 = tt2[0]
+				var behind: Vector2 = en2.position + (en2.position - pos).normalized() * 36.0
+				for q in range(0, 5):
+					pfx.sp("fist", String(vis["pal"]), pos.lerp(behind, float(q) / 4.0) + Vector2(0.0, -LIFT), {"life": 0.25, "alpha": 0.6})
+				player.position = behind
+				player.invuln = maxf(player.invuln, 0.5)
+				_p_hit_circle(behind, 56.0, m, 1.0)
+				shake = maxf(shake, 3.0)
+		"mistcloud":   # Bola Neblina: nube que ralentiza y confunde
+			var c8: Vector2 = _p_target_pos(300.0, pos + d * 100.0)
+			_p_tele(c8, 56.0, m, 0.4)
+			_later(0.4, func(): _p_zone(c8, 56.0, 3.2, 0.5, m, 0.5))
+		"lockon":   # Psicochoque: fija hasta 3 blancos y no falla
+			for q in _p_targets(3, _reach(m)):
+				var en3 = q
+				pfx.sp("twinring", String(vis["pal"]), en3.position + Vector2(0.0, -en3.body_h * 0.6), {"life": 0.4, "scale": 1.8, "spin": 6.0, "fade": false})
+				_later(0.4, func():
+					if is_instance_valid(en3) and not en3.dead:
+						_hit_move(en3, _pk(m, 1.0), en3.position - player.position, m)
+						_ring(en3.position, 4.0, 34.0, col, 0.25))
+		"crossbeam":   # Psicoataque: 4 rayos en cruz alrededor
+			var base: float = aim
+			for i in range(4):
+				var a7: float = base + float(i) * PI / 2.0
+				_later(0.05, func(): _p_warn(player.position, a7, rad * 0.85, m))
+				_later(0.45, func(): _p_beam(m, a7, rad * 0.85, _f(m, "width", 34.0) * 0.8, 0.6))
+		"stealthmine":   # Trampa Rocosa: minas en tu rastro que sueltan esquirlas
+			var n2: int = maxi(1, int(_f(m, "count", 3.0)))
+			for i in range(n2):
+				var f2: Field = _new_field("mine", m, pos - d * (10.0 + 34.0 * float(i)))
+				f2.arm = 0.35
+				f2.life = _f(m, "dur", 9.0)
+				f2.r = rad
+				f2.shards = 5
+			_trim_fields("mine", 10)
+		"cleave":   # Hachazo Petreo: tajo y esquirlas hacia delante
+			_p_hit_arc(aim, rad, arc, m, 1.0)
+			_later(0.12, func():
+				for s5 in [-0.25, 0.0, 0.25]:
+					_p_bullet(m, aim + s5, 380.0, 0.5, 2, 5.0, 0.45, player.position + d * rad * 0.6))
+		"pillarring":   # Lanzas Petreas: columnas en espiral alrededor del enemigo
+			var c9: Vector2 = _p_target_pos(300.0, pos + d * 120.0)
+			var a8: float = randf() * TAU
+			for i in range(6):
+				var pp: Vector2 = c9 + Vector2.from_angle(a8 + float(i) / 6.0 * TAU) * 54.0
+				_later(0.09 * float(i), func():
+					_p_tele(pp, 28.0, m, 0.25)
+					pfx.sp("pillar", String(vis["pal"]), pp + Vector2(0.0, -6.0), {"v": Vector2(0.0, -20.0), "life": 0.4, "scale": 1.4}))
+				_later(0.09 * float(i) + 0.25, func(): _p_hit_circle(pp, 30.0, m, 0.6))
+			_later(0.9, func(): _p_hit_circle(c9, 40.0, m, 1.0))
+		"chainpull":   # Anclaje: cadena que arrastra al enemigo hacia ti
+			var tt3: Array = _p_targets(1, _reach(m))
+			if tt3.is_empty():
+				return
+			var en4 = tt3[0]
+			pfx.beam(pos + Vector2(0.0, -LIFT), (en4.position - pos).angle(), pos.distance_to(en4.position), 6.0, {"pal": String(vis["pal"]), "beam": "anchor"})
+			if not en4.boss:
+				for s6 in range(1, 6):
+					_later(0.05 * float(s6), func():
+						if is_instance_valid(en4) and not en4.dead:
+							en4.position = en4.position.lerp(player.position + (en4.position - player.position).normalized() * 30.0, 0.4))
+			_later(0.3, func():
+				if is_instance_valid(en4) and not en4.dead:
+					_hit_move(en4, _pk(m, 1.2), en4.position - player.position, m)
+					_p_hit_circle(en4.position, 44.0, m, 0.5)
+					shake = maxf(shake, 4.0))
+		"rooted":   # Hiperrayo: rayo colosal y quedas inmovil un momento
+			_p_beam(m, aim, rad, _f(m, "width", 44.0), 1.0)
+			root_t = 0.7
+			shake = maxf(shake, 6.0)
+		"pinch":   # Martillazo: pinza que cierra por los flancos
+			_p_hit_arc(aim + 1.5, rad, 1.2, m, 0.7)
+			_p_hit_arc(aim - 1.5, rad, 1.2, m, 0.7)
+			_later(0.14, func(): _p_hit_arc(player.aim, rad, 1.3, m, 0.6))
+		"inktrail":   # Pulpocanon: tinta que deja un reguero que ralentiza
+			var bk: Bullet = _p_bullet(m, aim, _f(m, "speed"), _f(m, "life", 1.3), int(_f(m, "pierce")), _f(m, "size", 8.0))
+			bk.leave = "ink"
+		"vortex":   # Torbellino: remolino que arrastra a los enemigos
+			var c10: Vector2 = _p_target_pos(300.0, pos + d * 90.0)
+			_p_zone(c10, rad, _f(m, "dur", 3.0), 0.3, m, 0.35, 150.0)
+		"windup":   # Mandoble Titanico: gran golpe tras preparar
+			_ring(pos, rad * 1.3, rad * 0.4, col, 0.4, 3.0)
+			_later(0.4, func():
+				_p_hit_arc(player.aim, rad, arc, m, 1.0)
+				_p_wave(m, 20.0, rad * 1.3, 0.25, 14.0, 0.4)
+				shake = maxf(shake, 6.0))
+		_:
+			_melee(m)
 
 
 func _in_arc(from: Vector2, p: Vector2, aim: float, half: float) -> bool:
@@ -2225,13 +3329,18 @@ func _aura(m: Dictionary) -> void:
 			elif vis.has("rise"):
 				v = Vector2(randf_range(-10.0, 10.0), -55.0)
 			pfx.sp(String(vis["aura"]), String(vis["pal"]), pos, {"v": v, "life": 0.42, "spin": randf_range(-6.0, 6.0) if VFX.spins(String(vis["aura"])) else 0.0})
+	var mag_k: float = 1.0
+	if m.has("var"):
+		mag_k = [0.5, 0.8, 1.0, 1.4, 1.9, 2.6][randi() % 6]   # Magnitud: potencia variable
+	if m.has("recoil") and not player.dead:
+		player.hp = maxf(1.0, player.hp - player.max_hp * float(m["recoil"]))
 	for e in enemies:
 		if e.dead:
 			continue
 		if e.position.distance_to(player.position) <= rad + e.radius * 0.5:
 			if m.has("dream") and e.sleep_t <= 0.0:
 				continue   # Come Sueños: solo afecta a enemigos dormidos
-			_hit_move(e, _f(m, "dmg") * _atk(), e.position - player.position, m)
+			_hit_move(e, _f(m, "dmg") * _atk() * mag_k, e.position - player.position, m)
 			if m.has("heal") and not player.dead:
 				var hl: float = player.max_hp * _f(m, "heal")
 				player.hp = minf(player.max_hp, player.hp + hl)
@@ -2240,11 +3349,29 @@ func _aura(m: Dictionary) -> void:
 
 func _buff(m: Dictionary) -> void:
 	var stat: String = String(m["stat"])
+	if stat == "heal":
+		var hv: float = player.max_hp * _f(m, "amount") * _rk("healmul")
+		player.hp = minf(player.max_hp, player.hp + hv)
+		add_text(player.position + Vector2(0.0, -player.body_h - 4.0), "+%d" % maxi(1, roundi(hv)), Color("#7dffb0"), 16)
+		Aud.sfx("heal")
+		_ring(player.position, player.radius * 2.4, player.radius * 1.1, _col(m), 0.35, 2.5)
+		return
 	if player.buffs.has(stat):
 		var b: Dictionary = player.buffs[stat]
 		b["amount"] = _f(m, "amount")
-		b["n"] = mini(int(_f(m, "stacks")), int(b["n"]) + 1)
-		b["t"] = _f(m, "dur")
+		var ts: Array = b["ts"]
+		var dur: float = _f(m, "dur")
+		if ts.size() < int(_f(m, "stacks")):
+			ts.append(dur)
+		else:
+			# Con el maximo de acumulaciones se renueva la que esta a punto de caducar.
+			var mi := 0
+			for i in range(ts.size()):
+				if float(ts[i]) < float(ts[mi]):
+					mi = i
+			ts[mi] = dur
+		b["n"] = ts.size()
+		b["t"] = dur
 	_ring(player.position, player.radius * 2.4, player.radius * 1.1, _col(m), 0.35, 2.5)
 	var bv: Dictionary = VFX.for_move(String(m["id"]), String(m["type"]))
 	for i in range(3):
@@ -2291,6 +3418,7 @@ func _chain(m: Dictionary) -> void:
 
 func _new_field(kind: String, m: Dictionary, pos: Vector2) -> Field:
 	var f := Field.new()
+	f.modulate.a = _fx_alpha()
 	f.kind = kind
 	f.move = m
 	f.color = _col(m)
@@ -2411,8 +3539,11 @@ func _orbit(m: Dictionary, delta: float) -> void:
 		bullets.erase(ex)
 	for i in range(mine.size(), want):
 		var nb := Bullet.new()
+		nb.modulate.a = _fx_alpha()
 		nb.orb = true
 		nb.mid = mid
+		if bool(m.get("evolved", false)):
+			evfx.track(nb, m)
 		var ov: Dictionary = VFX.for_move(mid, String(m["type"]))
 		nb.shape = String(ov["proj"])
 		nb.pal = String(ov["pal"])
@@ -2427,6 +3558,8 @@ func _orbit(m: Dictionary, delta: float) -> void:
 		var ob = mine[i]
 		ob.dmg = _f(m, "dmg") * _atk()
 		ob.orad = _f(m, "radius")
+		if m.has("pulse"):
+			ob.orad *= 1.0 + float(m["pulse"]) * sin(run_time * 1.8 + float(i) * 2.1)
 		ob.ospeed = _f(m, "speed")
 		ob.r = _f(m, "size", 8.0)
 		ob.color = _col(m)
@@ -2486,13 +3619,19 @@ func _hit_move(e, dmg: float, dir: Vector2, m: Dictionary) -> void:
 	cur_kind = ""
 
 
+var _ds_busy := false
+
+
 func _hit_enemy(e, dmg: float, col: Color, dir: Vector2, knock: float, mtype: String, burn: int, poison: int, slow: float, cc: String = "", ccp: float = 0.0) -> void:
+	ccp += cave.ccp_add(cc)
+	slow *= cave.slow_mul()
 	# Un enemigo dormido recibe un 30 % mas y se despierta (salvo si el golpe es de un movimiento que duerme).
 	var was_asleep: bool = e.sleep_t > 0.0 and cc != "sleep"
 	if was_asleep:
 		dmg *= 1.3
+	_ch_pierce(e)
 	var eff: String = _eff_label(_types_mult(mtype, e.types))
-	var d_final: float = dmg * _type_mult(mtype, e)
+	var d_final: float = dmg * _type_mult(mtype, e) * (1.5 if _has_mod("glass") else 1.0)
 	if mtype == "electric" and e.para_t > 0.0:
 		d_final *= 1.35   # un enemigo paralizado recibe mas daño electrico
 	if eff == "super" and _has_item("expertbelt"):
@@ -2504,6 +3643,24 @@ func _hit_enemy(e, dmg: float, col: Color, dir: Vector2, knock: float, mtype: St
 	if mtype == "ground" and _has_item("thickclub") and [104, 105].has(_pdex()):
 		d_final *= 1.5
 	if mtype == "bug" and _has_item("silverpowder"):
+		d_final *= 1.2
+	elif _has_item("ti_" + mtype):
+		d_final *= 1.15   # objeto de tipo: +15% y un efecto propio
+		match mtype:
+			"fire":
+				if e.burn > 0:
+					d_final *= 1.15
+			"poison":
+				if e.poison > 0:
+					d_final *= 1.2
+			"dragon":
+				if e.boss:
+					d_final *= 1.2
+			"dark":
+				if e.burn > 0 or e.poison > 0 or e.slow > 0.0 or e.para_t > 0.0 or e.sleep_t > 0.0 or e.frozen_t > 0.0 or e.conf_t > 0.0:
+					d_final *= 1.2
+	# S58.6 (PENDIENTE DE APROBACION, desactivado por defecto): Pokemon de un solo tipo +20% con movimientos de ese tipo, una vez por golpe.
+	if bool(SV.d["settings"].get("mono_bonus", false)) and player.types.size() == 1 and String(player.types[0]) == mtype and not ab_fx.has("owntype"):
 		d_final *= 1.2
 	if not ab_fx.is_empty():
 		if String(ab_fx.get("pinch", "")) == mtype and player.hp < player.max_hp * 0.4:
@@ -2518,24 +3675,64 @@ func _hit_enemy(e, dmg: float, col: Color, dir: Vector2, knock: float, mtype: St
 			d_final *= 1.0 + _abn("boss_dmg")
 		if eff == "weak":
 			d_final *= 1.0 + _abn("tinted")
-	var crit_p: float = float(perks["crit"]) + (0.15 if _has_item("scopelens") else 0.0) + _abn("crit")
+	var crit_p: float = minf(0.95, float(perks["crit"]) + (0.15 if _has_item("scopelens") else 0.0) + (0.05 if _has_item("ti_normal") else 0.0) + _lens_add() + _abn("crit"))
 	if crit_p > 0.0 and randf() < crit_p:
-		d_final *= 1.5
+		d_final *= _edge_mul()
+		if _ch_on() and not _ch_rs("no_crit"):
+			ch_m["crits"] = int(ch_m["crits"]) + 1
 		add_text(e.position + Vector2(0.0, -e.body_h - 26.0), L.t("¡Crítico!"), Color("#ffb347"), 16)
 	if _has_item("shellbell"):
 		bell_heal = minf(4.0, bell_heal + d_final * 0.04)
+	if mtype == "fighting" and _has_item("ti_fighting"):
+		knock *= 1.4
+	if mtype == "water" and _has_item("ti_water"):
+		slow = maxf(slow, 0.25)
+	if mtype == "poison" and _has_item("ti_poison") and poison > 0:
+		poison += 1
+	var amp: float = _amp_k()
+	if amp > 1.0:
+		ccp = minf(0.95, ccp * amp)
+		if burn > 0 and randf() < amp - 1.0:
+			burn += 1
+		if poison > 0 and randf() < amp - 1.0:
+			poison += 1
+	d_final *= kec.dmg_mul(e) * kec.echo_take()
 	_damage_enemy(e, d_final, col, dir, knock, eff)
+	kec.on_hit(e, d_final)
+	# Colmillo Vampirico (y Hechizo): solo cuenta la vida realmente recuperada; la cura no dispara nada mas.
+	var fang: float = _fang_pct() + (0.03 if (mtype == "ghost" and _has_item("ti_ghost")) else 0.0)
+	if fang > 0.0:
+		var got: float = _heal_real(d_final * fang)
+		if got >= 1.0 and randf() < 0.25:
+			add_text(player.position + Vector2(randf_range(-8.0, 8.0), -player.body_h - 8.0), "+%d" % roundi(got), Color("#7dffb0"), 13)
 	if e.dead:
 		return
+	# Golpe Doble: un segundo golpe (con critico, robo de vida y estados); nunca encadena otro Golpe Doble.
+	if not _ds_busy and randf() < _dstrike_p():
+		_ds_busy = true
+		_hit_enemy(e, dmg, col, dir, knock, mtype, burn, poison, slow, cc, ccp)
+		_ds_busy = false
+		if e.dead:
+			return
 	if was_asleep:
 		e.sleep_t = 0.0
 		add_text(e.position + Vector2(0.0, -e.body_h - 18.0), "¡Despertó!", Color("#ffe9a8"), 16)
 	if cc != "" and randf() < ccp:
-		_apply_cc(e, cc)
+		_apply_cc(e, cc, amp)
+	if mtype == "electric" and _has_item("ti_electric") and randf() < 0.08 * amp:
+		_apply_cc(e, "para", amp)
+	elif mtype == "ice" and _has_item("ti_ice") and randf() < 0.06 * amp:
+		_apply_cc(e, "freeze", amp)
+	elif mtype == "psychic" and _has_item("ti_psychic") and randf() < 0.08 * amp:
+		_apply_cc(e, "conf", amp)
+	elif mtype == "fairy" and _has_item("ti_fairy") and randf() < 0.06 * amp:
+		_apply_cc(e, "conf", amp * 1.3)
 	if burn > 0:
 		e.apply_burn(burn)
+		_ch_status(e, "burn")
 	if poison > 0:
 		e.apply_poison(poison)
+		_ch_status(e, "poison")
 	if slow > 0.0:
 		e.apply_slow(slow)
 
@@ -2550,6 +3747,7 @@ func _move_desc(nd: Dictionary) -> String:
 
 # Aplica un estado de control. Los jefes lo resisten: duracion mucho menor y luego quedan inmunes unos segundos.
 func _apply_cc(e, kind: String, dur_k: float = 1.0) -> void:
+	dur_k *= kec.cc_dur() * cave.dur_mul(kind)
 	if e.dead or e.cc_imm > 0.0 or not CC_DUR.has(kind):
 		return
 	if kind == "sleep" and int(e.dex) == 491:
@@ -2559,6 +3757,14 @@ func _apply_cc(e, kind: String, dur_k: float = 1.0) -> void:
 			e.set_meta("imm_ms", now)
 			add_text(e.position + Vector2(0.0, -e.body_h - 18.0), "¡Inmune!", Color("#c8d0dc"), 16)
 		return
+	if kind == "charm":
+		# Enamorado: los jefes son inmunes y, tras acabarse, hay un respiro para que no se encadene sin fin
+		if e.boss or e.charm_t > 0.0 or e.charm_imm > 0.0:
+			if e.boss and run_time - float(e.get_meta("imm_t", -99.0)) > 1.5:
+				e.set_meta("imm_t", run_time)
+				add_text(e.position + Vector2(0.0, -e.body_h - 18.0), L.t("¡Inmune!"), Color("#c8d0dc"), 16)
+			return
+		dur_k = minf(dur_k, 1.6) * (1.3 if _has_item("ti_fairy") else 1.0)
 	if (e.frozen_t > 0.0 or e.sleep_t > 0.0) and (kind == "conf" or kind == "para"):
 		return
 	var dur: float = float(CC_DUR[kind]) * dur_k
@@ -2582,7 +3788,14 @@ func _apply_cc(e, kind: String, dur_k: float = 1.0) -> void:
 		"conf":
 			fresh = e.conf_t <= 0.0
 			e.conf_t = maxf(e.conf_t, dur)
+		"charm":
+			fresh = true
+			e.charm_t = dur
+			e.frozen_t = 0.0
+			e.sleep_t = 0.0
+			e.conf_t = 0.0
 	if fresh:
+		_ch_status(e, kind)
 		var cc_col := Color.html(String(CC_COL[kind]))
 		add_text(e.position + Vector2(0.0, -e.body_h - 18.0), String(CC_TEXT[kind]), cc_col, 16)
 		_ring(e.position, 4.0, e.radius * 2.2, cc_col, 0.35, 2.5)
@@ -2590,7 +3803,7 @@ func _apply_cc(e, kind: String, dur_k: float = 1.0) -> void:
 
 # Humo, hielo, chispas y estrellitas segun el estado.
 func _cc_fx(e, delta: float) -> void:
-	if e.frozen_t <= 0.0 and e.sleep_t <= 0.0 and e.para_t <= 0.0 and e.conf_t <= 0.0:
+	if e.frozen_t <= 0.0 and e.sleep_t <= 0.0 and e.para_t <= 0.0 and e.conf_t <= 0.0 and e.charm_t <= 0.0:
 		return
 	e.cc_fx -= delta
 	if e.cc_fx > 0.0 or not e.visible:
@@ -2601,10 +3814,46 @@ func _cc_fx(e, delta: float) -> void:
 		pfx.px(base, Color("#d8f6ff"), Vector2(randf_range(-8.0, 8.0), -10.0), 0.6, 1.6, 40.0)
 	elif e.sleep_t > 0.0:
 		add_text(e.position + Vector2(e.radius * 0.6, -e.body_h - 6.0), "Z", Color("#b9b6ff"), 14)
+	elif e.charm_t > 0.0:
+		add_text(e.position + Vector2(randf_range(-6.0, 6.0), -e.body_h - 6.0), "♥", Color("#ff6fa8"), 15)
 	elif e.conf_t > 0.0:
 		pfx.px(e.position + Vector2(cos(e.bob * 2.0) * e.radius, -e.body_h - 4.0 + sin(e.bob * 2.0) * 3.0), Color("#ff7ad9"), Vector2(0.0, -6.0), 0.5, 2.0)
 	elif e.para_t > 0.0:
 		pfx.px(base, Color("#ffe14d"), Vector2(randf_range(-30.0, 30.0), randf_range(-30.0, 10.0)), 0.25, 1.6, 0.0)
+
+
+# Enemigo enamorado: lucha de tu lado. Persigue a otro enemigo y le pega; sin rivales, se queda cerca de ti. Nunca te ataca.
+func _charmed_step(e: Enemy, delta: float, kn_decay: float, spd: float) -> void:
+	e.conf_cd = maxf(0.0, e.conf_cd - delta)
+	var tgt = null
+	var best: float = 420.0
+	for o in enemies:
+		if o == e or o.dead or o.charm_t > 0.0:
+			continue
+		var dd: float = o.position.distance_to(e.position)
+		if dd < best:
+			best = dd
+			tgt = o
+	var ang: float
+	var mv := 1.0
+	if tgt != null:
+		ang = (tgt.position - e.position).angle()
+	else:
+		var tp: Vector2 = player.position - e.position
+		ang = tp.angle()
+		if tp.length() < 90.0:
+			mv = 0.0
+	e.position += (Vector2.from_angle(ang) * spd * 1.1 * mv + e.knock) * delta
+	if not e.flying:
+		e.position = _collide(e.position, e.radius * 0.5)
+	e.knock *= kn_decay
+	e.face_angle(ang)
+	e.loop_anim("Walk" if mv > 0.0 else "Idle", 1.2)
+	if tgt != null and e.conf_cd <= 0.0 and best <= e.radius + tgt.radius + 6.0:
+		e.conf_cd = 0.6
+		e.strike((tgt.position - e.position).angle())
+		var pct: float = 0.012 if tgt.boss else 0.03
+		_damage_enemy(tgt, e.dmg * 2.0 + tgt.max_hp * pct, Color("#ff6fa8"), (tgt.position - e.position).normalized(), 140.0)
 
 
 # Enemigo confundido: vaga sin rumbo, persigue a otro enemigo y le pega (ya no te ataca).
@@ -2679,6 +3928,8 @@ func _update_fields(delta: float) -> void:
 				pfx.burst(f.position + Vector2(0.0, -6.0), f.color, 10, 150.0)
 				shake = maxf(shake, 2.0)
 				_blast(f, f.r, 1.0 if trig else 0.5)
+				if f.shards > 0:
+					_p_radial(m, f.position, f.shards, 250.0, 0.45, 0.5)
 				f.queue_free()
 				fields.remove_at(i)
 		elif f.kind == "meteor":
@@ -2907,6 +4158,191 @@ func _has_mod(id: String) -> bool:
 	return mods.has(id)
 
 
+# ---------------------------------------------------------------
+# Retos de 10 minutos: contadores de objetivos, restricciones y resultado
+# ---------------------------------------------------------------
+func _ch_setup() -> void:
+	ch_inst = SV.run_chal.duplicate()
+	ch_def = CH.by_id(int(ch_inst.get("id", 0)))
+	ch_m = CH.new_metrics()
+	ch_m["boss_clean"] = 0
+	ch_sets = {"burn": {}, "poison": {}, "freeze": {}, "para": {}, "sleep": {}, "conf": {}, "charm": {}}
+	mods = []
+	if ch_def.is_empty():
+		return
+	var rs: Dictionary = ch_def["rs"]
+	if rs.has("frail"):
+		mods.append("frail")
+	if rs.has("no_heal") or rs.has("one_hp"):
+		mods.append("nohealing")
+
+
+func _ch_on() -> bool:
+	return mode == "chal" and not ch_def.is_empty() and not ch_over
+
+
+func _ch_rs(k: String) -> bool:
+	return (ch_def.get("rs", {}) as Dictionary).has(k)
+
+
+func _max_moves() -> int:
+	if mode == "chal" and _ch_rs("one_move"):
+		return 1
+	if mode == "chal" and _ch_rs("max_moves"):
+		return 2
+	return MAX_MOVES + clampi(int(perks.get("wslots", 0)), 0, 2)   # 4 base + hasta 2 comprados (Seccion 50)
+
+
+# Un enemigo recibe un estado (burn, poison, freeze, para, sleep, conf).
+func _ch_status(e, kind: String) -> void:
+	if not _ch_on() or _ch_rs("no_status") or not ch_sets.has(kind):
+		return
+	var id: int = e.get_instance_id()
+	(ch_sets[kind] as Dictionary)[id] = true
+	var ms: Dictionary = ch_multi.get(id, {})
+	ms[kind] = true
+	ch_multi[id] = ms
+	var kinds := 0
+	var multi := 0
+	for k in ch_sets:
+		if not (ch_sets[k] as Dictionary).is_empty():
+			kinds += 1
+	for eid in ch_multi:
+		if (ch_multi[eid] as Dictionary).size() >= 2:
+			multi += 1
+	ch_m["kinds"] = kinds
+	ch_m["multi_status_n"] = multi
+	ch_m["burn_n"] = (ch_sets["burn"] as Dictionary).size()
+	ch_m["poison_n"] = (ch_sets["poison"] as Dictionary).size()
+	ch_m["freeze_n"] = (ch_sets["freeze"] as Dictionary).size()
+	ch_m["para_n"] = (ch_sets["para"] as Dictionary).size()
+	ch_m["infat_n"] = (ch_sets["charm"] as Dictionary).size()
+
+
+# Cada golpe: cuenta los ataques que alcanzan a 3 o mas enemigos a la vez.
+func _ch_pierce(e) -> void:
+	if not _ch_on() or dmg_src == "":
+		return
+	e.set_meta("ch_src", dmg_src)   # los estados (quemadura, veneno) rematan: la derrota cuenta para el último movimiento que lo golpeó
+	var f: int = Engine.get_physics_frames()
+	var h: Array = ch_hits.get(dmg_src, [-1, 0, false])
+	if int(h[0]) != f:
+		h = [f, 0, false]
+	h[1] = int(h[1]) + 1
+	if int(h[1]) >= 3 and not bool(h[2]):
+		h[2] = true
+		ch_m["pierce3"] = int(ch_m["pierce3"]) + 1
+	ch_hits[dmg_src] = h
+
+
+func _ch_kill(e, src: String) -> void:
+	if not _ch_on():
+		return
+	ch_m["kills"] = kills
+	if e.boss and not e.judge:
+		ch_m["bosses"] = int(ch_m["bosses"]) + 1
+		if e.has_meta("ch_t") and ch_last_hurt < float(e.get_meta("ch_t")):
+			ch_m["boss_clean"] = int(ch_m["boss_clean"]) + 1   # jefe derrotado sin recibir ningún daño mientras estuvo en pantalla
+	if not _ch_rs("no_status"):
+		var cc_any: bool = e.frozen_t > 0.0 or e.sleep_t > 0.0 or e.para_t > 0.0 or e.conf_t > 0.0 or e.charm_t > 0.0
+		if cc_any or e.burn > 0 or e.poison > 0:
+			ch_m["kills_status"] = int(ch_m["kills_status"]) + 1
+		if cc_any:
+			ch_m["kills_cc"] = int(ch_m["kills_cc"]) + 1
+	if src == "_other" and e.has_meta("ch_src"):
+		src = String(e.get_meta("ch_src"))
+	if src != "" and MD.MOVES.has(src):
+		var md: Dictionary = MD.MOVES[src]
+		var ty: String = String(md["type"])
+		ch_m["kt_" + ty] = int(ch_m.get("kt_" + ty, 0)) + 1
+		ch_src_kills[src] = int(ch_src_kills.get(src, 0)) + 1
+		var kd: String = String(md["kind"])
+		if ["projectile", "boomerang", "turret", "chain", "beam"].has(kd):
+			ch_m["kills_proj"] = int(ch_m["kills_proj"]) + 1
+		elif ["melee", "dash", "orbit"].has(kd):
+			ch_m["kills_melee"] = int(ch_m["kills_melee"]) + 1
+		elif ["aura", "nova", "meteor", "mine", "cone", "trail"].has(kd):
+			ch_m["kills_aoe"] = int(ch_m["kills_aoe"]) + 1
+		var m20 := 0
+		for k in ch_src_kills:
+			if int(ch_src_kills[k]) >= 20:
+				m20 += 1
+		ch_m["moves_20"] = m20
+		var t10 := 0
+		for k2 in ch_m:
+			if String(k2).begins_with("kt_") and int(ch_m[k2]) >= 10:
+				t10 += 1
+		ch_m["types_10"] = t10
+		var t20 := 0
+		for k3 in ch_m:
+			if String(k3).begins_with("kt_") and int(ch_m[k3]) >= 20:
+				t20 += 1
+		ch_m["types_20"] = t20
+
+
+func _ch_tick(delta: float) -> void:
+	if not _ch_on():
+		return
+	if _ch_rs("one_hp") and player != null:
+		player.max_hp = 1.0
+		player.hp = minf(player.hp, 1.0)
+	ch_m["time"] = run_time
+	ch_m["kills"] = kills
+	ch_m["coins"] = coins
+	ch_m["equipped"] = maxi(int(ch_m["equipped"]), _slot_list().size())
+	ch_m["gacha_unlock"] = GPM.unlocked().size()
+	ch_m["new_move"] = GPM.unlocked().size()
+	ch_m["bonded"] = maxi(int(ch_m["bonded"]), bond_ids.size())
+	var cur: float = run_time - ch_last_hurt
+	ch_m["nodmg_cur"] = cur
+	ch_m["nodmg"] = maxf(float(ch_m["nodmg"]), cur)
+	if player.position.distance_to(ch_prev_pos) > 0.05:
+		ch_moved_min[int(run_time / 60.0)] = true
+	ch_prev_pos = player.position
+	ch_m["move_min"] = ch_moved_min.size()
+	ch_m["loot"] = run_chests
+	ch_check_t -= delta
+	if ch_check_t > 0.0:
+		return
+	ch_check_t = 0.4
+	hud.ch_lines = CH.lines(ch_def, ch_m)
+	for e in enemies:
+		if e.boss and not e.has_meta("ch_t"):
+			e.set_meta("ch_t", run_time)
+	if run_time >= CH.CH_TIME:
+		ch_m["survive_full"] = 1
+		_ch_finish(CH.succeeded(ch_def, ch_m))
+	elif CH.succeeded(ch_def, ch_m):
+		_ch_finish(true)
+
+
+func _ch_finish(ok: bool) -> void:
+	if ch_over:
+		return
+	ch_over = true
+	timeup = true
+	hud.timeup = true
+	if ok:
+		var got: String = CH.grant(ch_inst)
+		hud.end_big = L.t("¡RETO SUPERADO!")
+		if got == "gold":
+			hud.end_l1 = L.t("Premio: 1 Gachapon Coin Dorada")
+		elif got == "coin":
+			hud.end_l1 = L.t("Premio: 1 Gachapon Coin")
+		else:
+			hud.end_l1 = L.t("Premio ya reclamado antes")
+		Aud.sfx("bossDown")
+	else:
+		hud.end_big = L.t("¡TIEMPO!")
+		hud.end_l1 = L.t("Has fallado el reto...")
+	hud.end_l2 = CH.name_of(ch_def)
+	player.dead = true
+	player.active = false
+	_clear_orbit_orbs()
+	for e in enemies:
+		e.active = false
+
+
 func _mode_label() -> String:
 	match mode:
 		"daily":
@@ -2922,9 +4358,11 @@ func _mode_label() -> String:
 		"rifts":
 			return L.t("Contrarreloj de grietas")
 		"tower":
-			return L.t("Torre de pisos")
+			return L.t("La torre")
 		"coop":
 			return L.t("Modo Cooperativo")
+		"chal":
+			return CH.name_of(ch_def) if not ch_def.is_empty() else L.t("Retos de 10 minutos")
 	return ""
 
 
@@ -3092,6 +4530,8 @@ func _bag_at(t: float) -> Array:
 			var wd: int = w
 			if key != "" and _fits_biome(_dex_by[int(d["dex"])], key):
 				wd = roundi(float(w) * BIOME_W_MUL)
+			if dn != null:
+				wd = roundi(float(wd) * dn.weight_mul(int(d["dex"])))
 			for i in range(wd):
 				bag.append(d)
 		if key != "":
@@ -3108,7 +4548,7 @@ func _hp_k(t: float) -> float:
 
 
 func _scale_at(t: float) -> Dictionary:
-	return {"hp": (1.0 + t / 95.0) * _adapt_k(), "dmg": (1.0 + t / 420.0) * pow(_adapt_k(), 0.7), "spd": 1.0 + minf(0.35, t / 1400.0)}
+	return {"hp": (1.0 + t / 150.0) * _adapt_k(), "dmg": (1.0 + t / 650.0) * pow(_adapt_k(), 0.7), "spd": 1.0 + minf(0.35, t / 1400.0)}
 
 
 func _boss_scale_k(dex: int) -> float:
@@ -3151,6 +4591,18 @@ func _make_enemy(def: Dictionary, pos: Vector2, sc: Dictionary, boss: bool = fal
 			e.hp = e.max_hp
 		if _has_mod("hard"):
 			e.dmg *= 1.5
+		if _has_mod("glass"):
+			e.dmg *= 2.0
+		var hpk: float = 1.0
+		if _has_mod("brainy"):
+			hpk *= 1.25
+		if _has_mod("rich"):
+			hpk *= 1.3
+		if _has_mod("plague"):
+			hpk *= 0.65
+		if hpk != 1.0:
+			e.max_hp = roundf(e.max_hp * hpk)
+			e.hp = e.max_hp
 	if mode == "tower":
 		var ek: float = _rk("ehp") * TOWER_HP_K
 		var es: float = _rk("espd") * (1.0 + 0.02 * float(maxi(0, tw_floor - 10)))
@@ -3192,8 +4644,22 @@ func _dt() -> float:
 	return run_time
 
 
+# Dificultad de tramo final (Seccion 52): 0 hasta el minuto 20 y 1 en el 60. Servicio unico: lo usan el spawner y la Normal Run.
+# Mas vida, dano y velocidad por enemigo, elites ocasionales y menos cantidad: la dificultad no depende solo de "mas bichos".
+func _late_x(t: float) -> float:
+	if mode == "tower" or mode == "rush" or mode == "chal":
+		return 0.0
+	return clampf((t - 1200.0) / 2400.0, 0.0, 1.0)
+
+
 func _spawn_one(angle: float = -999.0, near: bool = false) -> Enemy:
 	var bag: Array = _bag_at(_dt())
+	if cave_type != "":
+		var tb: Array = bag.filter(func(d): return _has_t(_dex_by[int(d["dex"])]["types"], [cave_type]))
+		if tb.is_empty():
+			tb = _cave_type_pool(cave_type)
+		if not tb.is_empty():
+			bag = tb
 	var def: Dictionary = bag[randi() % bag.size()]
 	var a: float = angle if angle > -900.0 else randf() * TAU
 	var pos: Vector2 = _ring_point(a)
@@ -3201,9 +4667,16 @@ func _spawn_one(angle: float = -999.0, near: bool = false) -> Enemy:
 		pos = player.position + Vector2.from_angle(a) * randf_range(380.0, 520.0)
 	pos = _free_spot(pos, 14.0)
 	var base: Dictionary = _scale_at(_dt())
-	var sc := {"hp": float(base["hp"]) * _hp_k(_dt()), "dmg": base["dmg"], "spd": base["spd"]}
+	var lx: float = _late_x(_dt())
+	var sc := {"hp": float(base["hp"]) * _hp_k(_dt()) * (1.0 + 1.0 * lx), "dmg": float(base["dmg"]) * (1.0 + 0.45 * lx), "spd": float(base["spd"]) * (1.0 + 0.08 * lx)}
 	var e: Enemy = _make_enemy(def, pos, sc)
 	e.dmg *= DMG_K
+	if lx > 0.0 and randf() < 0.04 + 0.12 * lx:   # elite de tramo final: mas duro, mas dano y mas experiencia
+		e.max_hp = roundf(e.max_hp * 2.2)
+		e.hp = e.max_hp
+		e.dmg *= 1.3
+		e.xp_val = roundf(e.xp_val * 2.0)
+		e.modulate = Color(1.0, 0.72, 0.72)
 	e.xp_val = roundf(e.xp_val * XP_K)
 	if enemies.size() >= int(ENEMY_CAP * 0.85):
 		e.max_hp = roundf(e.max_hp * 1.6)
@@ -3246,6 +4719,11 @@ func _update_spawner(delta: float) -> void:
 	# Enemigos por segundo (spawner.js): sube con el tiempo de la run.
 	var t: float = run_time
 	banner_t = maxf(0.0, banner_t - delta)
+	if join_t >= 0.0:
+		join_t += delta
+		if join_t > 3.2:
+			join_t = -1.0
+	fusion_t = maxf(0.0, fusion_t - delta)
 	if mode == "rush":
 		_update_rush(delta)
 		return
@@ -3253,13 +4731,17 @@ func _update_spawner(delta: float) -> void:
 		_update_tower(delta)
 		return
 	# Jefes
-	if boss_idx < boss_run.size() and t >= float(boss_run[boss_idx]["at"]):
+	if mode == "normal":
+		_update_director(delta)
+		_update_mini(delta)
+		_update_wildleg(delta)
+	if boss_idx < boss_run.size() and t >= float(boss_run[boss_idx]["at"]) and (mode != "normal" or (boss_idx > 0 and arena == null and not dir_finale)):
 		_spawn_boss(boss_run[boss_idx])
 		boss_idx += 1
 	var fight: bool = _boss_alive()
 	if enemies.size() < ENEMY_CAP:
-		var rate: float = (1.6 + t * 0.028 + pow(t / 60.0, 1.6) * 0.5) * 0.17 * (1.8 if _has_mod("horde") else 1.0) * (0.75 if _has_item("pureincense") else 1.0)
-		spawn_acc += rate * _adapt_k() * (0.25 if fight else 1.0) * delta
+		var rate: float = (1.6 + t * 0.028 + pow(t / 60.0, 1.6) * 0.4) * 0.15 * (1.0 + 0.7 * clampf(1.0 - t / 240.0, 0.0, 1.0)) * (1.8 if _has_mod("horde") else 1.0) * (2.5 if _has_mod("plague") else 1.0) * (0.75 if _has_item("pureincense") else 1.0)
+		spawn_acc += rate * (1.0 - 0.25 * _late_x(t)) * _adapt_k() * (0.25 if fight else 1.0) * delta
 		while spawn_acc >= 1.0:
 			spawn_acc -= 1.0
 			if enemies.size() < ENEMY_CAP:
@@ -3281,6 +4763,222 @@ func _update_spawner(delta: float) -> void:
 	if preload_t <= 0.0:
 		preload_t = 10.0
 		_preload_upcoming(t + 60.0)
+
+
+# ---------------------------------------------------------------
+# S63: Normal Run hasta Eternatus. Un solo director: 00:30 oleada, 01:00 Grieta, 02:00 Meowth, 03:00 jefe,
+# 04:00 siguiente mapa (tras el jefe), 60:00 Eternatus. Cada hito se dispara una vez; si hay un encuentro critico
+# (Grieta dentro, jefe vivo, altar) queda en cola y sale en cuanto se libere, en orden cronologico.
+# ---------------------------------------------------------------
+# El aliado Alfa dura toda la partida: no debe bloquear eventos como si fuera un altar legendario en curso.
+func _legend_busy() -> bool:
+	return legend != null and not (is_instance_valid(legend) and legend.alpha)
+
+
+func _dir_crit() -> bool:
+	return arena != null or _boss_alive() or _legend_busy()
+
+
+func _update_director(delta: float) -> void:
+	if player.dead or timeup:
+		return
+	dir_gap = maxf(0.0, dir_gap - delta)
+	for ms in DIR_MS:
+		var id: String = ms[0]
+		if dir_done.has(id):
+			continue
+		if run_time < float(ms[1]):
+			break
+		if id == "wave" and run_time - float(ms[1]) > 150.0:
+			dir_done[id] = true   # una oleada de apertura que llega muy tarde ya no tiene sentido
+			continue
+		if dir_gap > 0.0:
+			return
+		if _dir_try(id):
+			dir_done[id] = true
+			dir_gap = 4.0
+			dir_log.append([id, run_time])
+			return
+	return
+
+
+func _dir_try(id: String) -> bool:
+	match id:
+		"wave":
+			if _dir_crit():
+				return false
+			var base_a: float = randf() * TAU
+			var n: int = mini(10, ENEMY_CAP - enemies.size())
+			for i in range(maxi(0, n)):
+				var e: Enemy = _spawn_one(base_a + randf_range(-0.5, 0.5))
+				e.set_meta("enc", "wave")
+			Aud.sfx("surge")
+			_say(L.t("¡Pequeña oleada!"), 2.4)
+			return true
+		"rift":
+			if arena != null or _boss_alive():
+				return false
+			if rift != null:
+				rift_info["guaranteed"] = true   # ya habia una programada: se marca, no se duplica
+				return true
+			_open_rift()
+			rift_check = RIFT_EVERY
+			if rift != null:
+				rift_info["guaranteed"] = true
+			return true
+		"meowth":
+			if arena != null or _boss_alive():
+				return false
+			_spawn_thief(true)
+			return true
+		"boss":
+			if arena != null or _boss_alive() or boss_run.is_empty():
+				return false
+			var b = _spawn_boss(boss_run[0])
+			b.set_meta("enc", "open_boss")
+			boss_idx = maxi(boss_idx, 1)
+			return true
+		"map":
+			if not dir_done.has("boss") or _boss_alive() or arena != null:
+				return false
+			dir_map = true
+			_update_biome()
+			return true
+		"eter":
+			if _dir_crit():
+				if not dir_warned:
+					dir_warned = true
+					_say(L.t("Algo enorme se acerca… termina lo que tienes entre manos."), 3.2)
+				return false
+			if not (_dex_by.has(ETERNATUS_DEX) and _smeta.has(str(ETERNATUS_DEX))):
+				dir_blocked = "eternatus_assets"
+				push_warning("S63: faltan los assets de Eternatus (890); jefe final bloqueado")
+				return true
+			_spawn_eternatus()
+			return true
+	return true
+
+
+func _spawn_eternatus() -> void:
+	dir_finale = true
+	var p: Dictionary = _dex_by[ETERNATUS_DEX]
+	var bb := "ranged" if _behavior_of(p) == "ranged" else "chase"
+	var def := {"at": 3600.0, "dex": ETERNATUS_DEX, "name": String(p["name"]), "hp": 7000.0, "spd": 58.0, "dmg": 40.0, "xp": 6000.0,
+		"behavior": bb, "shotDmg": 28.0, "shotCd": 1.0, "range": 300.0}
+	_preload_dex(ETERNATUS_DEX)
+	var e = _spawn_boss(def, 3600.0)
+	e.set_meta("enc", "eternatus")
+	dir_eter = e
+	_say(L.t("¡ETERNATUS ha despertado!"), 4.0)
+	shake = 20.0
+
+
+func _eternatus_win() -> void:
+	if timeup or player.dead:
+		return
+	var st: Dictionary = SV.d["stats"]
+	st["eternatusKills"] = int(st.get("eternatusKills", 0)) + 1
+	timeup = true
+	hud.timeup = true
+	hud.end_big = L.t("¡ETERNATUS DERROTADO!")
+	hud.end_l1 = L.t("Tiempo: %d min") % int(run_time / 60.0)
+	hud.end_l2 = L.t("Derrotaste %d Pokémon") % kills
+	player.dead = true
+	player.active = false
+	_clear_orbit_orbs()
+	for en in enemies:
+		en.active = false
+
+
+# S63.3: mini-jefes grandes y raros (Tyranitar, Wailord, Onix, Steelix)
+func _update_mini(delta: float) -> void:
+	if player.dead or timeup or dir_finale or not dir_done.has("map") or arena != null:
+		return
+	mini_chk -= delta
+	if mini_chk > 0.0:
+		return
+	mini_chk = 20.0
+	if _boss_alive() or _legend_busy() or randf() > 0.18:
+		return
+	if run_time - float(mini_last.get(biome_idx, -9999.0)) < 300.0:
+		return
+	_spawn_mini()
+
+
+# S62.8: legendarios salvajes raros entre el minuto 30 y el final (solo con sprites reales; un unico premio por derrota)
+const WILD_LEG := [144, 145, 146, 243, 244, 245, 249, 250, 377, 378, 379, 380, 381, 382, 383, 384]
+var wl_t := 600.0
+var wl_cd := 0.0
+
+
+func _update_wildleg(delta: float) -> void:
+	if run_time < 1800.0 or run_time > 3480.0 or player.dead or timeup or dir_finale or arena != null or not dir_done.has("map"):
+		return
+	wl_cd -= delta
+	if wl_cd > 0.0:
+		return
+	wl_cd = 20.0
+	if _boss_alive() or _legend_busy() or caves_active() or inv.active() or meteor.deo != null or mew.cur != null or alpha.cur != null:
+		return
+	if run_time < wl_t or randf() > 0.25:
+		return
+	var pool: Array = []
+	for dx in WILD_LEG:
+		if _dex_by.has(dx) and _smeta.has(str(dx)):
+			pool.append(dx)
+	if pool.is_empty():
+		return
+	var dex: int = int(pool[randi() % pool.size()])
+	var p: Dictionary = _dex_by[dex]
+	var lx: float = _late_x(run_time)
+	var def := {"dex": dex, "name": String(p["name"]), "hp": roundf(1800.0 * (1.0 + run_time / 600.0)), "spd": 52.0, "dmg": 48.0, "xp": 1200.0, "behavior": "chase"}
+	var e: Enemy = _make_enemy(def, _ring_point(randf() * TAU), {"hp": 1.0 + lx, "spd": 1.0, "dmg": 1.0 + 0.4 * lx}, true)
+	e.set_meta("enc", "wildleg")
+	wl_t = run_time + randf_range(480.0, 720.0)
+	Aud.sfx("boss")
+	_say(L.t("¡Un %s legendario salvaje apareció!") % e.enemy_name, 3.4)
+	shake = 10.0
+
+
+func _spawn_mini(force_dex: int = -1) -> Enemy:
+	var pool: Array = []
+	for dx in MINI_DEXES:
+		if _dex_by.has(dx) and _smeta.has(str(dx)):
+			pool.append(dx)
+	if pool.is_empty():
+		return null
+	var dex: int = force_dex if force_dex > 0 else int(pool[randi() % pool.size()])
+	if not (_dex_by.has(dex) and _smeta.has(str(dex))):
+		return null
+	var p: Dictionary = _dex_by[dex]
+	var lx: float = _late_x(run_time)
+	var def := {"dex": dex, "name": String(p["name"]), "hp": roundf(1500.0 * (1.0 + run_time / 600.0)), "spd": 46.0, "dmg": 46.0, "xp": 900.0,
+		"behavior": "chase"}
+	var pos: Vector2 = Vector2.ZERO
+	var ok := false
+	for i in range(10):
+		pos = player.position + Vector2.from_angle(randf() * TAU) * randf_range(420.0, 560.0)
+		if not _blocked(pos, 60.0):
+			ok = true
+			break
+	if not ok:
+		return null   # el mapa no tiene hueco para un bicho tan grande
+	var e: Enemy = _make_enemy(def, pos, {"hp": 1.0 + lx, "spd": 1.0, "dmg": 1.0 + 0.4 * lx}, true)
+	_grow(e, 1.5)
+	e.set_meta("enc", "mini")
+	mini_last[biome_idx] = run_time
+	Aud.sfx("boss")
+	_say(L.t("¡Un %s gigante apareció!") % e.enemy_name, 3.0)
+	return e
+
+
+func _grow(e: Enemy, k: float) -> void:
+	e.scl *= k
+	e.sprite.scale *= k
+	e.radius *= k
+	e.body_h *= k
+	e.shadow_rx *= k
+
 
 
 # Jefe fijo de cada piso (siempre el mismo): cada 5 pisos, un legendario.
@@ -3311,7 +5009,7 @@ func _tower_def(f: int) -> Dictionary:
 		bb = "ranged"
 	elif _base_spd(bp) > 90.0:
 		bb = "charger"
-	var hp: float = 900.0 * pow(1.2, float(mini(f, 15) - 1)) * pow(1.07, float(maxi(0, f - 15)))
+	var hp: float = 900.0 * pow(1.2, float(mini(f, 15) - 1)) * pow(1.07, float(clampi(f - 15, 0, 15))) * pow(1.035, float(maxi(0, f - 30)))
 	var dm: float = minf(120.0, 26.0 + 4.5 * float(f))
 	hp *= 1.8 + 3.2 * clampf(float(f - 5) / 25.0, 0.0, 1.0)
 	if f == TOWER_FLOORS:
@@ -3368,7 +5066,7 @@ func _update_tower(delta: float) -> void:
 			_say(L.t("Piso %d: %s") % [f, L.t(String(d["name"]))], 3.0)
 			# escoltas: del piso 11 en adelante el jefe llega acompañado
 			if f > 10:
-				var esc: int = mini(ENEMY_CAP, 3 + (f - 10) / 2)
+				var esc: int = mini(ENEMY_CAP, 3 + (mini(f, 30) - 10) / 2)
 				var base_a: float = randf() * TAU
 				for i in range(esc):
 					if enemies.size() < _tw_cap():
@@ -3377,8 +5075,8 @@ func _update_tower(delta: float) -> void:
 	var fight: bool = tw_boss != null or tw_boss2 != null
 	var cap: int = _tw_cap()
 	if enemies.size() < cap:
-		var chaos: float = 1.0 + 0.06 * float(maxi(0, f - 10))
-		var rate: float = (1.6 + t * 0.028 + pow(t / 60.0, 1.6) * 0.5) * 0.17 * (1.8 if _has_mod("horde") else 1.0) * chaos * TOWER_SPAWN_K * _rk("spawn") * (0.75 if _has_item("pureincense") else 1.0)
+		var chaos: float = 1.0 + 0.06 * float(clampi(f - 10, 0, 20))
+		var rate: float = (1.6 + t * 0.028 + pow(t / 60.0, 1.6) * 0.5) * 0.17 * (1.8 if _has_mod("horde") else 1.0) * (2.5 if _has_mod("plague") else 1.0) * chaos * TOWER_SPAWN_K * _rk("spawn") * (0.75 if _has_item("pureincense") else 1.0)
 		spawn_acc += rate * ((0.25 if f <= 20 else 0.5) if fight else 1.0) * delta
 		while spawn_acc >= 1.0:
 			spawn_acc -= 1.0
@@ -3388,9 +5086,9 @@ func _update_tower(delta: float) -> void:
 	if f > 10 and (not fight or f > 20):
 		tw_surge -= delta
 		if tw_surge <= 0.0:
-			tw_surge = maxf(16.0, 46.0 - 1.5 * float(f - 10))
+			tw_surge = maxf(16.0, 46.0 - 1.5 * float(mini(f, 30) - 10))
 			var base_s: float = randf() * TAU
-			var n2: int = mini(cap - enemies.size(), 8 + (f - 10))
+			var n2: int = mini(cap - enemies.size(), 8 + (mini(f, 30) - 10))
 			for i in range(maxi(0, n2)):
 				_spawn_one(base_s + randf_range(-0.6, 0.6))
 			Aud.sfx("surge")
@@ -3462,8 +5160,8 @@ func _tower_clear() -> void:
 	if f >= TOWER_FLOORS:
 		_tower_win()
 		return
-	# Vinculos de ataque de la Torre: uno al superar el piso 10 y otro al superar el piso 20
-	if f == 10 or f == 20:
+	# Vinculos de ataque de la Torre: uno al superar cada piso 10, 20, 30, 40 y 50
+	if f == 10 or f == 20 or f == 30 or f == 40 or f == 50:
 		bonds += 1
 		add_text(player.position + Vector2(0.0, -player.body_h - 10.0), L.t("¡Vínculo!"), Color("#ff8ad8"), 26)
 		_ring(player.position, 8.0, 90.0, Color("#ff8ad8"), 0.7)
@@ -3644,7 +5342,7 @@ func _update_events(delta: float) -> void:
 			horde_defs = []
 	# Igual que events.js: los temporizadores corren siempre (menos en el Juicio); si hay un jefe vivo al
 	# vencer, el duende espera 8 s y el evento 10 s.
-	if run_time > 0.0 and not jd.active():
+	if run_time > 0.0 and not jd.active() and not dir_finale:
 		if thieves < 2:
 			thief_t -= delta
 			if thief_t <= 0.0:
@@ -3703,14 +5401,26 @@ func _start_event(id: String) -> void:
 		_say(L.t("¡Hora dorada! Doble de experiencia"), 3.0)
 
 
-func _spawn_thief() -> void:
-	var gold: bool = randf() < 0.25
-	var dex: int = 1000 if gold else 52
-	if not _dex_by.has(dex) or not _smeta.has(str(dex)):
-		return
+var thief_cycle := -1   # v5.2.1: los ladrones rotan Meowth > Gholdengo > Poltchageist (antes salia casi siempre Meowth)
+
+
+func _spawn_thief(force_coins: bool = false) -> void:
+	if thief_cycle < 0:
+		thief_cycle = randi() % 3
+	var kinds := [52, 1000, 1012]   # Meowth: monedas | Gholdengo: solo tickets | Poltchageist: Gachapon Coins
+	var dex: int = 52
+	if not force_coins:
+		for k in range(3):
+			var cand: int = int(kinds[(thief_cycle + k) % 3])
+			if _dex_by.has(cand) and _smeta.has(str(cand)):
+				dex = cand
+				thief_cycle = (thief_cycle + k + 1) % 3
+				break
+	var gold: bool = dex == 1000
+	var gimmi: bool = dex == 1012
 	var def := {"dex": dex, "name": String(_dex_by[dex]["name"]), "behavior": "thief",
 		"hp": roundf(60.0 * (1.0 + run_time / 95.0) * (1.5 if gold else 1.0)), "spd": 92.0, "dmg": 0.0, "xp": 10.0,
-		"loot": "ticket10" if gold else "coins"}
+		"loot": "ticket10" if gold else ("gimmi" if gimmi else "coins")}
 	var a: float = randf() * TAU
 	var pos: Vector2 = player.position + Vector2(cos(a) * randf_range(230.0, 300.0), sin(a) * randf_range(230.0, 300.0) * 0.8)
 	var e: Enemy = _make_enemy(def, pos, {"hp": 1.0, "spd": 1.0, "dmg": 1.0})
@@ -3722,6 +5432,8 @@ func _spawn_thief() -> void:
 	_ring(pos, 4.0, 40.0, Color("#ffd23f"), 0.5)
 	if gold:
 		_say(L.t("¡Un %s con un ticket ×10! ¡Atrápalo antes de que huya!") % e.enemy_name, 3.2)
+	elif gimmi:
+		_say(L.t("¡Un %s con una Gachapon Coin! ¡Atrápalo antes de que huya!") % e.enemy_name, 3.2)
 	else:
 		_say(L.t("¡Un %s cargado de monedas! ¡Atrápalo antes de que huya!") % e.enemy_name, 3.2)
 
@@ -3746,6 +5458,12 @@ func _update_enemies(delta: float) -> void:
 			e.para_t -= delta
 		if e.conf_t > 0.0:
 			e.conf_t -= delta
+		if e.charm_imm > 0.0:
+			e.charm_imm -= delta
+		if e.charm_t > 0.0:
+			e.charm_t -= delta
+			if e.charm_t <= 0.0:
+				e.charm_imm = 8.0
 		_cc_fx(e, delta)
 		# Estados alterados.
 		if e.slow_t > 0.0:
@@ -3757,7 +5475,7 @@ func _update_enemies(delta: float) -> void:
 			e.burn_tick -= delta
 			if e.burn_tick <= 0.0:
 				e.burn_tick = 0.5
-				_damage_enemy(e, 1.6 * float(e.burn) * (1.0 + float(player.level) * 0.06), Color("#ff9a4d"))
+				_damage_enemy(e, 1.6 * float(e.burn) * (1.0 + float(player.level) * 0.06) * kec.dot_mul() * cave.dot_mul("burn"), Color("#ff9a4d"))
 			if e.burn_t <= 0.0:
 				e.burn = 0
 				if e.burn_k > 0.0:
@@ -3772,7 +5490,7 @@ func _update_enemies(delta: float) -> void:
 				e.poison_tick = 0.6
 				# Contra jefes el veneno hace el 20% del porcentaje normal: si no, un Pokémon venenoso los derrite solo.
 				var pmul: float = POISON_BOSS_MUL if e.boss else 1.0
-				_damage_enemy(e, e.max_hp * 0.012 * pmul * float(e.poison) + 1.0, Color("#d47cf0"))
+				_damage_enemy(e, (e.max_hp * 0.008 * pmul * float(e.poison) + 1.0) * kec.dot_mul() * cave.dot_mul("poison"), Color("#d47cf0"))
 			if e.poison_t <= 0.0:
 				e.poison = 0
 			# Burbujas y gotas moradas mientras dure el veneno
@@ -3792,6 +5510,8 @@ func _update_enemies(delta: float) -> void:
 			tint = Color(0.55, 0.85, 1.3)
 		elif e.sleep_t > 0.0:
 			tint = Color(0.6, 0.62, 0.95)
+		elif e.charm_t > 0.0:
+			tint = Color(1.3, 0.75, 0.95)
 		elif e.conf_t > 0.0:
 			tint = Color(1.0, 0.7, 1.0).lerp(Color(0.8, 0.55, 1.0), 0.5 + 0.5 * sin(e.bob * 1.4))
 		elif e.para_t > 0.0 and int(e.bob * 2.0) % 2 == 0:
@@ -3826,6 +5546,8 @@ func _update_enemies(delta: float) -> void:
 
 
 func _enemy_step(e: Enemy, delta: float, kn_decay: float) -> void:
+	if bool(e.def.get("scripted", false)):
+		return   # Arceus en la Sentencia: lo mueve judgment.gd
 	var to: Vector2 = player.position - e.position
 	var dist: float = to.length()
 	var dirv: Vector2 = Vector2.ZERO
@@ -3841,6 +5563,9 @@ func _enemy_step(e: Enemy, delta: float, kn_decay: float) -> void:
 			e.position = _collide(e.position, e.radius * 0.5)
 		e.knock *= kn_decay
 		e.loop_anim("Idle", 0.05)
+		return
+	if e.charm_t > 0.0:
+		_charmed_step(e, delta, kn_decay, spd)
 		return
 	if e.conf_t > 0.0:
 		_confused_step(e, delta, kn_decay, spd)
@@ -4363,6 +6088,73 @@ func _hazard_inside(h: Hazard) -> bool:
 	return absf(-rel.x * d.y + rel.y * d.x) <= h.width * 0.5 + pr * 0.6
 
 
+func _hazard_hits_enemy(h: Hazard, en) -> bool:
+	var er: float = en.radius
+	if h.kind == "zone":
+		return en.position.distance_squared_to(h.position) < pow(h.r + er * 0.6, 2.0)
+	var d: Vector2 = Vector2.from_angle(h.angle)
+	var rel: Vector2 = en.position - h.position
+	var along: float = rel.dot(d)
+	if along < -er or along > h.length + er:
+		return false
+	return absf(-rel.x * d.y + rel.y * d.x) <= h.width * 0.5 + er * 0.6
+
+
+# Ataques de jefe del aliado capturado: los mismos de los jefes (pisoton, embestida, salto, lluvia, rayos, onda, salvas), pero contra los enemigos.
+func _ally_boss_attack(lg, tg) -> void:
+	if lg.boss_moves.is_empty():
+		var t: Array = [lg.ltype]
+		var pref := "volley"
+		if _has_t(t, ["fire", "ground", "poison", "rock", "grass"]):
+			pref = "rain"
+		elif _has_t(t, ["electric", "psychic", "dragon", "ice", "steel"]):
+			pref = "beam"
+		elif _has_t(t, ["fairy", "ghost", "water", "flying"]):
+			pref = "nova"
+		var others: Array = ["rain", "beam", "nova", "volley"]
+		others.erase(pref)
+		lg.boss_moves = ["slam", "dash" if _hash(lg.dex, 3, 7) < 0.5 else "leap", pref, others[int(_hash(lg.dex, 5, 9) * 3.0) % 3]]
+	var id: String = String(lg.boss_moves[randi() % lg.boss_moves.size()])
+	var d: float = lg.position.distance_to(tg.position)
+	if id == "slam" and d > 150.0:
+		id = "leap"
+	var col: Color = lg.col
+	var ang: float = (tg.position - lg.position).angle()
+	var dm: float = lg.dmg
+	if id == "slam":
+		_ally_hz(_hazard_zone(lg.position, 96.0 + lg.radius, 0.55, 0.0, lg.ltype, col), dm * 1.8)
+		lg.play("Charge", 1.2)
+	elif id == "dash":
+		_ally_hz(_hazard_beam(lg.position, ang, 330.0 + lg.radius, lg.radius * 2.0 + 16.0, 0.55, 0.0, lg.ltype, col), dm * 1.6)
+		lg.play("Charge", 1.3)
+	elif id == "leap":
+		_ally_hz(_hazard_zone(tg.position, 82.0, 0.65, 0.0, lg.ltype, col), dm * 1.7)
+		lg.play("Charge", 1.4)
+	elif id == "rain":
+		for i in range(4):
+			var a: float = randf() * TAU if i > 0 else 0.0
+			var dd: float = randf_range(40.0, 120.0) if i > 0 else 0.0
+			_ally_hz(_hazard_zone(tg.position + Vector2(cos(a) * dd, sin(a) * dd * 0.8), 50.0, 0.6 + float(i) * 0.12, 0.0, lg.ltype, col), dm * 1.1)
+		lg.play("Shoot", 1.0)
+	elif id == "beam":
+		for i in range(3):
+			_ally_hz(_hazard_beam(lg.position, ang + (float(i) - 1.0) * 0.5, 400.0, 26.0, 0.8, 0.0, lg.ltype, col), dm * 1.3)
+		lg.play("Charge", 1.1)
+	elif id == "nova":
+		_ally_hz(_hazard_zone(lg.position, 250.0, 0.7, 0.0, lg.ltype, col), dm * 1.2)
+		_ring(lg.position, lg.radius, 250.0, col, 0.7)
+		lg.play("Charge", 1.4)
+	else:   # volley: abanico de rayos finos
+		for i in range(5):
+			_ally_hz(_hazard_beam(lg.position, ang + (float(i) - 2.0) * 0.27, 420.0, 14.0, 0.5, 0.0, lg.ltype, col), dm * 0.9)
+		lg.play("Charge", 1.4)
+	Aud.sfx("boss")
+
+
+func _ally_hz(h: Hazard, dm: float) -> void:
+	h.ally_dmg = dm
+
+
 func _update_hazards(delta: float) -> void:
 	trap_slow_t = maxf(0.0, trap_slow_t - delta)
 	wp_t = maxf(0.0, wp_t - delta)
@@ -4412,7 +6204,13 @@ func _update_hazards(delta: float) -> void:
 				f.width = h.width
 				f.life = 0.3
 				fx.add_child(f)
-			if not player.dead and _hazard_inside(h):
+			if h.ally_dmg > 0.0:
+				for en in enemies.duplicate():
+					if en.dead or bool(en.def.get("scripted", false)):
+						continue
+					if _hazard_hits_enemy(h, en):
+						_damage_enemy(en, h.ally_dmg, h.color, (en.position - h.position).normalized(), 140.0)
+			elif not player.dead and _hazard_inside(h):
 				player.invuln = 0.0
 				if h.pct > 0.0:
 					_hurt_player(maxf(h.dmg, player.max_hp * h.pct), "", h.pure)
@@ -4497,6 +6295,7 @@ func _damage_enemy(e, amount: float, col: Color = Color.WHITE, dir: Vector2 = Ve
 			if kh > 0.0:
 				player.hp = minf(player.max_hp, player.hp + kh)
 		var lg: int = e.dex if (e.legend and not e.judge and not bool(e.def.get("dyna", false))) else 0
+		_ch_kill(e, src_k)
 		PG.event("kill", {"types": e.types, "boss": e.boss and not e.judge, "legend": lg})
 		Aud.sfx("bossDown" if e.boss else "faint")
 		_drop(e)
@@ -4551,12 +6350,14 @@ func _gen_chunk(cx: int, cy: int) -> Dictionary:
 			elif h > 0.994:
 				_add_prop(props, placed, "rock", wp, 18.0, rng)
 	# Especiales (en sitios abiertos, lejos del inicio y de cualquier otro objeto)
-	if rng.randf() < 0.22 and not menu_mode:
+	if rng.randf() < 0.22 * (kec.map_mul() if kec != null else 1.0) and not menu_mode:
 		_place_special("chest", 16.0, 7.0, props, placed, rng, cx, cy)
 	if rng.randf() < 0.08 and not menu_mode:
 		_place_special("spring", 40.0, 10.0, props, placed, rng, cx, cy)
 	if rng.randf() < 0.08 and not menu_mode:
-		_place_special("altar", 18.0, 10.0, props, placed, rng, cx, cy)
+		_alt_legend = rng.randf() < 0.25 and not _lg_pool().is_empty()
+		_place_special("altar", 100.0 if _alt_legend else 18.0, 10.0, props, placed, rng, cx, cy)
+		_alt_legend = false
 	if rng.randf() < 0.3:
 		_place_special("trap", 16.0, 13.0, props, placed, rng, cx, cy)
 	# Hierba en parches: matas a media casilla, con las filas alternadas, para que se unan y no queden una por casilla
@@ -4678,15 +6479,24 @@ func _add_prop(props: Array, placed: Array, kind: String, pos: Vector2, r: float
 	p.position = pos
 	if kind == "spring" or kind == "trap":
 		p.z_index = -1   # al ras del suelo: todo lo demas se dibuja por encima
-	if kind == "chest" and rng.randf() < 0.2:
-		p.sub = "big"
-		p.r = 22.0
+	if kind == "chest":
+		var cr: float = rng.randf()
+		if cr < 0.2:
+			p.sub = "big"
+			p.r = 22.0
+		elif cr < 0.32:
+			p.sub = "paid"
+		elif cr < 0.42:
+			p.sub = "trap" if rng.randf() < 0.5 else "trapv"   # trap = disfrazado, trapv = sospechoso
 	if kind == "trap":
 		p.sub = ["poison", "ice", "fire", "freeze", "shock", "sleep", "confuse"][rng.randi() % 7]
 	if kind == "altar":
 		var pw: Dictionary = POWERS[rng.randi() % POWERS.size()]
 		p.power = String(pw["id"])
 		p.color = Color.html(String(pw["color"]))
+		if _alt_legend:
+			p.sub = "legend"   # S53: altar legendario
+			p.color = Color("#ffd23f")
 	world.add_child(p)
 	props.append(p)
 	placed.append([pos, maxf(p.r, vis), kind])
@@ -4705,6 +6515,8 @@ func _update_biome() -> void:
 	var b: int = int(run_time / (150.0 if mode == "rush" else 240.0)) + biome_off
 	if mode == "tower":
 		b = tw_floor - 1
+	if mode == "normal":
+		b = biome_off + (1 if dir_map else 0)   # S63: una sola transicion (04:00, tras el jefe)
 	if b == biome_idx:
 		return
 	biome_idx = b
@@ -4741,6 +6553,8 @@ func _cut_grass(pos: Vector2, r: float) -> void:
 			_spawn_orb(gp, "heal", 0.0)
 		elif rr < 0.07:
 			_spawn_orb(gp, "coin", 1.0)
+		elif rr < 0.0715:
+			try_ball(gp, 1.0)
 
 
 func _update_world(delta: float) -> void:
@@ -4831,10 +6645,34 @@ func _spring_push(pos: Vector2) -> Vector2:
 	return pos
 
 
+# Altar legendario solido: un anillo de piedra con un hueco al frente (las escaleras). Solo se llega al circulo subiendo por ellas.
+func _legend_walls(p: Prop, pos: Vector2, rad: float) -> Vector2:
+	var l: Vector2 = pos - p.position
+	if absf(l.x) > 150.0 or l.y < -150.0 or l.y > 170.0:
+		return pos
+	for i in range(26):
+		var an: float = TAU * float(i) / 26.0
+		var sn: float = sin(an)
+		var cs: float = cos(an)
+		if sn > 0.0 and absf(cs) < 0.45:
+			continue   # hueco de las escaleras (abajo)
+		var wp := Vector2(cs * 94.0, sn * 62.0 - 4.0)
+		var d: Vector2 = l - wp
+		var md: float = 18.0 + rad
+		var dd: float = d.length_squared()
+		if dd < md * md:
+			if dd < 0.0001:
+				d = Vector2(0.0, 1.0)
+			l = wp + d.normalized() * md
+	return p.position + l
+
+
 func _collide(pos: Vector2, rad: float) -> Vector2:
 	if arena != null:
 		return arena.collide(pos, rad)
 	pos = ground.collide(pos, rad)
+	if mew != null:
+		pos = mew.collide(pos, rad)
 	var c: Vector2i = _chunk_of(pos)
 	for dx in range(-1, 2):
 		for dy in range(-1, 2):
@@ -4842,6 +6680,9 @@ func _collide(pos: Vector2, rad: float) -> Vector2:
 			if ch == null:
 				continue
 			for p in ch["props"]:
+				if p.kind == "altar" and p.sub == "legend":
+					pos = _legend_walls(p, pos, rad)
+					continue
 				if not p.solid:
 					continue
 				var d: Vector2 = pos - p.position
@@ -4887,7 +6728,22 @@ func _free_spot(pos: Vector2, rad: float) -> Vector2:
 	return pos
 
 
+const TERRAIN_HOME := {"water": ["water"], "lava": ["fire"], "swamp": ["poison", "water"], "ice": ["ice"], "poison": ["poison"], "spark": ["electric"]}
+var _terr_bonus_on := false
+
+
+# Seccion 40: +12% de velocidad solo mientras pisas un entorno de tu tipo (se quita al salir, sin acumularse).
 func _player_terrain(delta: float) -> float:
+	var base: float = _player_terrain_base(delta)
+	var liq: String = _liquid_at(player.position)
+	var home: bool = TERRAIN_HOME.has(liq) and _has_t(player.types, TERRAIN_HOME[liq])
+	if home and not _terr_bonus_on:
+		add_text(player.position + Vector2(0.0, -player.body_h - 20.0), L.t("+Velocidad"), Color("#8fe0ff"), 16)
+	_terr_bonus_on = home
+	return base * (1.12 if home else 1.0)
+
+
+func _player_terrain_base(delta: float) -> float:
 	var liq: String = _liquid_at(player.position)
 	if liq == "water":
 		if _has_t(player.types, ["water", "flying"]):
@@ -4968,7 +6824,12 @@ func _update_props(delta: float) -> void:
 			continue
 		var d: float = p.position.distance_to(pp)
 		if p.kind == "chest" and not p.used:
-			if p.sub == "big":
+			if p.sub == "paid":
+				pass   # lo gestiona el director de POI (precio + boton de interaccion)
+			elif p.sub == "trap" or p.sub == "trapv":
+				if d < p.r + player.radius + 14.0:
+					poi.trigger_trap_chest(p)
+			elif p.sub == "big":
 				# Cofre grande: hay que quedarse pegado a el unos segundos
 				if d < p.r + player.radius + 22.0:
 					p.charge += delta
@@ -4994,16 +6855,32 @@ func _update_props(delta: float) -> void:
 					st.tween_property(p, "modulate:a", 0.0, 1.2)
 					st.tween_callback(p.queue_free)
 					_forget_prop(p)
-		elif p.kind == "altar" and not p.used and d < 50.0:
+		elif p.kind == "altar" and p.sub == "legend" and not p.used:
+			# S53: te paras en el centro y la barra "Invocando" se llena. Salirte la pausa (con un desgaste minimo).
+			if is_instance_valid(legend):
+				if d < 60.0 and run_time - legend_msg_t > 3.0:
+					legend_msg_t = run_time
+					_say(L.t("Ya tienes un legendario a tu lado"), 2.0)
+			else:
+				if d < LEG_ZONE and not player.dead:
+					p.charge += delta
+					if p.charge >= LEG_TIME:
+						p.used = true
+						_summon_legend(p)
+				else:
+					p.charge = maxf(0.0, p.charge - delta * 0.12)
+				if p.charge != p.lastc:
+					p.lastc = p.charge
+		elif p.kind == "altar" and not p.used and p.sub != "legend" and d < 50.0:
 			p.used = true
 			_use_altar(p)
 		elif p.kind == "trap":
 			p.cd = maxf(0.0, p.cd - delta)
 			# Como en el original, la trampa salta tambien si la pisa un enemigo que no vuele
-			var stepped: bool = d < 26.0
+			var stepped: bool = d < 38.0
 			if not stepped and p.cd <= 0.0 and d < 400.0:
 				for te in enemies:
-					if not te.dead and not te.flying and te.position.distance_to(p.position) < te.radius + 6.0:
+					if not te.dead and not te.flying and te.position.distance_to(p.position) < te.radius + 14.0:
 						stepped = true
 						break
 			if p.cd <= 0.0 and stepped:
@@ -5013,6 +6890,52 @@ func _update_props(delta: float) -> void:
 				tt.tween_property(p, "modulate:a", 0.0, 0.35)
 				tt.tween_callback(p.queue_free)
 				_forget_prop(p)
+
+
+const TRAP_R := 112.0
+
+
+func _trap_fx(sub: String, pos: Vector2, col: Color) -> void:
+	# Cada trampa estalla con su propia animacion
+	shake = maxf(shake, 2.0)
+	match sub:
+		"poison":
+			_ring(pos, 6.0, TRAP_R, col, 0.55)
+			for i in range(14):
+				var q: Vector2 = pos + Vector2.from_angle(randf() * TAU) * randf_range(10.0, TRAP_R * 0.8)
+				pfx.burst(q, Color("#d47cf0"), 3, 60.0)
+			_ring(pos, 4.0, TRAP_R * 0.5, Color("#6b2c8f"), 0.8, 3.0)
+		"ice":
+			_ring(pos, 6.0, TRAP_R, col, 0.7, 6.0)
+			pfx.burst(pos, Color("#b8f06a"), 26, 130.0)
+		"freeze":
+			for i in range(8):
+				var d: Vector2 = Vector2.from_angle(float(i) * TAU / 8.0)
+				pfx.burst(pos + d * TRAP_R * 0.55, Color("#d8f6ff"), 6, 90.0)
+			_ring(pos, 6.0, TRAP_R, col, 0.45)
+			_ring(pos, 6.0, TRAP_R * 0.6, Color.WHITE, 0.3, 2.0)
+		"shock":
+			for i in range(6):
+				var d2: Vector2 = Vector2.from_angle(randf() * TAU)
+				for k in range(5):
+					pfx.burst(pos + d2 * (14.0 + k * 18.0) + Vector2(randf_range(-8, 8), randf_range(-8, 8)), Color("#ffe14d"), 3, 70.0)
+			_ring(pos, 6.0, TRAP_R, col, 0.25, 3.0)
+			shake = maxf(shake, 4.0)
+		"sleep":
+			_ring(pos, 6.0, TRAP_R, col, 1.0, 3.0)
+			for i in range(4):
+				add_text(pos + Vector2(randf_range(-40.0, 40.0), randf_range(-30.0, 10.0)), "Z", Color("#cfd8ff"), 22 + i * 3)
+		"confuse":
+			for i in range(3):
+				_ring(pos, 6.0 + i * 10.0, TRAP_R * (0.5 + 0.25 * i), col, 0.5 + 0.2 * i, 3.0)
+			for i in range(10):
+				var an: float = float(i) * 0.7
+				pfx.burst(pos + Vector2.from_angle(an) * (8.0 + i * 9.0), Color("#ff7ad9"), 3, 50.0)
+		_:
+			_ring(pos, 6.0, TRAP_R, col, 0.4, 7.0)
+			_ring(pos, 6.0, TRAP_R * 0.6, Color("#ffe27a"), 0.3, 4.0)
+			pfx.burst(pos, Color("#ff7b3d"), 36, 240.0)
+			shake = maxf(shake, 5.0)
 
 
 func _trigger_trap(p: Prop) -> void:
@@ -5032,9 +6955,9 @@ func _trigger_trap(p: Prop) -> void:
 		col = Color("#b9b6ff")
 	elif p.sub == "confuse":
 		col = Color("#ff7ad9")
-	_ring(pos, 6.0, 74.0, col, 0.5)
+	_trap_fx(p.sub, pos, col)
 	for e in enemies:
-		if e.dead or e.position.distance_to(pos) > 74.0:
+		if e.dead or e.position.distance_to(pos) > TRAP_R:
 			continue
 		if p.sub == "poison":
 			e.apply_poison(5)
@@ -5054,7 +6977,7 @@ func _trigger_trap(p: Prop) -> void:
 			_apply_cc(e, "conf", 1.5)
 		else:
 			_damage_enemy(e, 90.0 + lvl * 18.0, col, (e.position - pos).normalized(), 220.0)
-	if not player.dead and player.position.distance_to(pos) < 74.0 * 0.7 and not _has_item("heavyboots") and _abn("trapimm") == 0.0:
+	if not player.dead and player.position.distance_to(pos) < TRAP_R * 0.7 and not _has_item("heavyboots") and _abn("trapimm") == 0.0:
 		player.invuln = 0.0
 		if p.sub == "poison":
 			_hurt_player(player.max_hp * 0.1, "poison")
@@ -5102,9 +7025,9 @@ func _open_chest(p: Prop) -> void:
 		# Botin grande: monedas, tickets, objeto y experiencia para subir un nivel
 		for i in range(9):
 			_spawn_orb(pos + Vector2(randf_range(-22.0, 22.0), randf_range(-14.0, 14.0)), "coin", 4.0)
-		for i in range(1 + randi() % 3):
+		for i in range(1 + (1 if randf() < 0.35 else 0)):
 			_spawn_orb(pos + Vector2(randf_range(-16.0, 16.0), randf_range(-10.0, 10.0)), "ticket", 1.0)
-		if randf() < 0.15:
+		if randf() < 0.08:
 			_spawn_orb(pos + Vector2(0.0, -10.0), "ticket10", 1.0)
 		if randf() < 0.5:
 			_spawn_orb(pos + Vector2(14.0, -14.0), "item", 0.0)
@@ -5116,15 +7039,36 @@ func _open_chest(p: Prop) -> void:
 	_forget_prop(p)
 
 
+# Mejora gratis (cofres de compra): sube un nivel y abre la eleccion de carta.
+func free_upgrade() -> void:
+	player.xp = player.xp_next
+	_gain_xp(0.0)
+
+
+# Las Poké Balls son escasas: como mucho una cada 90 s de partida y nunca si ya llevas 3 o hay una en el suelo.
+var ball_last := -999.0
+func try_ball(pos: Vector2, chance: float, force: bool = false) -> bool:
+	if not force:
+		if balls >= 3 or run_time - ball_last < 90.0 or randf() > chance:
+			return false
+		for o in orbs:
+			if is_instance_valid(o) and o.kind == "ball":
+				return false
+	ball_last = run_time
+	_spawn_orb(pos, "ball", 1.0)
+	return true
+
+
 func _chest_roll(pos: Vector2, off: Vector2) -> void:
 	pos += off
-	var r: float = randf()
+	try_ball(pos + Vector2(14.0, 0.0), 0.12)
+	var r: float = kec.chest_roll_adjust(randf())
 	if r < 0.40:
 		for i in range(10):
 			_spawn_orb(pos, "coin", 5.0)
-		if randf() < 0.1:
-			_spawn_orb(pos, "ticket", float(1 + randi() % 3))
-			if randf() < 0.15:
+		if randf() < 0.07:
+			_spawn_orb(pos, "ticket", float(1 + randi() % 2))
+			if randf() < 0.08:
 				_spawn_orb(pos, "ticket10", 1.0)
 		add_text(pos + Vector2(0.0, -30.0), L.t("¡Monedas!"), Color("#ffd23f"), 22)
 	elif r < 0.72:
@@ -5139,6 +7083,155 @@ func _chest_roll(pos: Vector2, off: Vector2) -> void:
 	else:
 		_spawn_orb(pos, "magnet", 0.0)
 		_spawn_orb(pos, "bomb", 0.0)
+
+
+# ---------------------------------------------------------------
+# S53: altar legendario -> aliado que ataca solo, con vida visible y sin curacion
+# ---------------------------------------------------------------
+const LEG_TIME := 4.0
+const LEG_ZONE := 46.0
+var legend = null
+var allies_extra: Array = []   # v5.3: segundo aliado capturado
+var _alt_legend := false
+var legend_msg_t := -99.0
+
+
+func _lg_pool() -> Array:
+	var out: Array = []
+	for p in _dex_list:
+		if bool(p.get("leg", false)) and _smeta.has(str(int(p["dex"]))):
+			out.append(p)
+	return out
+
+
+func _summon_legend(p: Prop) -> void:
+	if is_instance_valid(legend):
+		return
+	var pool: Array = _lg_pool()
+	if pool.is_empty():
+		return
+	var pd: Dictionary = pool[randi() % pool.size()]
+	var dx: int = int(pd["dex"])
+	var lg := Legend.new()
+	lg.setup(dx, _sm(dx), flash_shader, 1.0, false)
+	lg.m = self
+	var ty: Array = pd["types"]
+	lg.ltype = String(ty[0]) if not ty.is_empty() else "normal"
+	lg.col = Color.html(String(MD.TYPE_COLOR.get(lg.ltype, "#ffd23f")))
+	lg.lname = L.t(String(pd["name"]))
+	var tm: float = run_time / 60.0
+	lg.max_hp = roundf(500.0 + float(player.level) * 70.0 + tm * 45.0)
+	lg.hp = lg.max_hp
+	lg.dmg = 26.0 + float(player.level) * 4.5 + tm * 2.0
+	lg.position = p.position + Vector2(0.0, 10.0)
+	lg.z_index = 1
+	world.add_child(lg)
+	legend = lg
+	lg.modulate.a = 0.0
+	var tw: Tween = lg.create_tween()
+	tw.tween_property(lg, "modulate:a", 1.0, 0.8)
+	# animacion de invocacion: columna de luz, tres anillos y una lluvia de particulas
+	for i in range(3):
+		_ring(p.position, 8.0, 90.0 + 50.0 * i, lg.col, 0.7 + 0.2 * i, 5.0 - i)
+	pfx.burst(p.position + Vector2(0.0, -30.0), lg.col, 40, 260.0)
+	pfx.burst(p.position + Vector2(0.0, -30.0), Color("#ffd23f"), 24, 160.0)
+	shake = maxf(shake, 6.0)
+	Aud.sfx("legend")
+	_say(L.t("¡%s responde al llamado!") % lg.lname, 3.0)
+	p.queue_redraw()
+
+
+func _upd_legend(delta: float) -> void:
+	for lx in allies_extra.duplicate():
+		if not is_instance_valid(lx) or lx.dead:
+			allies_extra.erase(lx)
+		else:
+			_upd_ally(lx, delta)
+	if not is_instance_valid(legend):
+		legend = null
+		return
+	_upd_ally(legend, delta)
+
+
+func _upd_ally(lg, delta: float) -> void:
+	if lg.dead:
+		return
+	lg.atk_t -= delta
+	lg.hit_t -= delta
+	# los enemigos que lo tocan le hacen dano (nunca se cura)
+	if lg.hit_t <= 0.0:
+		var taken := 0.0
+		for e in enemies:
+			if e.dead:
+				continue
+			if e.position.distance_to(lg.position) < e.radius + lg.radius + 6.0:
+				taken += e.dmg * 0.55
+		if taken > 0.0:
+			lg.hit_t = 0.6
+			lg.hurt(taken)
+	if lg.dead:
+		_legend_die(lg)
+		return
+	var tg: Node2D = _nearest_enemy(lg.position, 380.0)
+	var want: Vector2 = player.position + Vector2(-70.0, 30.0)
+	var spd := 150.0
+	if tg != null and lg.position.distance_to(tg.position) > 170.0 and lg.position.distance_to(player.position) < 420.0:
+		want = tg.position
+		spd = 190.0
+	var to: Vector2 = want - lg.position
+	# histeresis: evita que el sprite alterne Walk/Idle (parpadeo) cuando esta justo en el limite
+	var dist_w: float = to.length()
+	if lg.moving and dist_w < 28.0:
+		lg.moving = false
+	elif not lg.moving and dist_w > 52.0:
+		lg.moving = true
+	var moving: bool = lg.moving
+	if moving:
+		lg.position += to.normalized() * spd * delta
+		lg.face_angle(to.angle())
+	elif tg != null:
+		lg.face_angle((tg.position - lg.position).angle())
+	lg.loop_anim("Walk" if moving and lg.has_anim("Walk") else "Idle", 1.0)
+	if tg != null and lg.atk_t <= 0.0 and lg.position.distance_to(tg.position) < 240.0:
+		if lg.alpha:
+			lg.atk_t = 1.7
+			_ally_boss_attack(lg, tg)
+		else:
+			lg.atk_t = 1.25
+			if lg.has_anim("Attack"):
+				lg.play_attack("Attack", 1.25)
+			_legend_strike(lg, tg)
+
+
+func _legend_strike(lg, tg) -> void:
+	# Ataque propio: un rayo cae del cielo sobre el objetivo y estalla en area; cada 3er golpe es una onda mayor
+	lg.n_hits += 1
+	var big: bool = lg.n_hits % 3 == 0
+	var rad: float = 120.0 if big else 78.0
+	var pos: Vector2 = tg.position
+	lg.fx_line(pos)
+	_ring(pos, 6.0, rad, lg.col, 0.4, 5.0 if big else 3.0)
+	pfx.burst(pos, lg.col, 22 if big else 12, 200.0)
+	pfx.burst(pos, Color.WHITE, 6, 120.0)
+	if big:
+		shake = maxf(shake, 3.0)
+		_ring(lg.position, 6.0, 90.0, lg.col, 0.5, 3.0)
+	for e in enemies:
+		if e.dead or e.position.distance_to(pos) > rad:
+			continue
+		_damage_enemy(e, lg.dmg * (2.2 if big else 1.0), lg.col, (e.position - pos).normalized(), 160.0 if big else 90.0)
+
+
+func _legend_die(lg) -> void:
+	_ring(lg.position, 8.0, 110.0, lg.col, 0.6, 4.0)
+	pfx.burst(lg.position + Vector2(0.0, -20.0), lg.col, 30, 220.0)
+	add_text(lg.position + Vector2(0.0, -50.0), L.t("%s se retira") % lg.lname, Color("#ffd23f"), 20)
+	if lg == legend:
+		legend = null
+	else:
+		allies_extra.erase(lg)
+	lg.dead = true
+	lg.fade = 0.6
 
 
 func _use_altar(p: Prop) -> void:
@@ -5167,6 +7260,9 @@ func _bullet_hit(b, e) -> void:
 		dir = e.position - player.position   # los orbes empujan hacia fuera, lejos de ti
 	dmg_src = b.src
 	_hit_enemy(e, b.dmg, b.color, dir, b.knock, b.mtype, b.burn, b.poison, b.slow, b.cc, b.ccp)
+	if MD.MOVES.has(b.src) and MD.MOVES[b.src].has("coin") and randf() < 0.5:
+		coins += 1   # Día de Pago: solo moneda normal
+		Aud.sfx("coin")
 	dmg_src = ""
 
 
@@ -5176,6 +7272,8 @@ func _update_bullets(delta: float) -> void:
 		b.age += delta
 		if arena == null:
 			_cut_grass(b.position, 20.0)
+			if sec != null:
+				sec.hit(b.position, b.r + 6.0, String(b.mtype))
 		if b.orb:
 			b.oa += b.ospeed * delta
 			b.position = player.position + Vector2(cos(b.oa) * b.orad, sin(b.oa) * b.orad * 0.7)
@@ -5211,10 +7309,17 @@ func _update_bullets(delta: float) -> void:
 				var sp: float = b.vel.length()
 				var want: Vector2 = (tg.position + Vector2(0.0, -tg.body_h * 0.5) - b.position).normalized() * sp
 				b.vel = b.vel.lerp(want, 1.0 - exp(-b.homing * delta))
+		if b.turn != 0.0:
+			b.vel = b.vel.rotated(b.turn * delta)
+		if b.leave != "":
+			b.leave_t -= delta
+			if b.leave_t <= 0.0:
+				b.leave_t = 0.13
+				_p_zone(b.position, 24.0, 1.8, 0.4, b.bm, 0.3)
 		if b.trail != "":
 			b.trail_t -= delta
 			if b.trail_t <= 0.0:
-				b.trail_t = 0.04
+				b.trail_t = 0.14
 				pfx.trail(b.trail, b.pal, b.position + Vector2(0.0, -18.0), b.vel)
 		if not remove:
 			b.ppos = b.position
@@ -5238,12 +7343,30 @@ func _update_bullets(delta: float) -> void:
 					continue
 				b.hits.append(e)
 				_bullet_hit(b, e)
+				if b.ric > 0:
+					b.ric -= 1
+					var nx: Node2D = null
+					var bd: float = 280.0 * 280.0
+					for e2 in enemies:
+						if e2.dead or b.hits.has(e2):
+							continue
+						var d2: float = b.position.distance_squared_to(e2.position)
+						if d2 < bd:
+							bd = d2
+							nx = e2
+					if nx != null:
+						b.vel = (nx.position - b.position).normalized() * b.vel.length()
+					else:
+						remove = true
+					break
 				if b.pierce > 0:
 					b.pierce -= 1
 				else:
 					remove = true
 					break
 		if remove:
+			if b.burst > 0:
+				_p_radial(b.bm, b.position, b.burst, 250.0, 0.5, 0.5)
 			b.queue_free()
 			bullets.remove_at(i)
 
@@ -5253,15 +7376,21 @@ func _update_bullets(delta: float) -> void:
 # ---------------------------------------------------------------
 func _xp_for(level: int) -> int:
 	var l: float = float(level)
-	return int(floor((8.0 + l * 6.0 + pow(l, 1.75) * 1.6) * 4.0))
+	# v5.3: los primeros niveles piden menos experiencia (-15% al inicio, normal desde el nivel 20)
+	var early: float = lerpf(0.85, 1.0, clampf((l - 1.0) / 19.0, 0.0, 1.0))
+	return int(floor((8.0 + l * 6.0 + pow(l, 1.75) * 1.6) * 4.0 * early))
 
 
 func _gain_xp(amount: float) -> void:
 	player.xp += amount * _xp_mul() * XP_GAIN * (TOWER_XP_K if mode == "tower" else 1.0)
-	while player.xp >= player.xp_next:
+	if is_nan(player.xp) or is_inf(player.xp):
+		player.xp = 0.0
+	var guard := 0
+	while player.xp >= player.xp_next and guard < 200:   # tope de seguridad: nunca un bucle infinito (congelamiento)
+		guard += 1
 		player.xp -= player.xp_next
 		player.level += 1
-		player.xp_next = _xp_need(player.level)
+		player.xp_next = maxf(1.0, _xp_need(player.level))
 		pending_levels += 1
 
 
@@ -5286,19 +7415,49 @@ func _spawn_orb(pos: Vector2, kind: String, value: float):
 
 
 func _drop(e) -> void:
+	if e.has_meta("jd_arceus"):
+		jd.arceus_down(e)
+		return
+	if e.has_meta("enc") and String(e.get_meta("enc")) == "eternatus":
+		call_deferred("_eternatus_win")
+	if e.has_meta("enc") and String(e.get_meta("enc")) == "alpha":
+		alpha.on_down(e)
+	elif e.has_meta("enc") and (String(e.get_meta("enc")) == "open_boss" or String(e.get_meta("enc")) == "mini"):
+		alpha.on_big_down(e, String(e.get_meta("enc")))
+	if e.has_meta("enc") and String(e.get_meta("enc")) == "wildleg" and not e.has_meta("wl_paid"):
+		e.set_meta("wl_paid", true)
+		for k in range(2):
+			_spawn_orb(e.position, "ticket", 1.0)
+		for k in range(20):
+			_spawn_orb(e.position, "coin", 10.0)
+		_spawn_orb(e.position + Vector2(20.0, 0.0), "item", 0.0)
+		_say(L.t("¡Legendario derrotado! Premio especial."), 2.6)
+	if e.has_meta("enc") and String(e.get_meta("enc")) == "deoxys":
+		meteor.on_deoxys_down(e)
+	if e.has_meta("enc") and String(e.get_meta("enc")) == "mewtwo":
+		mew.on_down(e)
 	if e.legend:
 		_legend_down(e)
 		return
+	kec.on_kill(e)
 	if e.boss and not e.judge:
 		run_bosses += 1
 	if e.judge:
 		jd.boss_down()
 		progress_event("judgeKill")
 	if e.behavior == "thief":
-		if String(e.def.get("loot", "coins")) == "ticket10":
-			for k in range(6):
-				_spawn_orb(e.position, "coin", 5.0)
+		if String(e.def.get("loot", "coins")) == "gimmi":
+			if not e.has_meta("paid"):
+				e.set_meta("paid", true)   # una sola tirada por encuentro
+				# Poltchageist: solo Gachapon Coins; muy rara vez (3%) la dorada
+				if randf() < 0.03:
+					_spawn_orb(e.position + Vector2(0.0, -14.0), "gcoin_gold", 1.0)
+				else:
+					_spawn_orb(e.position + Vector2(0.0, -14.0), "gcoin", 1.0)
+		elif String(e.def.get("loot", "coins")) == "ticket10":
+			# Gholdengo: solo tickets (nada de monedas)
 			_spawn_orb(e.position, "ticket10", 1.0)
+			_spawn_orb(e.position + Vector2(12.0, 0.0), "ticket", 1.0)
 		else:
 			for k in range(20):
 				_spawn_orb(e.position, "coin", 5.0)
@@ -5313,7 +7472,7 @@ func _drop(e) -> void:
 		if not e.judge:
 			_spawn_orb(e.position + Vector2(24.0, 0.0), "heal", 0.0)
 			_spawn_orb(e.position + Vector2(-24.0, 0.0), "magnet", 0.0)
-			if randf() < 1.0 / 3.0:
+			if randf() < 0.2:
 				_spawn_orb(e.position + Vector2(0.0, -20.0), "ticket10", 1.0)
 			for k in range(10):
 				_spawn_orb(e.position + Vector2(randf_range(-40.0, 40.0), randf_range(-30.0, 30.0)), "coin", 5.0)
@@ -5325,7 +7484,7 @@ func _drop(e) -> void:
 	if e.xp_val >= XP_ENEMY:
 		kind = "xpBig"
 	_spawn_orb(e.position, kind, e.xp_val)
-	if randf() < 1.0 / 400.0:
+	if randf() < 1.0 / 600.0:
 		_spawn_orb(e.position + Vector2(10.0, 0.0), "ticket", 1.0)
 	var r: float = randf()
 	var off: Vector2 = Vector2.from_angle(randf() * TAU) * 14.0
@@ -5376,24 +7535,49 @@ func _collect(kind: String, value: float) -> void:
 				o.pulled = true
 		add_text(player.position + Vector2(0.0, -player.body_h - 4.0), L.t("IMAN!"), Color("#7fe0ff"))
 	elif kind == "coin":
-		coins += int(value * (1.25 if _has_item("pureincense") else 1.0) + randf())
+		coins += int(value * (1.25 if _has_item("pureincense") else 1.0) * (2.0 if _has_mod("rich") else 1.0) + randf())
 		Aud.sfx("coin")
 	elif kind == "ticket10":
 		tickets10 += int(value)
 		Aud.sfx("shinyGet")
 		add_text(player.position + Vector2(0.0, -player.body_h - 4.0), L.t("+%d ×10 tickets") % int(value), Color("#c47bff"))
+	elif kind == "gcoin_gold":
+		gold_gcoins_run += int(value)
+		Aud.sfx("legend")
+		add_text(player.position + Vector2(0.0, -player.body_h - 4.0), L.t("+%d Gachapon Coin Dorada") % int(value), Color("#ffd23f"), 22)
+	elif kind == "gcoin":
+		gcoins_run += int(value)
+		Aud.sfx("shinyGet")
+		add_text(player.position + Vector2(0.0, -player.body_h - 4.0), L.t("+%d Gachapon Coin") % int(value), Color("#ff8ad8"), 20)
 	elif kind == "ticket":
 		tickets += int(value)
 		Aud.sfx("shinyGet")
 		add_text(player.position + Vector2(0.0, -player.body_h - 4.0), L.t("+%d tickets") % int(value), Color("#ffd23f"))
+	elif kind == "ball":
+		if balls < BALL_CAP:
+			balls += maxi(1, int(value))
+			balls = mini(balls, BALL_CAP)
+			Aud.sfx("shinyGet")
+			add_text(player.position + Vector2(0.0, -player.body_h - 4.0), L.t("+%d Poké Ball") % maxi(1, int(value)), Color("#ff6b6b"))
+		else:
+			add_text(player.position + Vector2(0.0, -player.body_h - 4.0), L.t("Mochila de Poké Balls llena"), Color("#c8d0dc"), 16)
 	elif kind == "item":
 		_offer_item()
 	elif kind == "bomb":
 		Aud.sfx("ball")
 		shake = 12.0
+		# La bomba aniquila de un golpe a todo lo que esta en pantalla; los jefes pierden el 30% de su vida.
+		_ring(player.position, 10.0, 620.0, Color("#ff7b3d"), 0.5, 6.0)
+		pfx.burst(player.position, Color("#ffb347"), 40, 320.0)
+		var killed := 0
 		for e in enemies.duplicate():
-			if not e.dead and e.position.distance_to(player.position) < 520.0:
-				_damage_enemy(e, 80.0, Color("#ff7b3d"))
+			if e.dead or e.position.distance_to(player.position) > 760.0 or bool(e.def.get("scripted", false)):
+				continue
+			if e.boss or e.legend or bool(e.def.get("final", false)) or e.judge:
+				_damage_enemy(e, maxf(80.0, e.max_hp * 0.3), Color("#ff7b3d"))
+			else:
+				_damage_enemy(e, e.hp + e.shield + 1.0, Color("#ff7b3d"))
+				killed += 1
 		add_text(player.position + Vector2(0.0, -player.body_h - 4.0), L.t("BOOM!"), Color("#ff7b3d"))
 
 
@@ -5403,7 +7587,7 @@ func _offer() -> Array:
 	var waiting := {}
 
 	# --- movimientos nuevos ---
-	if _slot_list().size() < MAX_MOVES:
+	if _slot_list().size() < _max_moves():
 		var owned := {}
 		var buffs := 0
 		for m in player.moves:
@@ -5416,12 +7600,20 @@ func _offer() -> Array:
 			var ty: String = String(d["type"])
 			if ty != "normal" and not player.types.has(ty):
 				continue
-			if owned.has(id) or banned.has(id):
+			if not GPM.playable(String(id)):
+				continue
+			if owned.has(id) or banned.has(id) or fused_away.has(String(id)):
 				continue
 			if buffs >= 2 and String(d["kind"]) == "buff":
 				continue
 			cand.append(id)
-		cand.shuffle()
+		# Los movimientos de tipo Normal salen menos (peso 0.15) para que los de tu propio tipo no queden opacados.
+		var keyed: Array = []
+		for id in cand:
+			var wgt: float = NORMAL_MOVE_W if String(MD.MOVES[id]["type"]) == "normal" else 1.0
+			keyed.append([pow(maxf(0.0001, randf()), 1.0 / wgt), id])
+		keyed.sort_custom(func(a, b): return a[0] > b[0])
+		cand = keyed.map(func(x): return x[1])
 		for i in range(mini(6, cand.size())):
 			var nid: String = String(cand[i])
 			var nd: Dictionary = MD.MOVES[nid]
@@ -5431,6 +7623,10 @@ func _offer() -> Array:
 
 	# --- evoluciones: movimiento al maximo + su condicion cumplida ---
 	for m in player.moves:
+		if mode == "chal" and _ch_rs("no_evo"):
+			break
+		if m.has("parts"):
+			continue   # un movimiento fusionado ya no se puede mejorar ni evolucionar
 		for ev in _evo_infos(m):
 			if not bool(ev["ready"]):
 				if STATS.has(String(ev["needs"])):
@@ -5442,7 +7638,7 @@ func _offer() -> Array:
 
 	# --- mejoras de movimientos que ya tienes ---
 	for m in player.moves:
-		if int(m["lvl"]) >= _max_lvl(m):
+		if m.has("parts") or int(m["lvl"]) >= _max_lvl(m):
 			continue
 		var ladder: Array = MD.LADDERS[String(m["kind"])]
 		pool.append({"cat": "up", "id": String(m["id"]), "key": "up:" + String(m["id"]), "w": 8.0,
@@ -5467,7 +7663,7 @@ func _offer() -> Array:
 		var w: float = 7.0
 		if evo_for:
 			w = 14.0
-		elif _slot_list().size() < MAX_MOVES:
+		elif _slot_list().size() < _max_moves():
 			w = 4.0
 		var tag := "Mejora"
 		var colr := Color("#8fa3c4")
@@ -5477,6 +7673,19 @@ func _offer() -> Array:
 		pool.append({"cat": "stat", "id": String(sid), "key": "stat:" + String(sid), "w": w,
 			"title": String(sd["title"]), "desc": String(sd["desc"]), "icon": String(STAT_ICON.get(sid, "star")), "tag": tag, "color": colr})
 
+	# --- reto "sin mejoras": solo movimientos nuevos, objetos y curacion ---
+	if mode == "chal" and _ch_rs("no_upgrade"):
+		var keep: Array = []
+		for c in pool:
+			var cc: String = String(c["cat"])
+			if not (cc == "evo" or cc == "up" or (cc == "stat" and String(c["id"]) != "heal")):
+				keep.append(c)
+		if keep.is_empty():
+			# Sin nada mas que ofrecer: solo curacion (nunca una mejora, ni siquiera como ultimo recurso)
+			for c in pool:
+				if String(c["cat"]) == "stat" and String(c["id"]) == "heal":
+					keep.append(c)
+		pool = keep
 	# --- elegir tres ---
 	var picked: Array = []
 	for i in range(pool.size()):
@@ -5503,7 +7712,7 @@ func _offer() -> Array:
 # ---------------------------------------------------------------
 # Vinculos: fusiona movimientos en un solo hueco (player.js)
 # ---------------------------------------------------------------
-const BOND_MAX := 4
+const BOND_MAX := 2   # S54: como mucho 2 movimientos vinculados a la vez
 
 
 # Atajos de Mejoras: cada movimiento con hueco fijo se coloca en ese numero; si aun
@@ -5575,6 +7784,21 @@ func _slot_list() -> Array:
 	return out
 
 
+func _slot_list_of(moves: Array, bids: Array) -> Array:
+	var out: Array = []
+	var grp: Array = []
+	var added := false
+	for m in moves:
+		if bids.has(String(m["id"])):
+			if not added:
+				added = true
+				out.append(grp)
+			grp.append(m)
+		else:
+			out.append([m])
+	return out
+
+
 func _active_group() -> Array:
 	var sl: Array = _slot_list()
 	return sl[clampi(player.slot, 0, sl.size() - 1)]
@@ -5616,7 +7840,7 @@ func _offer_bond(quiet: bool = false) -> void:
 		elif bond_first != "":
 			d = L.t("Se lanzará a la vez que %s. Queda un hueco libre.") % _move_name(bond_first)
 		picks.append({"cat": "bond", "id": String(m["id"]), "key": "bond:" + String(m["id"]), "w": 1.0,
-			"title": String(m["name"]), "desc": d, "icon": "move:" + String(m["id"]),
+			"title": String(m["name"]), "desc": d, "icon": "move:" + String(m.get("recipe", m["id"])),
 			"tag": L.t("Nv.%d") % int(m["lvl"]), "color": _col(m)})
 	var heading: String = L.t("Elige el primer movimiento que vas a unir")
 	if mode == "add":
@@ -5626,6 +7850,214 @@ func _offer_bond(quiet: bool = false) -> void:
 	choosing = true
 	Aud.sfx("levelup")
 	cards.show_cards(picks, heading, L.t("¡Vínculo!"), false)
+
+
+# ---------------------------------------------------------------
+# S54: fusion de dos movimientos vinculados (evolucionados y al maximo) en un Movimiento de Vinculo
+# ---------------------------------------------------------------
+const FUSE_DMG := 2.2   # cada mitad pega mucho mas que un evolucionado normal (x1,8)
+var fuse_asked := ""
+var fused_once := false   # solo una fusion por partida
+var fused_away: Array = []   # movimientos consumidos: ya no se ofrecen en las mejoras
+
+
+func _fuse_pair() -> Array:
+	if fused_once or bond_ids.size() != 2:
+		return []
+	var out: Array = []
+	for id in bond_ids:
+		for m in player.moves:
+			if String(m["id"]) == String(id) and not m.has("parts"):
+				out.append(m)
+	if out.size() != 2:
+		return []
+	for m in out:
+		if not bool(m["evolved"]) or int(m["lvl"]) < _max_lvl(m):
+			return []
+	return out
+
+
+func _fuse_ready() -> bool:
+	if player.dead or mode == "tower" or _ch_rs("no_fusion"):
+		return false
+	return not _fuse_pair().is_empty()
+
+
+func _offer_fuse() -> void:
+	var pr: Array = _fuse_pair()
+	if pr.is_empty():
+		return
+	fuse_asked = "+".join(bond_ids)   # se ofrece una sola vez por pareja
+	var nm := "%s + %s" % [L.t(String(pr[0]["name"])), L.t(String(pr[1]["name"]))]
+	var picks: Array = [
+		{"cat": "fuse", "id": "yes", "key": "fuse:yes", "w": 1.0, "title": L.t("Fusionar"),
+		 "desc": L.t("Los dos movimientos originales se perderán el resto de la partida y se unirán en uno mucho más potente: %s.") % nm,
+		 "icon": "evo:" + String(pr[0]["id"]), "tag": L.t("Vínculo"), "color": Color("#ff8ad8")},
+		{"cat": "fuse", "id": "no", "key": "fuse:no", "w": 1.0, "title": L.t("Cancelar"),
+		 "desc": L.t("Conservas los dos movimientos tal como están."),
+		 "icon": "evo:" + String(pr[1]["id"]), "tag": "", "color": Color("#8fa3c4")}]
+	choosing = true
+	Aud.sfx("levelup")
+	cards.show_cards(picks, L.t("¿Fusionar los movimientos vinculados?"), L.t("¡Vínculo!"), false)
+
+
+func _do_fuse() -> void:
+	var pr: Array = _fuse_pair()
+	if pr.is_empty():
+		return
+	var a: Dictionary = pr[0]
+	var b: Dictionary = pr[1]
+	var fm: Dictionary = a.duplicate(true)
+	fm["parts"] = [a, b]
+	for pm in fm["parts"]:
+		if pm.has("dmg"):
+			pm["dmg"] = float(pm["dmg"]) * FUSE_DMG
+		if pm.has("cd"):
+			pm["cd"] = float(pm["cd"]) * 0.8
+	fm["name"] = "%s + %s" % [String(a["name"]), String(b["name"])]
+	fm["fused"] = true
+	fused_once = true
+	fused_away.append(String(a["id"]))
+	fused_away.append(String(b["id"]))
+	var rec: Dictionary = FUS.find(String(a["id"]), String(b["id"]))
+	if not rec.is_empty():
+		fm["name"] = String(rec["name"])
+		fm["recipe"] = String(rec["id"])
+		if not SV.d["fusions"].has(rec["id"]):
+			SV.d["fusions"].append(rec["id"])
+			SV.save()
+			_say(L.t("¡Receta descubierta: %s!") % L.t(String(rec["name"])), 3.5)
+	fm["lvl"] = _max_lvl(a)
+	fm["evolved"] = true
+	var out: Array = []
+	var placed := false
+	for m in player.moves:
+		if m == a or m == b:
+			if not placed:
+				placed = true
+				out.append(fm)
+			continue
+		out.append(m)
+	player.moves = out
+	bond_ids = []
+	bond_first = ""
+	fuse_asked = ""
+	player.slot = clampi(player.slot, 0, maxi(0, _slot_list().size() - 1))
+	_clear_orbit_orbs()
+	Aud.sfx("legend")
+	Aud.sfx("fusion")
+	var fcol := Color("#ff8ad8")
+	if not rec.is_empty():
+		fcol = Color.html(String(rec["col"]))
+	_ring(player.position, 8.0, 160.0, fcol, 0.9, 5.0)
+	_ring(player.position, 8.0, 280.0, Color.WHITE, 1.2, 3.0)
+	pfx.burst(player.position + Vector2(0.0, -20.0), fcol, 60, 300.0)
+	pfx.burst(player.position + Vector2(0.0, -20.0), Color.WHITE, 24, 180.0)
+	shake = maxf(shake, 14.0)
+	fusion_t = 2.8
+	fusion_name = L.t(String(fm["name"]))
+	fm["sig_t"] = 0.8
+	PG.event("fuse")
+
+
+# ---------------------------------------------------------------
+# S23: resumen vivo de la partida (pausa). DPS = dano registrado en los ultimos 20 s / 20 s (o el tiempo jugado si es menos).
+# ---------------------------------------------------------------
+const DPS_WIN := 20
+var dmg_hist: Array = []
+var dmg_hist_t := 0.0
+
+
+func _sample_dmg(delta: float) -> void:
+	dmg_hist_t += delta
+	if dmg_hist_t < 1.0:
+		return
+	dmg_hist_t -= 1.0
+	dmg_hist.append(run_dmg.duplicate())
+	if dmg_hist.size() > DPS_WIN + 1:
+		dmg_hist.pop_front()
+
+
+func _move_dmg_of(mv: Dictionary, src: Dictionary) -> float:
+	if mv.has("parts"):
+		var t := 0.0
+		for pm in mv["parts"]:
+			t += float(src.get(String(pm["id"]), 0.0))
+		return t
+	return float(src.get(String(mv["id"]), 0.0))
+
+
+func _ptypes_text() -> Array:
+	var out: Array = []
+	for t in player.types:
+		out.append(L.t(String(MD.TYPE_NAME.get(String(t), String(t)))))
+	return out
+
+
+func pause_summary() -> Dictionary:
+	var crit_p: float = minf(0.95, float(perks["crit"]) + (0.15 if _has_item("scopelens") else 0.0) + (0.05 if _has_item("ti_normal") else 0.0) + _lens_add() + _abn("crit"))
+	var all_stats: Array = [
+		[L.t("Vida"), "%d / %d" % [int(player.hp), int(player.max_hp)], "heart"],
+		[L.t("Daño"), "%d%%" % roundi(_atk() / maxf(0.001, base_atk) * 100.0), "fist"],
+		[L.t("Velocidad"), "%d" % roundi(_spd()), "boot"],
+		[L.t("Recarga"), "%d%%" % roundi(100.0 / maxf(0.05, _cd_mul_raw())), "clock"],
+		[L.t("Defensa"), "%d%%" % roundi(_reduction() * 100.0), "shield"],
+		[L.t("Regeneración"), "%.1f/s" % _regen(), "sprout"],
+		[L.t("Imán"), "%d" % roundi(_magnet()), "magnet"],
+		[L.t("Experiencia"), "x%.2f" % _xp_mul(), "book"],
+		[L.t("Tamaño"), "%d%%" % roundi(_size_k() * 100.0), "size"],
+		[L.t("Prob. de crítico"), "%d%%" % roundi(crit_p * 100.0), "scopelens"],
+		[L.t("Daño crítico"), "x%.2f" % _edge_mul(), "expertbelt"],
+		[L.t("Robo de vida"), "%d%%" % roundi(_fang_pct() * 100.0), "lifeorb"],
+		[L.t("Golpe doble"), "%d%%" % roundi(_dstrike_p() * 100.0), "choiceband"],
+		[L.t("Proyectiles extra"), "+%d" % _mult_extra(), "cards"],
+		[L.t("Perforación extra"), "+%d" % _pierce_extra(), "quickclaw"],
+		[L.t("Potencia de estados"), "x%.2f" % _amp_k(), "star"],
+		[L.t("Pokémonedas finales"), "x%.2f" % _treasure_k(), "amuletcoin"],
+		[L.t("Nivel"), "%d" % player.level, "star"],
+		[L.t("Derrotas"), "%d" % kills, "fist"],
+		[L.t("Tipos"), "/".join(PackedStringArray(_ptypes_text())), "star"],
+		[L.t("Habilidad"), L.t(String(AB.FX[AB.of(_pdex())]["name"])), "star"],
+	]
+	var out := {"moves": [], "stats": [], "items": [], "all": all_stats, "time": run_time, "level": player.level,
+		"hp": "%d / %d" % [int(player.hp), int(player.max_hp)], "window": DPS_WIN, "kills": kills, "pname": L.t(String(_dex_by[_pdex()]["name"])), "dex": _pdex(), "ab_name": L.t(String(AB.FX[AB.of(_pdex())]["name"])), "ab_desc": L.t(String(AB.FX[AB.of(_pdex())]["desc"])), "types": _ptypes_text(), "hp_ratio": clampf(float(player.hp) / maxf(1.0, float(player.max_hp)), 0.0, 1.0), "sprite": _sum_sprite()}
+	var old: Dictionary = dmg_hist[0] if not dmg_hist.is_empty() else {}
+	var span: float = float(maxi(1, dmg_hist.size() - 1)) if not dmg_hist.is_empty() else 1.0
+	for mv in player.moves:
+		var tot: float = _move_dmg_of(mv, run_dmg)
+		var dps: float = maxf(0.0, tot - _move_dmg_of(mv, old)) / span
+		var ids: Array = []
+		if mv.has("parts"):
+			for pm in mv["parts"]:
+				ids.append(String(pm["id"]))
+		else:
+			ids.append(String(mv["id"]))
+		var kills := 0
+		for i in ids:
+			kills += int(run_kills_by.get(i, 0))
+		out["moves"].append({"name": L.t(String(mv["name"])), "type": L.t(String(MD.TYPE_NAME.get(String(mv["type"]), ""))), "lvl": int(mv["lvl"]),
+			"dmg": int(tot), "dps": dps, "kills": kills, "icon": "move:" + ids[0], "col": String(MD.TYPE_COLOR.get(String(mv["type"]), "#ffffff"))})
+	for sid in STATS:
+		var lv: int = _lv(String(sid))
+		if lv > 0 and String(sid) != "heal":
+			out["stats"].append({"name": L.t(String(STATS[sid]["title"])), "lv": lv, "icon": String(STAT_ICON.get(sid, "star"))})
+	for it in [item, item2, item3]:
+		if String(it) != "":
+			var idesc := ""
+			for td in TD.ITEMS:
+				if String(td["id"]) == String(it):
+					idesc = L.t(String(td["desc"]))
+			out["items"].append({"id": String(it), "name": _item_name_of(String(it)), "desc": idesc})
+	return out
+
+
+func _sum_sprite() -> Texture2D:
+	if player.sprite == null or player.sprite.texture == null:
+		return null
+	var at := AtlasTexture.new()
+	at.atlas = player.sprite.texture
+	at.region = player.sprite.region_rect if player.sprite.region_enabled else Rect2(Vector2.ZERO, player.sprite.texture.get_size())
+	return at
 
 
 func _move_name(id: String) -> String:
@@ -5670,6 +8102,26 @@ func _bond_pick(id: String) -> void:
 	Aud.sfx("legend")
 	_ring(player.position, 8.0, 130.0, Color("#ff8ad8"), 0.8)
 	_say(L.t("¡Vínculo! %d movimientos a la vez") % bond_ids.size(), 2.6)
+	_fuse_hint()
+
+
+# v5.2: si la pareja vinculada no se puede fusionar, dice por que (antes no pasaba nada y no se sabia el motivo).
+func _fuse_hint() -> void:
+	if bond_ids.size() != 2 or mode == "tower":
+		return
+	var why := ""
+	if fused_once:
+		why = L.t("Solo se puede fusionar una vez por partida")
+	else:
+		for id in bond_ids:
+			for m in player.moves:
+				if String(m["id"]) == String(id) and not why != "":
+					if m.has("parts"):
+						why = L.t("%s ya es una fusión") % L.t(String(m["name"]))
+					elif not bool(m["evolved"]):
+						why = L.t("Para fusionar, %s debe estar evolucionado") % L.t(String(m["name"]))
+	if why != "":
+		get_tree().create_timer(2.8).timeout.connect(func(): _say(why, 3.4))
 
 
 func _open_cards() -> void:
@@ -5703,8 +8155,15 @@ func _on_card_chosen(idx: int) -> void:
 			Aud.sfx("levelup")
 			_ring(player.position, 8.0, 140.0, Color("#4f9cf0"), 0.7)
 			add_text(player.position + Vector2(0.0, -player.body_h - 8.0), L.t("¡Caramelo Raro! +1 nivel"), Color("#4f9cf0"), 22)
+			# v5.2.2: pasa directo a la pantalla de mejora, sin cerrar las cartas un fotograma (eso hacia parpadear la pantalla)
+			cards.hide_cards()
+			choosing = false
+			_open_cards()
+			return
 		elif cat == "itemtake":
-			if int(c.get("slot", 1)) == 2:
+			if int(c.get("slot", 1)) == 3:
+				item3 = id
+			elif int(c.get("slot", 1)) == 2:
 				item2 = id
 			else:
 				item = id
@@ -5716,17 +8175,22 @@ func _on_card_chosen(idx: int) -> void:
 	if cat == "bond":
 		_bond_pick(id)
 		return
+	if cat == "fuse":
+		cards.hide_cards()
+		choosing = false
+		if id == "yes":
+			_do_fuse()
+		return
 	if cat == "new":
 		var nm: Dictionary = _new_move(id, 1)
 		var cur_g: Array = _active_group()
 		var cur_first: Dictionary = cur_g[0]
 		player.moves.append(nm)
 		_arrange(cur_first)
-		if cur_g.size() < 2:
-			var nsl: Array = _slot_list()
-			for gi in range(nsl.size()):
-				if String(nsl[gi][0]["id"]) == id:
-					_set_active(gi)
+		# S58.7: aprender un movimiento NO cambia el movimiento activo elegido por el jugador.
+		for gi in range(_slot_list().size()):
+			if String(_slot_list()[gi][0]["id"]) == String(cur_first["id"]):
+				player.slot = gi
 	elif cat == "evo" or cat == "up":
 		for m in player.moves:
 			if String(m["id"]) == id:
@@ -5742,6 +8206,8 @@ func _on_card_chosen(idx: int) -> void:
 			player.hp = minf(player.max_hp, player.hp + 20.0)
 		elif id == "heal":
 			player.hp = minf(player.max_hp, player.hp + player.max_hp * 0.45)
+	if mode == "chal" and (cat == "evo" or cat == "up" or (cat == "stat" and id != "heal")):
+		ch_m["upgrades"] = int(ch_m.get("upgrades", 0)) + 1   # las mejoras de las cartas cuentan como mejoras compradas
 	Aud.sfx("confirm")
 	pending_levels = maxi(0, pending_levels - 1)
 	cards.hide_cards()
@@ -5753,11 +8219,23 @@ func _on_card_chosen(idx: int) -> void:
 # ---------------------------------------------------------------
 func _offer_item() -> void:
 	var two: bool = tw_risk.has("l_bag") or has_bag
+	var three: bool = has_bag3
 	var pool: Array = []
 	for it in TD.ITEMS:
-		if String(it["id"]) != item and not (two and String(it["id"]) == item2) and _item_ok_for(String(it["id"])):
+		if String(it["id"]) != item and not (two and String(it["id"]) == item2) and not (three and String(it["id"]) == item3) and _item_ok_for(String(it["id"])):
 			pool.append(it)
+	var blocked: Array = SV.d.get("item_block", [])
+	var pool2: Array = []
+	for it2 in pool:
+		if not blocked.has(String(it2["id"])) or String(it2["id"]) == "rarecandy":
+			pool2.append(it2)
+	if not pool2.is_empty():
+		pool = pool2
 	var nw: Dictionary = pool[randi() % pool.size()]
+	var full: bool = item != "" and (not two or item2 != "") and (not three or item3 != "")
+	if bool(SV.d.get("item_lock", false)) and full and String(nw["id"]) != "rarecandy":
+		add_text(player.position + Vector2(0.0, -player.body_h - 8.0), L.t("Objeto ignorado (bloqueo activo)"), Color("#8fa3c4"), 16)
+		return
 	var picks: Array = []
 	if not two:
 		picks.append({"cat": "itemtake", "id": String(nw["id"]), "key": "it:" + String(nw["id"]), "w": 1.0,
@@ -5771,6 +8249,7 @@ func _offer_item() -> void:
 				"title": _item_name(), "desc": cur_desc, "icon": item, "tag": "Quedarte con el tuyo", "color": Color("#8fa3c4")})
 		choosing = true
 		cards.show_cards(picks, L.t("Solo puedes llevar uno: elige con cuál quedarte"), L.t("Has encontrado un objeto"), false)
+		_item_ui(String(nw["id"]))
 		return
 	# Doble equipaje: dos huecos. Si hay uno libre se rellena; si no, eliges a cuál sustituye.
 	var slots: Array = []
@@ -5778,19 +8257,54 @@ func _offer_item() -> void:
 		slots.append(1)
 	elif item2 == "":
 		slots.append(2)
+	elif three and item3 == "":
+		slots.append(3)
 	else:
-		slots = [1, 2]
+		slots = [1, 2, 3] if three else [1, 2]
+	if String(nw["id"]) == "rarecandy":
+		slots = [1]   # el Caramelo Raro no ocupa hueco: una sola carta
 	for sl in slots:
 		var tg: String = "Objeto nuevo"
-		if slots.size() == 2:
-			tg = L.t("Sustituye: %s") % L.t(_item_name_of(item if int(sl) == 1 else item2))
+		if slots.size() >= 2:
+			tg = L.t("Sustituye: %s") % L.t(_item_name_of(item if int(sl) == 1 else (item2 if int(sl) == 2 else item3)))
 		picks.append({"cat": "itemtake", "slot": int(sl), "id": String(nw["id"]), "key": "it:%s:%d" % [String(nw["id"]), int(sl)], "w": 1.0,
 			"title": String(nw["name"]), "desc": String(nw["desc"]), "icon": String(nw["id"]), "tag": tg, "color": Color("#ff8ad8")})
 	if item != "":
 		picks.append({"cat": "itemkeep", "id": item, "key": "keep", "w": 1.0, "title": "Quedarte con los tuyos",
 			"desc": L.t("Sigues con tus objetos actuales."), "icon": item, "tag": "Sin cambios", "color": Color("#8fa3c4")})
 	choosing = true
-	cards.show_cards(picks, L.t("Puedes llevar dos objetos"), L.t("Has encontrado un objeto"), false)
+	cards.show_cards(picks, L.t("Puedes llevar tres objetos") if three else L.t("Puedes llevar dos objetos"), L.t("Has encontrado un objeto"), false)
+	_item_ui(String(nw["id"]))
+
+
+func _item_ui(new_id: String) -> void:
+	cards.item_mode = true
+	cards.lock_on = bool(SV.d.get("item_lock", false))
+	cards.block_name = "" if new_id == "rarecandy" else new_id
+	cards.queue_redraw()
+
+
+func _on_lock_toggled() -> void:
+	SV.d["item_lock"] = not bool(SV.d.get("item_lock", false))
+	SV.save()
+	cards.lock_on = bool(SV.d["item_lock"])
+	Aud.sfx("confirm")
+	cards.queue_redraw()
+
+
+func _on_block_pressed() -> void:
+	var bl: Array = SV.d.get("item_block", [])
+	if not bl.has(cards.block_name):
+		bl.append(cards.block_name)
+	SV.d["item_block"] = bl
+	SV.save()
+	# El objeto ofrecido se descarta: nos quedamos con lo que ya llevamos.
+	for i in range(cards.items.size()):
+		if String(cards.items[i]["cat"]) == "itemkeep":
+			cards.chosen.emit(i)
+			return
+	cards.hide_cards()
+	choosing = false
 
 
 # ---------------------------------------------------------------
@@ -5862,6 +8376,8 @@ func _update_rift(delta: float) -> void:
 	rift_check = 8.0 if mode == "rifts" else RIFT_EVERY
 	if rift != null or run_time >= RIFT_END or _boss_alive() or mode == "rush" or mode == "tower":
 		return
+	if mode == "normal" and (dir_finale or not dir_done.has("rift")):
+		return   # S63: la primera Grieta la abre el director; en el final no hay Grietas
 	if mode == "rifts" and run_time > RIFTS_LIMIT - 40.0:
 		return   # ya no da tiempo a una pelea nueva
 	# Guarida Dynamax: 5% por chequeo (cada RIFT_EVERY s), no en la contrarreloj de grietas
@@ -5963,7 +8479,7 @@ func _update_rift_hud() -> void:
 	hud.rift_ttl = -1.0
 	hud.legend_frac = -1.0
 	if arena != null:
-		hud.arena_left = maxf(0.0, ARENA_LIMIT - float(ainfo.get("t", 0.0))) if String(ainfo.get("phase", "")) == "fight" else -1.0
+		hud.arena_left = maxf(0.0, ARENA_LIMIT - float(ainfo.get("t", 0.0))) if String(ainfo.get("phase", "")) == "fight" and not bool(ainfo.get("cave", false)) else -1.0
 		var b = ainfo.get("boss")
 		if b != null and is_instance_valid(b):
 			hud.legend_name = b.enemy_name
@@ -6063,15 +8579,54 @@ func _arena_begin() -> void:
 	shake = 10.0
 
 
+# Entrada a una cueva elemental (cave.gd / cave_int.gd): igual que entrar a una grieta, sin jefe ni limite de tiempo.
+func _cave_begin(ci: Node2D, ty: String, owner: String = "cave") -> void:
+	ainfo = {"phase": "fight", "t": 0.0, "back": player.position, "dex": 0, "type": ty, "shiny": false,
+		"stash_e": enemies.duplicate(), "stash_o": orbs.duplicate(), "end": 0.0, "boss": null, "den": false, "cave": true, "owner": owner}
+	for e in enemies:
+		e.visible = false
+	for o in orbs:
+		if is_instance_valid(o):
+			o.visible = false
+	enemies.clear()
+	orbs.clear()
+	_free_list(bullets)
+	_free_list(fields)
+	_free_list(hazards)
+	_free_list(ebullets)
+	ground.visible = false
+	arena = ci
+	arena.position = ARENA_POS
+	arena.z_index = -2
+	add_child(arena)
+	arena.build(world)
+	player.position = ARENA_POS + (Vector2(0.0, 220.0) if owner == "lab" else CVE.CVI.SPAWN)
+	player_vel = Vector2.ZERO
+	player.invuln = 1.5
+	wx_kind = ""
+	wx.clear()
+	shake = 3.0
+
+
+# Si no hay enemigos del tipo en la lista actual, usa cualquiera de ese tipo de las primeras etapas
+func _cave_type_pool(ty: String) -> Array:
+	var out: Array = []
+	for ti in range(mini(cast_run.size(), 3)):
+		for d in cast_run[ti]["list"]:
+			if _has_t(_dex_by[int(d["dex"])]["types"], [ty]):
+				out.append(d)
+	return out
+
+
 # El vinculo se elige dentro de la grieta, ya vencido el legendario y recogido el premio, justo antes de salir
 func _arena_bond_ready() -> bool:
-	return arena != null and String(ainfo.get("phase", "")) == "won" and float(ainfo.get("end", 9.0)) <= 2.0
+	return arena != null and not bool(ainfo.get("cave", false)) and String(ainfo.get("phase", "")) == "won"
 
 
 func _arena_expel() -> void:
 	ainfo["phase"] = "lost"
 	ainfo["end"] = 1.2
-	_say(L.t("La grieta os ha expulsado…"), 2.6)
+	_say(L.t("La cueva os ha expulsado…") if bool(ainfo.get("cave", false)) else L.t("La grieta os ha expulsado…"), 2.6)
 	Aud.sfx("back")
 
 
@@ -6097,7 +8652,15 @@ func _update_arena(delta: float) -> void:
 		if float(ainfo["end"]) <= 0.0:
 			_arena_end(false)
 	elif ph == "won":
-		ainfo["end"] = float(ainfo["end"]) - delta
+		# v5.2: no se sale de la grieta hasta elegir el vínculo pendiente
+		if bonds > 0 and not choosing and not bool(ainfo.get("cave", false)) and _bond_options().is_empty() and not bool(ainfo.get("bond_drop", false)):
+			# Sin movimientos que vincular, el vínculo ganado en la grieta se quita en vez de quedarse guardado
+			ainfo["bond_drop"] = true
+			bonds -= 1
+			_say(L.t("No quedan movimientos que vincular: el vínculo se descarta"), 3.0)
+		var bond_wait: bool = not bool(ainfo.get("cave", false)) and (choosing or (bonds > 0 and not _bond_options().is_empty()))
+		if not bond_wait or float(ainfo["end"]) > 2.0:
+			ainfo["end"] = float(ainfo["end"]) - delta
 		if float(ainfo["end"]) <= 0.0:
 			_arena_end(true)
 
@@ -6167,8 +8730,8 @@ func _legend_down(e) -> void:
 	for k in range(n):
 		made.append(_spawn_orb(pos, "xpBig", per))
 	made.append(_spawn_orb(pos + Vector2(24.0, 0.0), "item", 0.0))
-	made.append(_spawn_orb(pos + Vector2(-24.0, 0.0), "ticket", 3.0))
-	if randf() < 0.5:
+	made.append(_spawn_orb(pos + Vector2(-24.0, 0.0), "ticket", 2.0))
+	if randf() < 0.3:
 		made.append(_spawn_orb(pos + Vector2(0.0, 24.0), "ticket10", 1.0))
 	for k in range(10):
 		made.append(_spawn_orb(pos, "coin", 10.0))
@@ -6202,7 +8765,7 @@ func _den_down(e) -> void:
 		made.append(_spawn_orb(pos, "xpBig", per))
 	made.append(_spawn_orb(pos + Vector2(24.0, 0.0), "item", 0.0))
 	made.append(_spawn_orb(pos + Vector2(-24.0, 0.0), "item", 0.0))
-	made.append(_spawn_orb(pos + Vector2(0.0, 24.0), "ticket", 2.0))
+	made.append(_spawn_orb(pos + Vector2(0.0, 24.0), "ticket", 1.0))
 	for k in range(12):
 		made.append(_spawn_orb(pos, "coin", 10.0))
 	made.append(_spawn_orb(pos + Vector2(0.0, -24.0), "heal", 0.0))
@@ -6213,7 +8776,7 @@ func _den_down(e) -> void:
 	dyn_cd = 0.0
 	Aud.sfx("bossDown")
 	if first:
-		_say(L.t("¡Has desbloqueado el Dynamax! Botón MAX, tecla C o gatillo izquierdo (desde el nivel %d)") % DYN.MIN_LEVEL, 4.2)
+		_say(L.t("¡Has desbloqueado el Dynamax! Botón MAX, tecla C o gatillo izquierdo (desde el minuto 3)"), 4.2)
 	else:
 		_say(L.t("¡Guarida superada! Caramelo Dynamax: puedes usar el Dynamax otra vez"), 3.6)
 	add_text(player.position + Vector2(0.0, -player.body_h - 10.0), "DYNAMAX", Color("#ff3d6e"), 26)
@@ -6225,6 +8788,8 @@ func _arena_end(won: bool, timeout: bool = false) -> void:
 	if arena == null:
 		return
 	var back: Vector2 = ainfo["back"]
+	var was_cave: bool = bool(ainfo.get("cave", false))
+	var was_owner: String = String(ainfo.get("owner", "cave"))
 	_free_list(bullets)
 	_free_list(fields)
 	_free_list(hazards)
@@ -6261,12 +8826,20 @@ func _arena_end(won: bool, timeout: bool = false) -> void:
 		player.hp = maxf(player.hp, player.max_hp * 0.3)
 		_ring(player.position, 8.0, 90.0, Color("#c9a6ff"), 0.8)
 	ainfo = {}
-	if won and bonds > 0 and _bond_options().is_empty():
+	if was_cave:
+		if was_owner == "lab":
+			mew.on_leave(won)
+		else:
+			cave.on_leave(won)
+	if won and not was_cave and bonds > 0 and _bond_options().is_empty():
 		_say(L.t("Guardas el vínculo: aprende otro movimiento para usarlo"), 3.0)
 	rift_check = 6.0 if mode == "rifts" else RIFT_EVERY
 	rift_miss = 0
 	_update_world(0.0)
 	shake = 0.0
+	if mode != "rifts":
+		ret_cd = 3.0
+		ret_last = 4
 
 
 func _start_weather(kind: String, dur: float) -> void:
@@ -6598,11 +9171,147 @@ class Player extends Actor:
 	var orb_cast_t := 0.0
 	var last_patch = null
 	var buffs := {
-		"atk": {"n": 0, "amount": 0.0, "t": 0.0},
-		"spd": {"n": 0, "amount": 0.0, "t": 0.0},
-		"def": {"n": 0, "amount": 0.0, "t": 0.0},
-		"regen": {"n": 0, "amount": 0.0, "t": 0.0},
+		"atk": {"n": 0, "amount": 0.0, "t": 0.0, "ts": []},
+		"spd": {"n": 0, "amount": 0.0, "t": 0.0, "ts": []},
+		"def": {"n": 0, "amount": 0.0, "t": 0.0, "ts": []},
+		"regen": {"n": 0, "amount": 0.0, "t": 0.0, "ts": []},
 	}
+
+
+class AimMark extends Node2D:
+	var m = null
+
+	func _process(_d: float) -> void:
+		var on: bool = m != null and m.aim_manual and not m.player.dead
+		if on != visible:
+			visible = on
+		if on:
+			position = m.player.position
+			queue_redraw()
+
+	func _draw() -> void:
+		var d := Vector2.from_angle(m.aim_ang)
+		var c := Vector2(0.0, -14.0)
+		var p0: Vector2 = c + d * 64.0
+		var p1: Vector2 = c + d * 84.0
+		var n := Vector2(-d.y, d.x)
+		draw_line(c + d * 40.0, p0, Color(1, 1, 1, 0.35), 2.0)
+		draw_colored_polygon(PackedVector2Array([p1, p0 + n * 8.0, p0 - n * 8.0]), Color(1, 0.95, 0.5, 0.85))
+
+
+class Legend extends Actor:
+	var m = null
+	var alpha := false
+	var hp := 1.0
+	var max_hp := 1.0
+	var dmg := 20.0
+	var ltype := "normal"
+	var col := Color("#ffd23f")
+	var lname := ""
+	var boss_moves: Array = []
+	var moving := false
+	var dead := false
+	var atk_t := 1.0
+	var hit_t := 0.0
+	var n_hits := 0
+	var bolt_pos := Vector2.ZERO
+	var bolt_t := 0.0
+	var tt := 0.0
+
+	func hurt(a: float) -> void:
+		hp -= a   # sin curacion: solo baja
+		flash = 1.0
+		if hp <= 0.0:
+			hp = 0.0
+			dead = true
+
+	func fx_line(p: Vector2) -> void:
+		bolt_pos = p
+		bolt_t = 0.3
+
+	func _process(delta: float) -> void:
+		super._process(delta)
+		tt += delta
+		if bolt_t > 0.0:
+			bolt_t -= delta
+		queue_redraw()
+
+	func _draw() -> void:
+		super._draw()
+		# aura giratoria de runas doradas
+		for i in range(6):
+			var an: float = tt * 1.4 + float(i) * TAU / 6.0
+			var pt := Vector2(cos(an) * (radius + 16.0), sin(an) * (radius + 16.0) * 0.45 - 4.0)
+			draw_rect(Rect2(pt - Vector2(2, 2), Vector2(4, 4)), Color(col.r, col.g, col.b, 0.85))
+		# rayo del ataque (cae del cielo sobre el objetivo)
+		if bolt_t > 0.0:
+			var l: Vector2 = bolt_pos - position
+			var k: float = bolt_t / 0.3
+			draw_line(l + Vector2(0.0, -420.0), l, Color(col.r, col.g, col.b, k), 6.0 * k + 1.0)
+			draw_line(l + Vector2(0.0, -420.0), l, Color(1, 1, 1, k), 2.0)
+		# barra de vida y nombre
+		var w := 56.0
+		var y: float = -body_h - 14.0
+		draw_rect(Rect2(-w * 0.5 - 1.0, y - 1.0, w + 2.0, 8.0), Color(0, 0, 0, 0.8))
+		draw_rect(Rect2(-w * 0.5, y, w * clampf(hp / max_hp, 0.0, 1.0), 6.0), Color("#ffd23f"))
+		draw_string(ThemeDB.fallback_font, Vector2(-w * 0.5, y - 5.0), lname, HORIZONTAL_ALIGNMENT_LEFT, 120, 11, Color.WHITE)
+
+
+# Aura azul circular del escudo del jugador (escudo del descanso de la Torre). Sigue al valor real del escudo
+# y desaparece sola al agotarse, al morir o al reiniciar (el nodo es hijo del jugador).
+class ShieldAura extends Node2D:
+	var m = null
+	var t := 0.0
+
+	func _process(d: float) -> void:
+		var on: bool = m != null and m.tw_shield > 0.0 and not m.player.dead
+		if on != visible:
+			visible = on
+		if on:
+			t += d
+			queue_redraw()
+
+	func _draw() -> void:
+		var r: float = maxf(m.player.radius, m.player.body_h * 0.5) + 12.0
+		var f: float = clampf(m.tw_shield / maxf(1.0, m.player.max_hp * 0.35), 0.0, 1.0)
+		bubble(self, Vector2(0.0, -m.player.body_h * 0.5), r, t, f)
+
+	# Burbuja brillante: interior en degradado (mas opaco hacia el borde), borde irisado, reflejos y destellos.
+	# f (0..1) = cuanto escudo queda: con poco, parpadea para avisar de que se rompe.
+	static func bubble(ci: CanvasItem, c: Vector2, r: float, t: float, f: float = 1.0) -> void:
+		var pulse: float = 0.5 + 0.5 * sin(t * 3.0)
+		var warn: float = 1.0
+		if f < 0.3:
+			warn = 0.55 + 0.45 * absf(sin(t * 9.0))
+		var rr: float = r * (1.0 + 0.015 * pulse)
+		# relleno: capas concentricas, el centro casi transparente y el borde lleno de color
+		for i in 7:
+			var k: float = float(i) / 6.0
+			var rad: float = rr * (1.0 - k * 0.55)
+			ci.draw_circle(c, rad, Color(0.30 + 0.25 * k, 0.62 + 0.2 * k, 1.0, (0.035 + 0.02 * pulse) * warn))
+		# borde irisado: segmentos con tono que rota (azul, cian, violeta suave)
+		var seg := 36
+		for i in seg:
+			var a0: float = TAU * float(i) / float(seg) + t * 0.6
+			var a1: float = TAU * float(i + 1) / float(seg) + t * 0.6 + 0.02
+			var hue: float = 0.56 + 0.11 * sin(a0 * 2.0 + t * 1.5)
+			var col := Color.from_hsv(hue, 0.55, 1.0, (0.62 + 0.25 * sin(a0 * 3.0 - t * 2.0) * 0.5 + 0.1) * warn)
+			ci.draw_arc(c, rr, a0, a1, 3, col, 3.2)
+		ci.draw_arc(c, rr - 3.5, 0.0, TAU, 40, Color(0.7, 0.9, 1.0, 0.22 * warn), 2.0)
+		ci.draw_arc(c, rr + 2.5, 0.0, TAU, 40, Color(0.4, 0.7, 1.0, 0.18 * warn), 2.0)
+		# reflejos de luz (arriba-izquierda) y rebote (abajo-derecha)
+		ci.draw_arc(c, rr * 0.78, PI * 1.08, PI * 1.42, 10, Color(1, 1, 1, 0.85 * warn), 4.0)
+		ci.draw_arc(c, rr * 0.78, PI * 1.5, PI * 1.58, 4, Color(1, 1, 1, 0.7 * warn), 4.0)
+		ci.draw_arc(c, rr * 0.8, PI * 0.12, PI * 0.3, 6, Color(0.85, 0.95, 1.0, 0.45 * warn), 3.0)
+		ci.draw_circle(c + Vector2(-rr * 0.52, -rr * 0.58), maxf(2.0, rr * 0.07), Color(1, 1, 1, 0.9 * warn))
+		# destellos que orbitan el borde
+		for j in 3:
+			var ang: float = t * 1.3 + TAU * float(j) / 3.0
+			var p: Vector2 = c + Vector2.from_angle(ang) * rr
+			var tw: float = 0.5 + 0.5 * sin(t * 5.0 + float(j) * 2.0)
+			var sz: float = 2.0 + 2.5 * tw
+			ci.draw_line(p - Vector2(sz, 0), p + Vector2(sz, 0), Color(1, 1, 1, 0.9 * tw * warn), 1.5)
+			ci.draw_line(p - Vector2(0, sz), p + Vector2(0, sz), Color(1, 1, 1, 0.9 * tw * warn), 1.5)
 
 
 # Gotas de veneno que "sudan" por el cuerpo del enemigo envenenado y resbalan hacia abajo
@@ -6684,6 +9393,8 @@ class Enemy extends Actor:
 	var para_t := 0.0
 	var sleep_t := 0.0
 	var conf_t := 0.0
+	var charm_t := 0.0
+	var charm_imm := 0.0
 	var conf_cd := 0.0
 	var cc_imm := 0.0
 	var cc_fx := 0.0
@@ -6701,7 +9412,7 @@ class Enemy extends Actor:
 	var sweat: Node2D = null
 
 	func apply_poison(n: int) -> void:
-		poison = mini(8, poison + n)
+		poison = mini(6, poison + n)
 		poison_t = 4.0
 		if sweat == null:
 			sweat = PoisonSweat.new()
@@ -6774,8 +9485,11 @@ class Enemy extends Actor:
 		elif golden:
 			draw_arc(Vector2(0.0, -body_h * 0.5), radius + 4.0, 0.0, TAU, 20, Color(1.0, 0.82, 0.25, 0.7), 2.0)
 		if shield > 0.0:
-			draw_arc(Vector2(0.0, -body_h * 0.5), maxf(radius, body_h * 0.5) + 3.0, 0.0, TAU, 24, Color(0.5, 0.8, 1.0, 0.85), 2.5)
+			var sr: float = maxf(radius, body_h * 0.5) + 6.0
+			ShieldAura.bubble(self, Vector2(0.0, -body_h * 0.5), sr, bob * 2.0 + float(get_instance_id() % 7), clampf(shield_t / 3.0, 0.0, 1.0))
 		if boss:
+			# S62.2: contorno discreto para que los jefes no se pierdan bajo los efectos amigos
+			draw_arc(Vector2(0.0, -body_h * 0.5), maxf(radius, body_h * 0.5) + 4.0, 0.0, TAU, 28, Color(1.0, 0.3, 0.3, 0.55), 2.0)
 			var bw := 90.0
 			var by: float = -body_h - 14.0
 			draw_rect(Rect2(-bw * 0.5, by, bw, 6.0), Color(0, 0, 0, 0.65))
@@ -6811,6 +9525,7 @@ class Hazard extends Node2D:
 	var pct := 0.0
 	var pure := false
 	var vis := ""
+	var ally_dmg := 0.0   # >0: ataque de un aliado capturado; daña a los enemigos en vez de al jugador
 
 	func _process(_delta: float) -> void:
 		queue_redraw()
@@ -6956,6 +9671,7 @@ class Prop extends Node2D:
 	var sub := ""
 	var color := Color.WHITE
 	var charge := 0.0
+	var lastc := 0.0
 	var cd := 0.0
 	var t := 0.0
 
@@ -6985,6 +9701,8 @@ class Prop extends Node2D:
 			if (cd > 0.0) != _trap_off:
 				_trap_off = cd > 0.0
 				queue_redraw()
+			elif cd <= 0.0 and Engine.get_process_frames() % 2 == 0:
+				queue_redraw()   # animacion de la trampa armada
 			return
 		queue_redraw()
 
@@ -7029,12 +9747,23 @@ class Prop extends Node2D:
 			var big: bool = sub == "big"
 			if big:
 				draw_set_transform(Vector2.ZERO, 0.0, Vector2(1.5, 1.5))
+			if (sub == "paid" or sub == "trap" or sub == "trapv") and not used:
+				var tnm: String = "ch%d" % POI.paid_tier if sub == "paid" else ("trapv" if sub == "trapv" else "trapd")
+				if POI.draw_tex(self, tnm, POI.SC, 0.0):
+					return
 			var okc: bool = _spr("chest_open" if used else "chest_closed")
 			if big:
 				draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 			if okc:
 				if not used:
 					draw_circle(Vector2(0.0, (-88.0 if big else -58.0) - 3.0 * sin(t * 3.0)), 3.0, Color(1.0, 0.9, 0.4, 0.8))
+					if sub == "paid":
+						draw_arc(Vector2(0.0, -26.0), 30.0, 0.0, TAU, 32, Color(0.4, 0.85, 1.0, 0.55 + 0.25 * sin(t * 4.0)), 3.0)
+						draw_circle(Vector2(0.0, -62.0), 5.0, Color("#7fe0ff"))
+					elif sub == "trapv":
+						draw_arc(Vector2(0.0, -26.0), 28.0, 0.0, TAU, 32, Color(1.0, 0.25, 0.25, 0.45 + 0.25 * sin(t * 6.0)), 2.0)
+						draw_circle(Vector2(-6.0, -30.0), 2.0, Color(1.0, 0.2, 0.2))
+						draw_circle(Vector2(6.0, -30.0), 2.0, Color(1.0, 0.2, 0.2))
 					if big:
 						draw_rect(Rect2(-7.0, -34.0, 14.0, 11.0), Color("#f2c443"))
 						draw_rect(Rect2(-7.0, -34.0, 14.0, 11.0), Color("#1e0f06"), false, 2.0)
@@ -7042,6 +9771,9 @@ class Prop extends Node2D:
 						draw_arc(Vector2(0.0, -40.0), 34.0, 0.0, TAU, 40, Color(1, 0.82, 0.25, 0.25), 2.0)
 						if charge > 0.0:
 							draw_arc(Vector2(0.0, -40.0), 34.0, -PI * 0.5, -PI * 0.5 + TAU * clampf(charge / 3.5, 0.0, 1.0), 40, Color(1, 0.85, 0.25, 0.95), 4.0)
+							var kf: float = clampf(charge / 3.5, 0.0, 1.0)
+							draw_rect(Rect2(-24.0, -96.0, 48.0, 8.0), Color(0, 0, 0, 0.7))
+							draw_rect(Rect2(-23.0, -95.0, 46.0 * kf, 6.0), Color(1.0, 0.85, 0.25).lerp(Color("#fff6c8"), kf))
 				return
 		elif kind == "altar":
 			if used:
@@ -7059,6 +9791,9 @@ class Prop extends Node2D:
 					draw_circle(Vector2(msz.x * 0.18, -msz.y * 0.18), 2.5, Color(0.12, 0.10, 0.12, 0.9))
 					return
 			var nm: String = "used" if used else power
+			if sub == "legend":
+				_draw_legend_altar()
+				return
 			if _spr("altar_" + nm):
 				if not used:
 					var pulse: float = 0.5 + 0.5 * sin(t * 3.0)
@@ -7078,7 +9813,7 @@ class Prop extends Node2D:
 
 	# Trampa como una baldosa plana pegada al suelo; cada tipo con su color y dibujo.
 	func _draw_trap_tile() -> void:
-		var u := 4.6   # 1 "pixel" de arte; la baldosa son 8x8 pixeles (~37 px)
+		var u := 7.4   # 1 "pixel" de arte; la baldosa son 8x8 pixeles (~59 px)
 		var off: bool = cd > 0.0
 		var base: Color
 		var edge: Color
@@ -7116,6 +9851,38 @@ class Prop extends Node2D:
 			base = base.lerp(Color(0.25, 0.25, 0.25), 0.7)
 			edge = edge.lerp(Color(0.2, 0.2, 0.2), 0.7)
 			hi = hi.lerp(Color(0.45, 0.45, 0.45), 0.8)
+		var tm: float = float(Time.get_ticks_msec()) * 0.001
+		if not off:
+			# Aviso del area real (radio 112) con animacion propia de cada tipo
+			var pul: float = 0.5 + 0.5 * sin(tm * 3.0)
+			var ac := Color(hi.r, hi.g, hi.b, 0.10 + 0.08 * pul)
+			draw_arc(Vector2.ZERO, 112.0, 0.0, TAU, 56, Color(hi.r, hi.g, hi.b, 0.22 + 0.15 * pul), 2.0)
+			match sub:
+				"poison":
+					for i in range(4):
+						var f: float = fposmod(tm * 0.6 + float(i) * 0.25, 1.0)
+						draw_circle(Vector2(sin(float(i) * 2.0) * 34.0, -f * 40.0), 3.0 + 3.0 * f, Color(hi.r, hi.g, hi.b, 0.7 * (1.0 - f)))
+				"ice":
+					draw_circle(Vector2.ZERO, 40.0 + 6.0 * pul, ac)
+				"freeze":
+					for i in range(6):
+						var an: float = tm * 0.5 + float(i) * TAU / 6.0
+						draw_rect(Rect2(Vector2.from_angle(an) * 50.0 - Vector2(2, 2), Vector2(4, 4)), Color(1, 1, 1, 0.8))
+				"shock":
+					if fmod(tm, 1.2) < 0.15:
+						var q: Vector2 = Vector2.from_angle(tm * 9.0) * 52.0
+						draw_line(Vector2.ZERO, q, Color("#fff6a0"), 2.0)
+				"sleep":
+					var zf: float = fposmod(tm * 0.5, 1.0)
+					draw_string(ThemeDB.fallback_font, Vector2(14.0, -20.0 - zf * 30.0), "z", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(hi.r, hi.g, hi.b, 1.0 - zf))
+				"confuse":
+					for i in range(10):
+						var aa: float = tm * 2.0 + float(i) * 0.6
+						draw_circle(Vector2.from_angle(aa) * (6.0 + float(i) * 4.5), 2.0, Color(hi.r, hi.g, hi.b, 0.7))
+				_:
+					for i in range(5):
+						var ff: float = fposmod(tm * 0.8 + float(i) * 0.2, 1.0)
+						draw_circle(Vector2(sin(float(i) * 3.0) * 26.0, -ff * 34.0), 3.5 * (1.0 - ff), Color("#ffb23a", 0.8))
 		var o := Vector2(-4.0 * u, -4.0 * u)
 		draw_rect(Rect2(o, Vector2(8.0 * u, 8.0 * u)), edge)
 		draw_rect(Rect2(o + Vector2(u, u), Vector2(6.0 * u, 6.0 * u)), base)
@@ -7140,6 +9907,39 @@ class Prop extends Node2D:
 			draw_rect(Rect2(o + (c as Vector2) * u, Vector2(sz, sz)), hi)
 		if sub == "fire" and not off:
 			draw_rect(Rect2(o + Vector2(3.0 * u, 3.0 * u), Vector2(2.0 * u, 2.0 * u)), Color("#ffe27a"))
+
+	# Altar legendario (arte nuevo): 4 estados que se funden segun avanza la invocacion.
+	# El origen del nodo es el centro del circulo (donde te paras).
+	func _draw_legend_altar() -> void:
+		var k := 1.25
+		var org := Vector2(-85.0 * k, -160.0 * k)
+		var sz := Vector2(170.0, 230.0) * k
+		var ck: float = clampf(charge / 4.0, 0.0, 1.0)
+		var lp: float = 0.5 + 0.5 * sin(t * 2.5)
+		var t0: Texture2D = WTex.get_t("altar_leg_0")
+		var t1: Texture2D = WTex.get_t("altar_leg_1")
+		var t2: Texture2D = WTex.get_t("altar_leg_2")
+		var t3: Texture2D = WTex.get_t("altar_leg_3")
+		if t0 == null or t1 == null:
+			return
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2(1.0, 0.45))
+		draw_circle(Vector2(0.0, 40.0), 120.0, Color(0, 0, 0, 0.28))
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+		if used:
+			draw_texture_rect(t0, Rect2(org, sz), false)
+			return
+		draw_texture_rect(t1, Rect2(org, sz), false, Color(1, 1, 1, 1.0 if charge > 0.0 else 0.88 + 0.12 * lp))
+		if t2 != null and ck > 0.0:
+			draw_texture_rect(t2, Rect2(org, sz), false, Color(1, 1, 1, clampf(ck * 2.5, 0.0, 1.0)))
+		if t3 != null and ck > 0.55:
+			draw_texture_rect(t3, Rect2(org, sz), false, Color(1, 1, 1, clampf((ck - 0.55) / 0.35, 0.0, 1.0)))
+		if charge > 0.0:
+			var w := 96.0
+			var y := -org.y * 0.0 - 196.0
+			var gold := Color(1.0, 0.82, 0.25)
+			draw_rect(Rect2(-w * 0.5 - 2.0, y - 2.0, w + 4.0, 16.0), Color(0, 0, 0, 0.8))
+			draw_rect(Rect2(-w * 0.5, y, w * ck, 12.0), gold)
+			draw_string(ThemeDB.fallback_font, Vector2(-w * 0.5, y - 6.0), L.t("Invocando"), HORIZONTAL_ALIGNMENT_CENTER, w, 14, Color.WHITE)
 
 	func _old_draw() -> void:
 		if kind == "tree":
@@ -7196,6 +9996,12 @@ class Bullet extends Node2D:
 	var pal := "normal"
 	var trail := ""
 	var trail_t := 0.0
+	var turn := 0.0
+	var leave := ""
+	var leave_t := 0.0
+	var ric := 0
+	var burst := 0
+	var bm: Dictionary = {}
 
 	func _init() -> void:
 		texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -7297,6 +10103,7 @@ class Field extends Node2D:
 	var tick := 0.0
 	var kick := 0.0
 	var gone := false
+	var shards := 0
 
 	func _process(_delta: float) -> void:
 		queue_redraw()
@@ -7431,14 +10238,16 @@ class Orb extends Node2D:
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 		var c := Vector2(0.0, -9.0)
 		if kind == "xp":
-			draw_circle(c, 8.0, Color(0.16, 0.56, 0.82, 0.35))
-			draw_circle(c, 4.5, Color("#7fe0ff"))
-			draw_circle(c + Vector2(-1.2, -1.4), 1.6, Color(1, 1, 1, 0.9))
+			var xk: float = 1.0 if value < 30.0 else 1.7
+			draw_circle(c, 11.0 * xk, Color(0.16, 0.56, 0.82, 0.4))
+			draw_circle(c, 6.5 * xk, Color("#7fe0ff"))
+			draw_arc(c, 6.5 * xk, 0.0, TAU, 14, Color("#e8fbff"), 1.5)
+			draw_circle(c + Vector2(-1.6, -1.9) * xk, 2.2 * xk, Color(1, 1, 1, 0.95))
 		elif kind == "xpBig":
-			draw_circle(c + Vector2(0.0, -4.0), 15.0, Color(1.0, 0.82, 0.25, 0.22))
+			draw_circle(c + Vector2(0.0, -4.0), 22.0, Color(1.0, 0.82, 0.25, 0.28))
 			var ctx: Texture2D = WTex.get_t("xp_big")
 			if ctx != null:
-				var csz := Vector2(ctx.get_width(), ctx.get_height()) * 2.4
+				var csz := Vector2(ctx.get_width(), ctx.get_height()) * 3.4
 				draw_texture_rect(ctx, Rect2(c + Vector2(-csz.x * 0.5, -csz.y * 0.5 - 4.0), csz), false)
 			else:
 				draw_circle(c, 7.0, Color("#ffd95e"))
@@ -7451,6 +10260,9 @@ class Orb extends Node2D:
 			elif kind == "ticket10":
 				icn = "ticket10"
 				glow = Color("#c47bff")
+			elif kind == "gcoin" or kind == "gcoin_gold":
+				icn = kind
+				glow = Color("#ffd23f") if kind == "gcoin_gold" else Color("#ff8ad8")
 			elif kind == "magnet":
 				icn = "magnet"
 				glow = Color("#7fe0ff")
@@ -7460,11 +10272,22 @@ class Orb extends Node2D:
 			elif kind == "item":
 				icn = "star"
 				glow = Color("#ff8ad8")
+			elif kind == "ball":
+				icn = "ball"
+				glow = Color("#ff6b6b")
 			elif kind != "coin":
 				icn = "berry"
 				glow = Color("#5fe08a")
 			draw_circle(c + Vector2(0.0, -4.0), 15.0, Color(glow.r, glow.g, glow.b, 0.22))
-			IC.draw_in(self, icn, c + Vector2(0.0, -4.0), 20.0)
+			if icn == "ball":
+				var bt: Texture2D = ALP.ball_tex()
+				if bt != null:
+					var bsz := Vector2(bt.get_width(), bt.get_height()) * 0.36
+					draw_texture_rect(bt, Rect2(c + Vector2(-bsz.x * 0.5, -bsz.y * 0.5 - 4.0), bsz), false)
+				else:
+					draw_circle(c, 7.0, Color("#e04040"))
+			else:
+				IC.draw_in(self, icn, c + Vector2(0.0, -4.0), 20.0)
 
 
 
@@ -7486,6 +10309,14 @@ class Cards extends Node2D:
 	var bans := 0
 	var ban_mode := false
 	var extras := true
+	# v5.2: pantalla de objeto -> bloquear (no volver a ofrecer objetos) y descartar el objeto ofrecido para siempre.
+	signal lock_toggled
+	signal block_pressed
+	var item_mode := false
+	var lock_on := false
+	var block_name := ""
+	# Proteccion contra pulsaciones del combate: al abrirse cartas nuevas no se acepta ninguna entrada durante GRACE segundos.
+	const GRACE := 0.7
 
 	func _btn_rects() -> Array:
 		var vp: Vector2 = get_viewport_rect().size
@@ -7495,16 +10326,26 @@ class Cards extends Node2D:
 		if extras and rerolls > 0 and not ban_mode:
 			reroll_pressed.emit()
 
+	func _toggle_lock() -> void:
+		if item_mode:
+			lock_toggled.emit()
+
+	func _do_block() -> void:
+		if item_mode and block_name != "":
+			block_pressed.emit()
+
 	func _toggle_ban() -> void:
 		if extras and bans > 0:
 			ban_mode = not ban_mode
 			queue_redraw()
 
 	func show_cards(list: Array, heading: String, head: String = "¡Subes de nivel!", ex: bool = true) -> void:
+		block_name = ""
 		items = list
 		title = heading
 		headline = head
 		extras = ex
+		item_mode = false
 		ban_mode = false
 		sel = 0
 		open = true
@@ -7556,7 +10397,7 @@ class Cards extends Node2D:
 		if event is InputEventJoypadMotion and event.axis == JOY_AXIS_LEFT_X:
 			if absf(event.axis_value) < 0.3:
 				_axis_free = true
-			elif absf(event.axis_value) > 0.6 and _axis_free and age > 0.3:
+			elif absf(event.axis_value) > 0.6 and _axis_free and age > GRACE:
 				_axis_free = false
 				_move(1 if event.axis_value > 0.0 else -1)
 			return
@@ -7571,10 +10412,17 @@ class Cards extends Node2D:
 			return
 		# Tragamos las pulsaciones (no las sueltas) mientras hay cartas.
 		get_viewport().set_input_as_handled()
-		if age < 0.4:
+		if age < GRACE:
 			return
 		if event is InputEventScreenTouch:
 			var brs: Array = _btn_rects()
+			if item_mode:
+				if brs[0].has_point(event.position):
+					_do_block()
+					return
+				if brs[1].has_point(event.position):
+					_toggle_lock()
+					return
 			if brs[0].has_point(event.position):
 				_do_reroll()
 				return
@@ -7602,8 +10450,10 @@ class Cards extends Node2D:
 					_pick(sel)
 				KEY_R:
 					_do_reroll()
+					_do_block()
 				KEY_B:
 					_toggle_ban()
+					_toggle_lock()
 		elif event is InputEventJoypadButton:
 			var bi: int = event.button_index
 			if bi == JOY_BUTTON_DPAD_LEFT or bi == PAD.btn("prev"):
@@ -7614,8 +10464,10 @@ class Cards extends Node2D:
 				_pick(sel)
 			elif bi == PAD.btn("reroll"):
 				_do_reroll()
+				_do_block()
 			elif bi == PAD.btn("ban"):
 				_toggle_ban()
+				_toggle_lock()
 
 	func _draw() -> void:
 		if not open:
@@ -7656,6 +10508,17 @@ class Cards extends Node2D:
 			IC.draw_in(self, String(it.get("icon", "star")), ic_c, 52.0)
 			draw_multiline_string(font, r.position + Vector2(12.0, 134.0), L.t(String(it["title"])), HORIZONTAL_ALIGNMENT_CENTER, r.size.x - 24.0, 24, 2, Color("#4a2f12") if paper else (Color("#2b1a00") if legend else Color.WHITE))
 			draw_multiline_string(font, r.position + Vector2(16.0, 196.0), L.t(String(it["desc"])), HORIZONTAL_ALIGNMENT_CENTER, r.size.x - 32.0, 18, 5, Color("#5a3d1c") if paper else (Color("#3a2600") if legend else Color("#c8d6ee")))
+		if age < GRACE:
+			# Estado "aun no": cartas atenuadas y una barra que se llena hasta poder elegir.
+			for r2 in rs:
+				draw_rect(r2, Color(0.0, 0.0, 0.0, 0.5))
+			var bw := 220.0
+			var bx: float = (vp.x - bw) * 0.5
+			var by: float = vp.y * 0.5 + 226.0
+			draw_rect(Rect2(bx, by, bw, 10.0), Color("#1b2a44"))
+			draw_rect(Rect2(bx, by, bw * clampf(age / GRACE, 0.0, 1.0), 10.0), Color("#ffd33d"))
+			draw_rect(Rect2(bx, by, bw, 10.0), Color("#8fa8cc"), false, 2.0)
+			draw_string(font, Vector2(0.0, by - 8.0), L.t("Un momento…"), HORIZONTAL_ALIGNMENT_CENTER, vp.x, 20, Color("#c8d6ee"))
 		if extras:
 			var brs: Array = _btn_rects()
 			if rerolls > 0:
@@ -7668,6 +10531,15 @@ class Cards extends Node2D:
 				_draw_key_label(brs[1], L.t("Vetar (%d)  [B]") % bans, "ban")
 			if ban_mode:
 				draw_string(font, Vector2(0.0, vp.y * 0.5 + 214.0), L.t("Elige un movimiento nuevo para vetarlo"), HORIZONTAL_ALIGNMENT_CENTER, vp.x, 22, Color("#ff9aa5"))
+		if item_mode:
+			var ibr: Array = _btn_rects()
+			if block_name != "":   # el Caramelo Raro no se puede descartar para siempre
+				draw_rect(ibr[0], Color("#5a1f2a"))
+				draw_rect(ibr[0], Color("#ff6b7a"), false, 2.0)
+				_draw_key_label(ibr[0], L.t("Descartar siempre  [R]"), "reroll")
+			draw_rect(ibr[1], Color("#1f5a34") if lock_on else Color("#1b2a44"))
+			draw_rect(ibr[1], Color("#7dffa0") if lock_on else Color("#8fa8cc"), false, 2.0)
+			_draw_key_label(ibr[1], (L.t("Bloqueo: SÍ  [B]") if lock_on else L.t("Bloqueo: NO  [B]")), "ban")
 		_draw_footer(vp)
 
 
@@ -7801,6 +10673,28 @@ class Ground extends Node2D:
 # trampas ocultas solo muy cerca, enemigos solo a corta distancia; grietas y jefes
 # siempre, como flecha en el borde.
 # ---------------------------------------------------------------
+# Marcas del minimapa de los eventos y NPC nuevos: [posicion de mundo, color, forma]
+func _mm_events() -> Array:
+	var out: Array = []
+	if kec != null and kec.active != null and is_instance_valid(kec.active):
+		out.append([kec.active.position, Color("#7be08a"), "npc"])
+	if rescue != null and rescue.cur != null and String(rescue.cur["state"]) == "active":
+		out.append([rescue.cur["pos"], Color("#ff9ad0"), "npc"])
+	if alpha != null and alpha.cur != null:
+		out.append([alpha.cur["pos"], Color("#ffd23f"), "star"])
+	if cave != null and cave.cur != null:
+		out.append([cave.cur["pos"], Color("#c8a26a"), "cave"])
+	if meteor != null and meteor.crater != null and is_instance_valid(meteor.crater["node"]):
+		out.append([meteor.crater["pos"], Color("#ff9a3d"), "star"])
+	if mew != null and mew.cur != null and mew.cur.has("labs"):
+		for lb in mew.cur["labs"]:
+			if is_instance_valid(lb["node"]):
+				out.append([lb["node"].position, Color("#c58cff"), "lab"])
+	if poi != null and poi.supply != null and is_instance_valid(poi.supply):
+		out.append([poi.supply.position, Color("#4fc3ff"), "box"])
+	return out
+
+
 class Minimap extends Node2D:
 	const N := 50          # tiles guardados en la imagen
 	const VIEW := 48       # tiles visibles (diametro)
@@ -8113,6 +11007,28 @@ class Minimap extends Node2D:
 				var base: Vector2 = CT + ad * (RAD - 2.0)
 				var perp := Vector2(-ad.y, ad.x)
 				draw_colored_polygon(PackedVector2Array([base + ad * 7.0, base - ad * 2.0 + perp * 6.0, base - ad * 2.0 - perp * 6.0]), Color(0.9, 0.82, 1.0, 0.8 + 0.2 * pul))
+		# NPC y eventos nuevos (Kecleon, rescates, alfas, cuevas, meteorito, laboratorios, cajas)
+		for ev in m._mm_events():
+			var eq: Vector2 = _edge(_pt(ev[0]))
+			var ec: Color = ev[1]
+			var shp: String = String(ev[2])
+			draw_circle(eq, 7.0 + 1.0 * pul, Color(ec.r, ec.g, ec.b, 0.4))
+			match shp:
+				"star":
+					draw_colored_polygon(PackedVector2Array([eq + Vector2(0, -6.5), eq + Vector2(2, -2), eq + Vector2(6.5, -1.5), eq + Vector2(2.5, 1.5), eq + Vector2(4, 6), eq + Vector2(0, 3), eq + Vector2(-4, 6), eq + Vector2(-2.5, 1.5), eq + Vector2(-6.5, -1.5), eq + Vector2(-2, -2)]), ec)
+				"cave":
+					draw_colored_polygon(PackedVector2Array([eq + Vector2(-6, 5), eq + Vector2(-4, -2), eq + Vector2(0, -6), eq + Vector2(4, -2), eq + Vector2(6, 5)]), ec)
+					draw_rect(Rect2(eq + Vector2(-2, 0), Vector2(4, 5)), Color(0.1, 0.08, 0.14))
+				"lab":
+					draw_rect(Rect2(eq + Vector2(-5, -5), Vector2(10, 10)), ec)
+					draw_rect(Rect2(eq + Vector2(-2, -2), Vector2(4, 4)), Color(0.15, 0.05, 0.25))
+				"box":
+					draw_rect(Rect2(eq + Vector2(-5, -4), Vector2(10, 8)), ec)
+					draw_line(eq + Vector2(-5, 0), eq + Vector2(5, 0), Color.WHITE, 1.2)
+				_:
+					draw_circle(eq, 4.5, ec)
+					draw_circle(eq + Vector2(0, -1.5), 1.6, Color.WHITE)
+			draw_arc(eq, 7.5, 0.0, TAU, 14, Color.WHITE, 1.2)
 		# jugador
 		draw_circle(c, 9.0, Color(1, 1, 1, 0.35))
 		draw_arc(c, 9.0, 0.0, TAU, 20, Color("#ffd23f"), 1.5)
@@ -8121,6 +11037,12 @@ class Minimap extends Node2D:
 
 
 class Hud extends Node2D:
+	func _ds(f: Font, p: Vector2, t: String, a: int, w: float, sz: int, c: Color) -> void:
+		draw_string(f, p, t, a, w, roundi(float(sz) * TXS.k()), c)
+
+	func _dso(f: Font, p: Vector2, t: String, a: int, w: float, sz: int, o: int, c: Color) -> void:
+		draw_string_outline(f, p, t, a, w, roundi(float(sz) * TXS.k()), o, c)
+
 	var hp := 1.0
 	var max_hp := 1.0
 	var run_time := 0.0
@@ -8129,6 +11051,9 @@ class Hud extends Node2D:
 	var z_dim := 0.0
 	var z_state := ""
 	var z_t := 0.0
+	var join_t := -1.0
+	var join_name := ""
+	var join_col := Color.WHITE
 	var z_name := ""
 	var z_type := ""
 	var z_btn := 0
@@ -8139,6 +11064,9 @@ class Hud extends Node2D:
 	var dyn_flash := 99.0
 	var dyn_type := "normal"
 	var dyn_btn := 0
+	var act_txt := ""
+	var act_sp := Vector2(-9999.0, -9999.0)
+	var poi_marks: Array = []
 	var rift_den := false
 	var ab_name := ""
 	var down := false
@@ -8151,13 +11079,20 @@ class Hud extends Node2D:
 	var xp_next := 1.0
 	var buff_text := ""
 	var power_id := ""
+	var items_hud: Array = []
+	var _page_t := 0.0
 	var item_name := ""
 	var item_id := ""
 	var item2_name := ""
 	var item2_id := ""
+	var item3_name := ""
+	var item3_id := ""
 	var weather_text := ""
 	var banner := ""
+	var fusion_t := 0.0
+	var fusion_name := ""
 	var coins := 0
+	var balls := 0
 	var tickets := 0
 	var tickets10 := 0
 	var paused := false
@@ -8195,6 +11130,7 @@ class Hud extends Node2D:
 			thief_notice += delta
 			if thief_notice >= 4.0:
 				thief_notice = -1.0
+		_page_t += delta
 		_acc += delta
 		if _acc >= 0.033:   # el HUD se redibuja 30 veces por segundo (texto y barras)
 			_acc = 0.0
@@ -8217,7 +11153,43 @@ class Hud extends Node2D:
 		elif icon_name != "":
 			IC.draw_in(self, icon_name, Vector2(tx + 14.0, y - 5.0), 26.0)
 			tx += iw
-		draw_string(font, Vector2(tx, y + 2.0), txt, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 20, col)
+		_ds(font, Vector2(tx, y + 2.0), txt, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 20, col)
+
+	# Caja de objetos y mejoras: 4 filas con icono, nombre y nivel; con mas de 4 cambia de pagina cada 4 s.
+	func draw_items(font: Font, ins: Vector4) -> void:
+		if items_hud.is_empty():
+			return
+		var per := 4
+		var pages: int = (items_hud.size() + per - 1) / per
+		var page: int = int(_page_t / 4.0) % pages
+		var x0: float = 16.0 + ins.x
+		var y0: float = 300.0 + ins.y + ((18.0 * stats.size() + 14.0) if (show_stats and not stats.is_empty()) else 0.0)
+		var rows: int = mini(per, items_hud.size() - page * per)
+		draw_rect(Rect2(x0 - 4.0, y0 - 4.0, 226.0, 34.0 * float(rows) + 8.0 + (14.0 if pages > 1 else 0.0)), Color(0.03, 0.06, 0.16, 0.5))
+		for i in range(rows):
+			var e: Dictionary = items_hud[page * per + i]
+			var cy: float = y0 + float(i) * 34.0 + 14.0
+			IC.draw_in(self, String(e["icon"]), Vector2(x0 + 14.0, cy), 26.0)
+			var txt: String = L.t(String(e["name"]))
+			var right := ""
+			var rcol := Color("#ffe58a")
+			if float(e["cd"]) >= 0.0:
+				if float(e["cd"]) <= 0.0:
+					right = L.t("Listo")
+					rcol = Color("#7dffb0")
+				else:
+					right = "%ds" % ceili(float(e["cd"]))
+					var act: bool = bool(e.get("act", false))
+					rcol = Color("#8fe0ff") if act else Color("#ff9a7a")
+					var k: float = clampf(float(e["cd"]) / maxf(1.0, float(e["cdmax"])), 0.0, 1.0)
+					draw_rect(Rect2(x0 + 32.0, cy + 10.0, 176.0, 3.0), Color(0, 0, 0, 0.5))
+					draw_rect(Rect2(x0 + 32.0, cy + 10.0, 176.0 * (k if act else 1.0 - k), 3.0), rcol)
+			elif int(e["lv"]) > 0:
+				right = L.t("Nv. %d") % int(e["lv"])
+			_ds(font, Vector2(x0 + 32.0, cy + 4.0), txt, HORIZONTAL_ALIGNMENT_LEFT, 128.0, 14, Color(1, 1, 1, 0.9))
+			_ds(font, Vector2(x0 + 32.0, cy + 4.0), right, HORIZONTAL_ALIGNMENT_RIGHT, 176.0, 14, rcol)
+		if pages > 1:
+			_ds(font, Vector2(x0, y0 + 34.0 * float(rows) + 8.0), "%d/%d" % [page + 1, pages], HORIZONTAL_ALIGNMENT_RIGHT, 218.0, 12, Color(1, 1, 1, 0.6))
 
 	func draw_powers(font: Font, vp: Vector2) -> void:
 		var y: float = 140.0
@@ -8229,6 +11201,9 @@ class Hud extends Node2D:
 			y += 46.0
 		if item2_name != "":
 			_chip(font, vp, y, L.t(item2_name), Color("#ffd23f"), null, item2_id)
+			y += 46.0
+		if item3_name != "":
+			_chip(font, vp, y, L.t(item3_name), Color("#8fe3b0"), null, item3_id)
 
 	func draw_thief_notice(font: Font, vp: Vector2) -> void:
 		if thief_notice < 0.0:
@@ -8247,8 +11222,8 @@ class Hud extends Node2D:
 		sb.set_border_width_all(2)
 		sb.set_corner_radius_all(10)
 		draw_style_box(sb, Rect2(-bw * 0.5, -34.0, bw, 68.0))
-		draw_string(font, Vector2(-bw * 0.5, -4.0), t1, HORIZONTAL_ALIGNMENT_CENTER, bw, 26, Color(1.0, 0.92, 0.55, a))
-		draw_string(font, Vector2(-bw * 0.5, 22.0), t2, HORIZONTAL_ALIGNMENT_CENTER, bw, 16, Color(1.0, 0.85, 0.45, a))
+		_ds(font, Vector2(-bw * 0.5, -4.0), t1, HORIZONTAL_ALIGNMENT_CENTER, bw, 26, Color(1.0, 0.92, 0.55, a))
+		_ds(font, Vector2(-bw * 0.5, 22.0), t2, HORIZONTAL_ALIGNMENT_CENTER, bw, 16, Color(1.0, 0.85, 0.45, a))
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 	# Brujula hacia los duendes del tesoro: flecha en el borde (o sobre su cabeza si ya los ves) con distancia y tiempo.
@@ -8273,15 +11248,15 @@ class Hud extends Node2D:
 				var lp: Vector2 = e + Vector2(-ca * 34.0, -sin(a) * 30.0 + 4.0)
 				var lw: float = 260.0
 				var lx: float = lp.x - (lw if ha == HORIZONTAL_ALIGNMENT_RIGHT else (0.0 if ha == HORIZONTAL_ALIGNMENT_LEFT else lw * 0.5))
-				draw_string_outline(font, Vector2(lx, lp.y), label, ha, lw, 16, 5, Color(0, 0, 0, 0.85))
-				draw_string(font, Vector2(lx, lp.y), label, ha, lw, 16, Color("#ffe27a"))
+				_dso(font, Vector2(lx, lp.y), label, ha, lw, 16, 5, Color(0, 0, 0, 0.85))
+				_ds(font, Vector2(lx, lp.y), label, ha, lw, 16, Color("#ffe27a"))
 			else:
 				var by: float = sp.y - 60.0 - absf(sin(Time.get_ticks_msec() * 0.001 * 4.0)) * 10.0
 				var p := Vector2(sp.x, by)
 				draw_colored_polygon(PackedVector2Array([p + Vector2(-17.0, -14.0), p + Vector2(17.0, -14.0), p + Vector2(0.0, 11.0)]), Color("#3a2606"))
 				draw_colored_polygon(PackedVector2Array([p + Vector2(-14.0, -12.0), p + Vector2(14.0, -12.0), p + Vector2(0.0, 8.0)]), gcol)
-				draw_string_outline(font, p + Vector2(-110.0, -22.0), label, HORIZONTAL_ALIGNMENT_CENTER, 220.0, 15, 5, Color(0, 0, 0, 0.85))
-				draw_string(font, p + Vector2(-110.0, -22.0), label, HORIZONTAL_ALIGNMENT_CENTER, 220.0, 15, Color("#ffe27a"))
+				_dso(font, p + Vector2(-110.0, -22.0), label, HORIZONTAL_ALIGNMENT_CENTER, 220.0, 15, 5, Color(0, 0, 0, 0.85))
+				_ds(font, p + Vector2(-110.0, -22.0), label, HORIZONTAL_ALIGNMENT_CENTER, 220.0, 15, Color("#ffe27a"))
 
 	func draw_rift_notice(font: Font, vp: Vector2) -> void:
 		if rift_notice < 0.0:
@@ -8304,9 +11279,91 @@ class Hud extends Node2D:
 		sb.set_border_width_all(2)
 		sb.set_corner_radius_all(10)
 		draw_style_box(sb, r)
-		draw_string(font, Vector2(-bw * 0.5, -4.0), t1, HORIZONTAL_ALIGNMENT_CENTER, bw, 26, Color(0.886, 0.816, 1.0, a))
-		draw_string(font, Vector2(-bw * 0.5, 22.0), t2, HORIZONTAL_ALIGNMENT_CENTER, bw, 16, Color(0.788, 0.69, 1.0, a))
+		_ds(font, Vector2(-bw * 0.5, -4.0), t1, HORIZONTAL_ALIGNMENT_CENTER, bw, 26, Color(0.886, 0.816, 1.0, a))
+		_ds(font, Vector2(-bw * 0.5, 22.0), t2, HORIZONTAL_ALIGNMENT_CENTER, bw, 16, Color(0.788, 0.69, 1.0, a))
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+	# Cartel de captura: mismo estilo que el del Movimiento Z (franja, rayos y letras que caen).
+	func draw_join(font: Font, vp: Vector2) -> void:
+		if join_t < 0.0:
+			return
+		var t: float = join_t
+		var cy: float = vp.y * 0.36
+		var tcol: Color = join_col
+		var open: float = _ease_out(clampf(t / 0.25, 0.0, 1.0))
+		var out: float = clampf((3.2 - t) / 0.4, 0.0, 1.0)
+		var al: float = open * out
+		var hh: float = 54.0 * open
+		var hi := Color(minf(1.0, tcol.r + 0.3), minf(1.0, tcol.g + 0.3), minf(1.0, tcol.b + 0.3), al)
+		draw_rect(Rect2(0.0, cy - hh, vp.x, hh * 2.0), Color(tcol.r * 0.22, tcol.g * 0.22, tcol.b * 0.22, 0.8 * al))
+		draw_rect(Rect2(0.0, cy - hh - 3.0, vp.x, 5.0), hi)
+		draw_rect(Rect2(0.0, cy + hh - 2.0, vp.x, 5.0), hi)
+		for i in range(14):
+			var ra: float = float(i) * TAU / 14.0 + t * 0.5
+			var rl: float = vp.x * 0.9
+			var c0 := Vector2(vp.x * 0.5, cy)
+			draw_colored_polygon(PackedVector2Array([c0, c0 + Vector2.from_angle(ra - 0.07) * rl, c0 + Vector2.from_angle(ra + 0.07) * rl]), Color(tcol.r, tcol.g, tcol.b, 0.14 * al))
+		# subtitulo con letras que se separan
+		var sub: String = L.t("¡FELICIDADES!")
+		var sp: float = lerpf(1.0, 12.0, _ease_out(clampf((t - 0.05) / 0.6, 0.0, 1.0)))
+		var sx: float = vp.x * 0.5 - (font.get_string_size(sub, HORIZONTAL_ALIGNMENT_LEFT, -1, 20).x + sp * float(sub.length() - 1)) * 0.5
+		for i in range(sub.length()):
+			var chs: String = sub.substr(i, 1)
+			_ds(font, Vector2(sx, cy - 20.0), chs, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color(1, 1, 1, 0.85 * al))
+			sx += font.get_string_size(chs, HORIZONTAL_ALIGNMENT_LEFT, -1, 20).x + sp
+		# nombre: cada letra cae con un golpe y rebote
+		var txt: String = join_name
+		var fs: int = 44 if vp.x >= 900.0 else 30
+		var tw: float = font.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+		var cx: float = vp.x * 0.5 - tw * 0.5
+		var n: int = txt.length()
+		for i in range(n):
+			var ch: String = txt.substr(i, 1)
+			var cw: float = font.get_string_size(ch, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+			var ts: float = 0.2 + float(i) * (0.45 / float(maxi(n, 1)))
+			var pr: float = clampf((t - ts) / 0.26, 0.0, 1.0)
+			if pr > 0.0:
+				var scl: float = lerpf(3.0, 1.0, _ease_back(pr))
+				var ca: float = clampf(pr * 5.0, 0.0, 1.0) * out
+				var shk: Vector2 = Vector2.ZERO
+				if t < ts + 0.4:
+					shk = Vector2(sin(t * 90.0 + float(i)) * 3.0, cos(t * 70.0 + float(i) * 2.0) * 3.0) * clampf(1.0 - (t - ts) / 0.4, 0.0, 1.0)
+				draw_set_transform(Vector2(cx + cw * 0.5, cy + 24.0) + shk, 0.0, Vector2(scl, scl))
+				var base := Color(minf(1.0, tcol.r * 0.45 + 0.55), minf(1.0, tcol.g * 0.45 + 0.55), minf(1.0, tcol.b * 0.45 + 0.55), ca)
+				for o in [Vector2(-3, 0), Vector2(3, 0), Vector2(0, -3), Vector2(0, 3)]:
+					_ds(font, Vector2(-cw * 0.5, 0.0) + o, ch, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(tcol.r, tcol.g, tcol.b, 0.55 * ca))
+				_ds(font, Vector2(-cw * 0.5 + 3.0, 4.0), ch, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(0, 0, 0, 0.7 * ca))
+				_ds(font, Vector2(-cw * 0.5, 0.0), ch, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, base)
+				draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+			cx += cw
+
+
+	func draw_fusion(f: Font, vp: Vector2) -> void:
+		if fusion_t <= 0.0:
+			return
+		var tt: float = 2.8 - fusion_t
+		var fin: float = clampf(tt / 0.35, 0.0, 1.0)
+		var fout: float = clampf(fusion_t / 0.6, 0.0, 1.0)
+		var al: float = fin * fout
+		var cy: float = vp.y * 0.38
+		# franja oscura y destellos que cruzan la pantalla
+		draw_rect(Rect2(0.0, cy - 70.0 * fin, vp.x, 140.0 * fin), Color(0.05, 0.0, 0.1, 0.55 * al))
+		draw_rect(Rect2(0.0, cy - 72.0 * fin, vp.x, 3.0), Color(1.0, 0.85, 1.0, 0.9 * al))
+		draw_rect(Rect2(0.0, cy + 70.0 * fin, vp.x, 3.0), Color(1.0, 0.85, 1.0, 0.9 * al))
+		var sx: float = fmod(tt * 1400.0, vp.x + 400.0) - 200.0
+		draw_rect(Rect2(sx, cy - 70.0, 90.0, 140.0), Color(1.0, 1.0, 1.0, 0.18 * al))
+		# texto largo: las letras se abren y se asientan
+		var txt := "F U S I O N !"
+		var sz: int = roundi(clampf(vp.x / 11.0, 34.0, 96.0) * (1.0 + 0.25 * (1.0 - fin)) * TXS.k())
+		var wob: float = 1.0 + 0.04 * sin(tt * 14.0)
+		var fs: int = roundi(float(sz) * wob)
+		var pos := Vector2(0.0, cy + float(fs) * 0.33)
+		draw_string_outline(f, pos + Vector2(0.0, 5.0), txt, HORIZONTAL_ALIGNMENT_CENTER, vp.x, fs, 14, Color(0.25, 0.0, 0.35, al))
+		draw_string_outline(f, pos, txt, HORIZONTAL_ALIGNMENT_CENTER, vp.x, fs, 10, Color(1.0, 0.45, 0.85, al))
+		draw_string(f, pos, txt, HORIZONTAL_ALIGNMENT_CENTER, vp.x, fs, Color(1.0, 0.97, 0.8, al))
+		if fusion_name != "":
+			draw_string_outline(f, Vector2(0.0, cy + 62.0), fusion_name, HORIZONTAL_ALIGNMENT_CENTER, vp.x, roundi(26.0 * TXS.k()), 6, Color(0.1, 0.0, 0.2, al))
+			draw_string(f, Vector2(0.0, cy + 62.0), fusion_name, HORIZONTAL_ALIGNMENT_CENTER, vp.x, roundi(26.0 * TXS.k()), Color(1.0, 0.9, 0.5, al))
 
 	func draw_rift(font: Font, vp: Vector2) -> void:
 		if rift_ttl >= 0.0:
@@ -8335,8 +11392,8 @@ class Hud extends Node2D:
 				var lp: Vector2 = e + Vector2(-ca * 34.0, -sin(a) * 30.0 + 4.0)
 				var lw: float = 240.0
 				var lx: float = lp.x - (lw if ha == HORIZONTAL_ALIGNMENT_RIGHT else (0.0 if ha == HORIZONTAL_ALIGNMENT_LEFT else lw * 0.5))
-				draw_string_outline(font, Vector2(lx, lp.y), label, ha, lw, 16, 5, Color(0, 0, 0, 0.85))
-				draw_string(font, Vector2(lx, lp.y), label, ha, lw, 16, tcol)
+				_dso(font, Vector2(lx, lp.y), label, ha, lw, 16, 5, Color(0, 0, 0, 0.85))
+				_ds(font, Vector2(lx, lp.y), label, ha, lw, 16, tcol)
 			else:
 				# Encima de la grieta: flecha que bota con la cuenta atras
 				var by: float = rift_scr.y - 46.0 - absf(sin(Time.get_ticks_msec() * 0.001 * 4.0)) * 10.0
@@ -8345,20 +11402,22 @@ class Hud extends Node2D:
 				draw_colored_polygon(tri, Color("#1a0b33"))
 				draw_colored_polygon(PackedVector2Array([p + Vector2(-14.0, -12.0), p + Vector2(14.0, -12.0), p + Vector2(0.0, 8.0)]), fcol)
 				var l2: String = "%s %d s" % [lbl, ceili(rift_ttl)]
-				draw_string_outline(font, p + Vector2(-100.0, -22.0), l2, HORIZONTAL_ALIGNMENT_CENTER, 200.0, 15, 5, Color(0, 0, 0, 0.85))
-				draw_string(font, p + Vector2(-100.0, -22.0), l2, HORIZONTAL_ALIGNMENT_CENTER, 200.0, 15, tcol)
+				_dso(font, p + Vector2(-100.0, -22.0), l2, HORIZONTAL_ALIGNMENT_CENTER, 200.0, 15, 5, Color(0, 0, 0, 0.85))
+				_ds(font, p + Vector2(-100.0, -22.0), l2, HORIZONTAL_ALIGNMENT_CENTER, 200.0, 15, tcol)
 		if legend_frac >= 0.0:
 			var w: float = minf(440.0, vp.x - 360.0)
 			var x0: float = vp.x * 0.5 - w * 0.5
 			draw_rect(Rect2(x0 - 2.0, vp.y - 148.0, w + 4.0, 22.0), Color(0, 0, 0, 0.6))
 			draw_rect(Rect2(x0, vp.y - 146.0, w * clampf(legend_frac, 0.0, 1.0), 18.0), Color("#b06bff"))
-			draw_string(font, Vector2(x0, vp.y - 154.0), legend_name, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 18, Color("#e6d4ff"))
+			_ds(font, Vector2(x0, vp.y - 154.0), legend_name, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 18, Color("#e6d4ff"))
 			if arena_left >= 0.0:
-				draw_string(font, Vector2(x0, vp.y - 154.0), "%02d:%02d" % [int(arena_left) / 60, int(arena_left) % 60], HORIZONTAL_ALIGNMENT_RIGHT, w, 18, Color("#ffd33d") if arena_left > 20.0 else Color("#ff6b7a"))
+				_ds(font, Vector2(x0, vp.y - 154.0), "%02d:%02d" % [int(arena_left) / 60, int(arena_left) % 60], HORIZONTAL_ALIGNMENT_RIGHT, w, 18, Color("#ffd33d") if arena_left > 20.0 else Color("#ff6b7a"))
 
 	var team: Array = []
 	var swap_cd := 0.0
 	var limit := 0.0
+	var ch_lines: Array = []
+	var ch_mode := false
 	var rifts_n := 0
 	var timeup := false
 	var end_big := ""
@@ -8386,7 +11445,7 @@ class Hud extends Node2D:
 			draw_rect(r, Color(0.08, 0.12, 0.25, 0.72) if not cur else Color(0.2, 0.32, 0.62, 0.85))
 			draw_rect(r, Color("#ffd23f") if cur else Color(1, 1, 1, 0.45), false, 2.0)
 			var dead: bool = bool(t["dead"])
-			draw_string(font, r.position + Vector2(8.0, 20.0), String(t["name"]), HORIZONTAL_ALIGNMENT_LEFT, r.size.x - 16.0, 16, Color(0.6, 0.6, 0.65) if dead else Color.WHITE)
+			_ds(font, r.position + Vector2(8.0, 20.0), String(t["name"]), HORIZONTAL_ALIGNMENT_LEFT, r.size.x - 16.0, 16, Color(0.6, 0.6, 0.65) if dead else Color.WHITE)
 			var f: float = clampf(float(t["frac"]), 0.0, 1.0)
 			draw_rect(Rect2(r.position + Vector2(8.0, 29.0), Vector2(r.size.x - 16.0, 9.0)), Color(0, 0, 0, 0.6))
 			var c2 := Color("#5fe08a") if f > 0.5 else (Color("#ffd33d") if f > 0.25 else Color("#ff6b7a"))
@@ -8421,6 +11480,52 @@ class Hud extends Node2D:
 		var ins: Vector4 = DSP.insets(get_tree())
 		return Rect2(vp.x - 126.0 - ins.z, vp.y - 330.0 - ins.w, 100.0, 100.0)
 
+	func act_rect() -> Rect2:
+		var vp: Vector2 = get_viewport_rect().size
+		if act_sp.x > -9000.0:   # v5.2: el botón de abrir se dibuja en el centro del cofre / caja
+			return Rect2(act_sp - Vector2(50.0, 50.0), Vector2(100.0, 100.0))
+		var ins: Vector4 = DSP.insets(get_tree())
+		# S22: boton de accion a media altura (derecha por defecto; izquierda segun Ajustes > Controles)
+		var left: bool = int(SV.d["settings"].get("act_side", 0)) == 1
+		var ax: float = (26.0 + ins.x) if left else (vp.x - 126.0 - ins.z)
+		# v5.2.2: encima del boton Dynamax (antes caia justo debajo y se solapaban)
+		var ay: float = vp.y * 0.5 - 50.0
+		if not left:
+			var dy: float = vp.y - 442.0 - ins.w
+			ay = minf(ay, dy - 114.0)
+			if ay < 150.0:   # pantalla baja: al costado del boton Dynamax en vez de encima
+				return Rect2(ax - 114.0, dy, 100.0, 100.0)
+		return Rect2(ax, ay, 100.0, 100.0)
+
+	func draw_poi(font: Font, vp: Vector2) -> void:
+		for mk in poi_marks:
+			var sp: Vector2 = mk["sp"]
+			var col: Color = mk["col"]
+			var on: bool = Rect2(Vector2(30, 70), vp - Vector2(60, 140)).has_point(sp)
+			if on:
+				_ds(font, sp + Vector2(-120, -28), String(mk["txt"]), HORIZONTAL_ALIGNMENT_CENTER, 240.0, 18, col)
+			else:
+				var c: Vector2 = vp * 0.5
+				var dir: Vector2 = (sp - c).normalized()
+				var q: Vector2 = Vector2(clampf(sp.x, 40.0, vp.x - 40.0), clampf(sp.y, 90.0, vp.y - 90.0))
+				draw_circle(q, 18.0, Color(0, 0, 0, 0.6))
+				draw_colored_polygon(PackedVector2Array([q + dir * 14.0, q + dir.rotated(2.5) * 12.0, q + dir.rotated(-2.5) * 12.0]), col)
+		if act_txt != "":
+			var r: Rect2 = act_rect()
+			var c2: Vector2 = r.position + r.size * 0.5
+			var beat: float = 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.006)
+			draw_circle(c2, 52.0 + beat * 5.0, Color(1, 0.85, 0.3, 0.22 + 0.2 * beat))
+			draw_circle(c2, 46.0, Color(0.1, 0.07, 0.02, 0.9))
+			draw_arc(c2, 46.0, 0.0, TAU, 40, Color("#ffd23f"), 4.0)
+			_ds(font, Vector2(c2.x - 44.0, c2.y + 8.0), act_txt, HORIZONTAL_ALIGNMENT_CENTER, 88.0, _fit_size(font, act_txt, 84.0, 26), Color.WHITE)
+
+	# Mayor tamano de letra (hasta mx) con el que el texto cabe en w pixeles.
+	func _fit_size(font: Font, txt: String, w: float, mx: int) -> int:
+		var sz: int = mx
+		while sz > 11 and font.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1.0, sz).x > w:
+			sz -= 1
+		return sz
+
 	func dyn_rect() -> Rect2:
 		var vp: Vector2 = get_viewport_rect().size
 		var ins: Vector4 = DSP.insets(get_tree())
@@ -8442,7 +11547,7 @@ class Hud extends Node2D:
 			var fr: float = clampf(dyn_left / DYN.DUR, 0.0, 1.0)
 			draw_rect(Rect2(x0 - 2.0, 62.0, w + 4.0, 20.0), Color(0, 0, 0, 0.65))
 			draw_rect(Rect2(x0, 64.0, w * fr, 16.0), tcol if fr > 0.25 else Color("#ffb347"))
-			draw_string(font, Vector2(x0, 58.0), "DYNAMAX  %d s" % ceili(dyn_left), HORIZONTAL_ALIGNMENT_CENTER, w, 16, Color.WHITE)
+			_ds(font, Vector2(x0, 58.0), "DYNAMAX  %d s" % ceili(dyn_left), HORIZONTAL_ALIGNMENT_CENTER, w, 16, Color.WHITE)
 		if dyn_flash < 2.7:
 			var fl: float = clampf(1.0 - dyn_flash / 0.25, 0.0, 1.0)
 			if fl > 0.0:
@@ -8473,12 +11578,12 @@ class Hud extends Node2D:
 					draw_set_transform(Vector2(ox, oy), 0.0, Vector2(sc, sc))
 					var base: Color = Color("#ff2f63").lerp(Color("#ffd6e0"), clampf(float(i) / 6.0 + 0.15 * sin(dyn_flash * 6.0 - float(i)), 0.0, 1.0))
 					var pos := Vector2(-cwid * 0.5, 0.0)
-					draw_string_outline(font, pos + Vector2(0.0, 6.0), String(word[i]), HORIZONTAL_ALIGNMENT_LEFT, -1.0, fs, 16, Color(0.22, 0.0, 0.1, 0.92 * al))
-					draw_string(font, pos + Vector2(3.0, 9.0), String(word[i]), HORIZONTAL_ALIGNMENT_LEFT, -1.0, fs, Color(0.55, 0.0, 0.2, 0.9 * al))
-					draw_string(font, pos + Vector2(0.0, 6.0), String(word[i]), HORIZONTAL_ALIGNMENT_LEFT, -1.0, fs, Color(base.r, base.g, base.b, al))
+					_dso(font, pos + Vector2(0.0, 6.0), String(word[i]), HORIZONTAL_ALIGNMENT_LEFT, -1.0, fs, 16, Color(0.22, 0.0, 0.1, 0.92 * al))
+					_ds(font, pos + Vector2(3.0, 9.0), String(word[i]), HORIZONTAL_ALIGNMENT_LEFT, -1.0, fs, Color(0.55, 0.0, 0.2, 0.9 * al))
+					_ds(font, pos + Vector2(0.0, 6.0), String(word[i]), HORIZONTAL_ALIGNMENT_LEFT, -1.0, fs, Color(base.r, base.g, base.b, al))
 					var sh: float = clampf(1.0 - absf(cx + cwid * 0.5 - shine) / 55.0, 0.0, 1.0)
 					if sh > 0.0:
-						draw_string(font, pos + Vector2(0.0, 6.0), String(word[i]), HORIZONTAL_ALIGNMENT_LEFT, -1.0, fs, Color(1.0, 1.0, 1.0, sh * 0.9 * al))
+						_ds(font, pos + Vector2(0.0, 6.0), String(word[i]), HORIZONTAL_ALIGNMENT_LEFT, -1.0, fs, Color(1.0, 1.0, 1.0, sh * 0.9 * al))
 					draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 					# chispas al aterrizar
 					if loc < 0.45:
@@ -8487,6 +11592,7 @@ class Hud extends Node2D:
 							var ang: float = float(q) * 1.256 + float(i)
 							draw_circle(Vector2(ox, by - 28.0) + Vector2.from_angle(ang) * (loc * 260.0), 3.0 * burst + 1.0, Color(1.0, 0.85, 0.9, burst * al))
 				cx += cwid
+		draw_poi(font, vp)
 		if dyn_btn > 0:
 			var r: Rect2 = dyn_rect()
 			var c: Vector2 = r.position + r.size * 0.5
@@ -8495,11 +11601,11 @@ class Hud extends Node2D:
 				draw_circle(c, 52.0 + beat * 6.0, Color(tcol.r, tcol.g, tcol.b, 0.25 + beat * 0.25))
 			draw_circle(c, 46.0, Color(0.14, 0.03, 0.07, 0.88))
 			draw_arc(c, 46.0, 0.0, TAU, 40, tcol if ready else Color(0.5, 0.52, 0.58), 4.0)
-			draw_string(font, Vector2(c.x - 44.0, c.y + (2.0 if dyn_btn == 3 else 11.0)), "MAX", HORIZONTAL_ALIGNMENT_CENTER, 88.0, 28 if dyn_btn == 3 else 32, Color.WHITE if ready else Color(0.6, 0.62, 0.68))
+			_ds(font, Vector2(c.x - 44.0, c.y + (2.0 if dyn_btn == 3 else 11.0)), "MAX", HORIZONTAL_ALIGNMENT_CENTER, 88.0, 28 if dyn_btn == 3 else 32, Color.WHITE if ready else Color(0.6, 0.62, 0.68))
 			if dyn_btn == 3:
-				draw_string(font, Vector2(c.x - 44.0, c.y + 26.0), "%d:%02d" % [int(dyn_cd) / 60, int(dyn_cd) % 60], HORIZONTAL_ALIGNMENT_CENTER, 88.0, 18, Color(0.85, 0.88, 0.95))
+				_ds(font, Vector2(c.x - 44.0, c.y + 26.0), "%d:%02d" % [int(dyn_cd) / 60, int(dyn_cd) % 60], HORIZONTAL_ALIGNMENT_CENTER, 88.0, 18, Color(0.85, 0.88, 0.95))
 			elif not ready:
-				draw_string(font, Vector2(c.x - 50.0, c.y + 70.0), L.t("Nv. %d") % DYN.MIN_LEVEL, HORIZONTAL_ALIGNMENT_CENTER, 100.0, 16, Color(0.75, 0.78, 0.85))
+				_ds(font, Vector2(c.x - 50.0, c.y + 70.0), L.t("Min 3"), HORIZONTAL_ALIGNMENT_CENTER, 100.0, 16, Color(0.75, 0.78, 0.85))
 
 	func draw_z(font: Font, vp: Vector2) -> void:
 		var tcol: Color = Color.html(String(MD.TYPE_COLOR.get(z_type, "#ffffff")))
@@ -8541,7 +11647,7 @@ class Hud extends Node2D:
 			var sx: float = vp.x * 0.5 - (font.get_string_size(sub, HORIZONTAL_ALIGNMENT_LEFT, -1, 22).x + sp * float(sub.length() - 1)) * 0.5
 			for i in range(sub.length()):
 				var ch: String = sub.substr(i, 1)
-				draw_string(font, Vector2(sx, cy - 28.0), ch, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color(1, 1, 1, 0.85 * al))
+				_ds(font, Vector2(sx, cy - 28.0), ch, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color(1, 1, 1, 0.85 * al))
 				sx += font.get_string_size(ch, HORIZONTAL_ALIGNMENT_LEFT, -1, 22).x + sp
 			# Nombre: cada letra cae con un golpe y rebote
 			var fs: int = 60 if vp.x >= 900.0 else 40
@@ -8567,9 +11673,9 @@ class Hud extends Node2D:
 					var base: Color = Color(minf(1.0, tcol.r * 0.45 + 0.55), minf(1.0, tcol.g * 0.45 + 0.55), minf(1.0, tcol.b * 0.45 + 0.55), ca)
 					var fc: Color = base.lerp(Color(1, 1, 1, ca), shine)
 					for o in [Vector2(-3, 0), Vector2(3, 0), Vector2(0, -3), Vector2(0, 3)]:
-						draw_string(font, Vector2(-cw * 0.5, 0.0) + o, ch, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(tcol.r, tcol.g, tcol.b, 0.55 * ca))
-					draw_string(font, Vector2(-cw * 0.5 + 3.0, 4.0), ch, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(0, 0, 0, 0.7 * ca))
-					draw_string(font, Vector2(-cw * 0.5, 0.0), ch, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, fc)
+						_ds(font, Vector2(-cw * 0.5, 0.0) + o, ch, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(tcol.r, tcol.g, tcol.b, 0.55 * ca))
+					_ds(font, Vector2(-cw * 0.5 + 3.0, 4.0), ch, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(0, 0, 0, 0.7 * ca))
+					_ds(font, Vector2(-cw * 0.5, 0.0), ch, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, fc)
 					draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 				cx += cw
 			# Destello blanco con el primer golpe
@@ -8588,9 +11694,9 @@ class Hud extends Node2D:
 			var zc: Color = Color.WHITE if ready else Color(0.6, 0.62, 0.68)
 			IC.draw_in(self, "zc:" + z_type, c + Vector2(0.0, -2.0 - (beat * 2.0 if ready else 0.0)), 64.0, zc)
 			if z_btn == 3:
-				draw_string(font, Vector2(c.x - 50.0, c.y + 70.0), "%d:%02d" % [int(z_cd) / 60, int(z_cd) % 60], HORIZONTAL_ALIGNMENT_CENTER, 100.0, 16, Color(0.75, 0.78, 0.85))
+				_ds(font, Vector2(c.x - 50.0, c.y + 70.0), "%d:%02d" % [int(z_cd) / 60, int(z_cd) % 60], HORIZONTAL_ALIGNMENT_CENTER, 100.0, 16, Color(0.75, 0.78, 0.85))
 			elif not ready:
-				draw_string(font, Vector2(c.x - 50.0, c.y + 70.0), L.t("Nv. %d") % ZM.MIN_LEVEL, HORIZONTAL_ALIGNMENT_CENTER, 100.0, 16, Color(0.75, 0.78, 0.85))
+				_ds(font, Vector2(c.x - 50.0, c.y + 70.0), L.t("Min 3"), HORIZONTAL_ALIGNMENT_CENTER, 100.0, 16, Color(0.75, 0.78, 0.85))
 
 	func pause_rects() -> Array:
 		var vp: Vector2 = get_viewport_rect().size
@@ -8623,9 +11729,9 @@ class Hud extends Node2D:
 		var ic: String = "medal%d" % clampi(int(toast.get("tier", 2)), 1, 3)
 		IC.draw_in(self, ic, Vector2(x0 + 36.0, y0 + h * 0.5), 36.0, Color(1, 1, 1, a))
 		var ty: float = y0 + (h * 0.5 + 8.0 if sub == "" else 34.0)
-		draw_string(font, Vector2(x0 + 66.0, ty), txt, HORIZONTAL_ALIGNMENT_LEFT, w - 76.0, 22, Color(1.0, 0.82, 0.25, a))
+		_ds(font, Vector2(x0 + 66.0, ty), txt, HORIZONTAL_ALIGNMENT_LEFT, w - 76.0, 22, Color(1.0, 0.82, 0.25, a))
 		if sub != "":
-			draw_string(font, Vector2(x0 + 66.0, y0 + 60.0), sub, HORIZONTAL_ALIGNMENT_LEFT, w - 76.0, 16, Color(0.72, 0.8, 0.94, a))
+			_ds(font, Vector2(x0 + 66.0, y0 + 60.0), sub, HORIZONTAL_ALIGNMENT_LEFT, w - 76.0, 16, Color(0.72, 0.8, 0.94, a))
 
 	func _draw() -> void:
 		var font := ThemeDB.fallback_font
@@ -8635,7 +11741,7 @@ class Hud extends Node2D:
 		draw_dyn(font, vp)
 		draw_toast(font, vp)
 		if show_fps:
-			draw_string(font, Vector2(vp.x - 130.0 - ins.z, vp.y - 12.0 - ins.w), "%d FPS" % int(Engine.get_frames_per_second()), HORIZONTAL_ALIGNMENT_RIGHT, 118.0, 20, Color(1, 1, 1, 0.85))
+			_ds(font, Vector2(vp.x - 130.0 - ins.z, vp.y - 12.0 - ins.w), "%d FPS" % int(Engine.get_frames_per_second()), HORIZONTAL_ALIGNMENT_RIGHT, 118.0, 20, Color(1, 1, 1, 0.85))
 		var frac: float = clampf(hp / max_hp, 0.0, 1.0)
 		var col := Color("#5fe08a")
 		if frac <= 0.25:
@@ -8646,36 +11752,39 @@ class Hud extends Node2D:
 		draw_rect(Rect2(0.0, 0.0, vp.x * clampf(xp / xp_next, 0.0, 1.0), 8.0), Color("#7fe0ff"))
 		draw_rect(Rect2(16.0 + ins.x, 16.0 + ins.y, 240.0, 18.0), Color(0, 0, 0, 0.55))
 		draw_rect(Rect2(18.0 + ins.x, 18.0 + ins.y, 236.0 * frac, 14.0), col)
-		draw_string(font, Vector2(16.0 + ins.x, 54.0 + ins.y), L.t("%s  PS %d/%d") % [poke_name, ceili(hp), ceili(max_hp)], HORIZONTAL_ALIGNMENT_LEFT, -1.0, 18, Color.WHITE)
-		draw_string(font, Vector2(16.0 + ins.x, 76.0 + ins.y), L.t("Nv. %d") % level, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 18, Color("#7fe0ff"))
+		_ds(font, Vector2(16.0 + ins.x, 54.0 + ins.y), L.t("%s  PS %d/%d") % [poke_name, ceili(hp), ceili(max_hp)], HORIZONTAL_ALIGNMENT_LEFT, -1.0, 18, Color.WHITE)
+		_ds(font, Vector2(16.0 + ins.x, 76.0 + ins.y), L.t("Nv. %d") % level, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 18, Color("#7fe0ff"))
 		if ab_name != "":
-			draw_string(font, Vector2(132.0 + ins.x, 76.0 + ins.y), ab_name, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 15, Color("#ffd98a"))
+			_ds(font, Vector2(132.0 + ins.x, 76.0 + ins.y), ab_name, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 15, Color("#ffd98a"))
 		if down:
 			var bw: float = 300.0
 			var bx: float = vp.x * 0.5 - bw * 0.5
 			var by: float = 56.0 + ins.y
 			draw_rect(Rect2(bx - 4.0, by - 4.0, bw + 8.0, 70.0), Color(0, 0, 0, 0.5))
-			draw_string(font, Vector2(bx, by + 16.0), L.t("Espectando: reviveras en %d s") % ceili(down_left), HORIZONTAL_ALIGNMENT_CENTER, bw, 20, Color("#ffd2d8"))
+			_ds(font, Vector2(bx, by + 16.0), L.t("Espectando: reviveras en %d s") % ceili(down_left), HORIZONTAL_ALIGNMENT_CENTER, bw, 20, Color("#ffd2d8"))
 			draw_rect(Rect2(bx, by + 28.0, bw, 14.0), Color(0, 0, 0, 0.6))
 			draw_rect(Rect2(bx + 1.0, by + 29.0, (bw - 2.0) * pbar, 12.0), Color("#9ad0ff"))
-			draw_string(font, Vector2(bx, by + 60.0), L.t("Vida de tu compañero"), HORIZONTAL_ALIGNMENT_CENTER, bw, 16, Color("#cfe6ff"))
+			_ds(font, Vector2(bx, by + 60.0), L.t("Vida de tu compañero"), HORIZONTAL_ALIGNMENT_CENTER, bw, 16, Color("#cfe6ff"))
 		if show_stats and not stats.is_empty():
 			var sy: float = 300.0 + ins.y
 			var sx: float = 16.0 + ins.x
 			draw_rect(Rect2(sx - 4.0, sy - 2.0, 150.0, 18.0 * stats.size() + 6.0), Color(0, 0, 0, 0.32))
 			for row in stats:
-				draw_string(font, Vector2(sx, sy + 13.0), String(row[0]), HORIZONTAL_ALIGNMENT_LEFT, 90.0, 14, Color(1, 1, 1, 0.75))
-				draw_string(font, Vector2(sx + 40.0, sy + 13.0), String(row[1]), HORIZONTAL_ALIGNMENT_RIGHT, 100.0, 14, Color("#ffe58a"))
+				_ds(font, Vector2(sx, sy + 13.0), String(row[0]), HORIZONTAL_ALIGNMENT_LEFT, 90.0, 14, Color(1, 1, 1, 0.75))
+				_ds(font, Vector2(sx + 40.0, sy + 13.0), String(row[1]), HORIZONTAL_ALIGNMENT_RIGHT, 100.0, 14, Color("#ffe58a"))
 				sy += 18.0
 		for ri in range(revives):
 			IC.draw_in(self, "revive", Vector2(70.0 + ins.x + float(ri) * 22.0, 71.0 + ins.y), 18.0)
 		draw_powers(font, vp)
+		draw_items(font, ins)
 		if not team.is_empty():
 			draw_team(font)
 		if weather_text != "":
-			draw_string(font, Vector2(0.0, 62.0), L.t(weather_text), HORIZONTAL_ALIGNMENT_CENTER, vp.x, 18, Color("#cfe2ff"))
+			_ds(font, Vector2(0.0, 62.0), L.t(weather_text), HORIZONTAL_ALIGNMENT_CENTER, vp.x, 18, Color("#cfe2ff"))
 		if banner != "":
-			draw_string(font, Vector2(0.0, 92.0), L.t(banner), HORIZONTAL_ALIGNMENT_CENTER, vp.x, 20, Color("#ffffff"))
+			_ds(font, Vector2(0.0, 92.0), L.t(banner), HORIZONTAL_ALIGNMENT_CENTER, vp.x, 20, Color("#ffffff"))
+		draw_join(font, vp)
+		draw_fusion(font, vp)
 		draw_rift(font, vp)
 		draw_rift_notice(font, vp)
 		draw_thief_notice(font, vp)
@@ -8683,15 +11792,22 @@ class Hud extends Node2D:
 		var tw: float = font.get_string_size(str(tickets), HORIZONTAL_ALIGNMENT_LEFT, -1.0, 18).x
 		var t10w: float = font.get_string_size(str(tickets10), HORIZONTAL_ALIGNMENT_LEFT, -1.0, 18).x
 		var rx: float = vp.x - 16.0 - ins.z
-		draw_string(font, Vector2(rx - t10w, 62.0), str(tickets10), HORIZONTAL_ALIGNMENT_LEFT, -1.0, 18, Color("#c47bff"))
+		_ds(font, Vector2(rx - t10w, 62.0), str(tickets10), HORIZONTAL_ALIGNMENT_LEFT, -1.0, 18, Color("#c47bff"))
 		IC.draw_in(self, "ticket10", Vector2(rx - t10w - 16.0, 56.0), 24.0)
 		rx -= t10w + 40.0
-		draw_string(font, Vector2(rx - tw, 62.0), str(tickets), HORIZONTAL_ALIGNMENT_LEFT, -1.0, 18, Color("#ffd23f"))
+		_ds(font, Vector2(rx - tw, 62.0), str(tickets), HORIZONTAL_ALIGNMENT_LEFT, -1.0, 18, Color("#ffd23f"))
 		IC.draw_in(self, "ticket", Vector2(rx - tw - 16.0, 56.0), 24.0)
 		rx -= tw + 40.0
 		var cw: float = font.get_string_size(str(coins), HORIZONTAL_ALIGNMENT_LEFT, -1.0, 18).x
-		draw_string(font, Vector2(rx - cw, 62.0), str(coins), HORIZONTAL_ALIGNMENT_LEFT, -1.0, 18, Color("#ffd23f"))
+		_ds(font, Vector2(rx - cw, 62.0), str(coins), HORIZONTAL_ALIGNMENT_LEFT, -1.0, 18, Color("#ffd23f"))
 		IC.draw_in(self, "coin", Vector2(rx - cw - 16.0, 56.0), 24.0)
+		if balls > 0:
+			rx -= cw + 40.0
+			var bw: float = font.get_string_size("x%d" % balls, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 18).x
+			_ds(font, Vector2(rx - bw, 62.0), "x%d" % balls, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 18, Color("#ff8a8a"))
+			var bt2: Texture2D = ALP.ball_tex()
+			if bt2 != null:
+				draw_texture_rect(bt2, Rect2(Vector2(rx - bw - 30.0, 42.0), Vector2(22.0, 22.0)), false)
 		var pr: Array = pause_rects()
 		draw_rect(pr[0], Color(0, 0, 0, 0.45))
 		draw_rect(pr[0], Color.WHITE, false, 2.0)
@@ -8701,13 +11817,31 @@ class Hud extends Node2D:
 		if limit > 0.0:
 			var left: float = maxf(0.0, limit - run_time)
 			var lc: String = "%02d:%02d" % [floori(left / 60.0), int(left) % 60]
-			draw_string(font, Vector2(0.0, 36.0), lc, HORIZONTAL_ALIGNMENT_CENTER, vp.x, 28, Color("#ff6b7a") if left < 30.0 else Color.WHITE)
-			draw_string(font, Vector2(0.0, 58.0), L.t("Grietas ganadas: %d") % rifts_n, HORIZONTAL_ALIGNMENT_CENTER, vp.x, 18, Color("#c9a6ff"))
+			_ds(font, Vector2(0.0, 36.0), lc, HORIZONTAL_ALIGNMENT_CENTER, vp.x, 28, Color("#ff6b7a") if left < 30.0 else Color.WHITE)
+			if ch_mode:
+				var cy := 134.0
+				for ln in ch_lines:
+					var okc: bool = bool(ln[3])
+					var txt: String = String(ln[0])
+					if okc:
+						txt += "  ✓"
+					elif bool(ln[4]):
+						var cs: int = int(minf(float(ln[1]), float(ln[2])))
+						txt += "  %d:%02d/%d:%02d" % [cs / 60, cs % 60, int(ln[2]) / 60, int(ln[2]) % 60]
+					elif float(ln[2]) > 1.0 and float(ln[2]) <= 100000.0:
+						txt += "  %d/%d" % [int(minf(float(ln[1]), float(ln[2]))), int(ln[2])]
+					var tw2: float = font.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 16).x
+					var px: float = vp.x - 16.0 - ins.z - tw2
+					_dso(font, Vector2(px, cy), txt, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 16, 5, Color(0, 0, 0, 0.85))
+					_ds(font, Vector2(px, cy), txt, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 16, Color("#8fe39b") if okc else Color.WHITE)
+					cy += 20.0
+			else:
+				_ds(font, Vector2(0.0, 58.0), L.t("Grietas ganadas: %d") % rifts_n, HORIZONTAL_ALIGNMENT_CENTER, vp.x, 18, Color("#c9a6ff"))
 		else:
-			draw_string(font, Vector2(0.0, 36.0), L.t(clock), HORIZONTAL_ALIGNMENT_CENTER, vp.x, 28, Color.WHITE)
+			_ds(font, Vector2(0.0, 36.0), L.t(clock), HORIZONTAL_ALIGNMENT_CENTER, vp.x, 28, Color.WHITE)
 		if adapt_pct > 0 and tower_floor <= 0 and limit <= 0.0:
 			var ac: Color = Color("#8fe39b") if adapt_pct < 100 else (Color("#ffd23f") if adapt_pct == 100 else Color("#ff9a5a"))
-			draw_string(font, Vector2(0.0, 58.0), L.t("Reto: %d%%") % adapt_pct, HORIZONTAL_ALIGNMENT_CENTER, vp.x, 16, ac)
+			_ds(font, Vector2(0.0, 58.0), L.t("Reto: %d%%") % adapt_pct, HORIZONTAL_ALIGNMENT_CENTER, vp.x, 16, ac)
 		if tower_floor > 0:
 			var sub: String = L.t("Piso %d / %d") % [tower_floor, TOWER_FLOORS]
 			if tower_t >= 0.0:
@@ -8718,8 +11852,8 @@ class Hud extends Node2D:
 				sub += "  ·  " + L.t("Pactos: %d") % tower_risk
 			if reap_pct >= 0.0:
 				sub += "  ·  " + L.t("Sed de victoria +%s%%") % ("%.1f" % reap_pct)
-			draw_string(font, Vector2(0.0, 58.0), sub, HORIZONTAL_ALIGNMENT_CENTER, vp.x, 18, Color("#ffd23f"))
-		draw_string(font, Vector2(vp.x - 236.0 - ins.z, 36.0), L.t("Derrotados: %d") % kills, HORIZONTAL_ALIGNMENT_RIGHT, 220.0, 20, Color.WHITE)
+			_ds(font, Vector2(0.0, 58.0), sub, HORIZONTAL_ALIGNMENT_CENTER, vp.x, 18, Color("#ffd23f"))
+		_ds(font, Vector2(vp.x - 236.0 - ins.z, 36.0), L.t("Derrotados: %d") % kills, HORIZONTAL_ALIGNMENT_RIGHT, 220.0, 20, Color.WHITE)
 		if dead:
 			# Camara lenta: primero se ve caer al Pokemon; despues oscurece y aparece GAME OVER.
 			var fade: float = clampf((death_t - 0.3) / 0.35, 0.0, 1.0)
@@ -8728,17 +11862,17 @@ class Hud extends Node2D:
 				var ga: float = fade
 				var big: String = (end_big if end_big != "" else L.t("¡TIEMPO!")) if timeup else "GAME OVER"
 				var bigc: Color = Color(1.0, 0.82, 0.25, ga) if timeup else Color(1.0, 0.36, 0.42, ga)
-				draw_string_outline(font, Vector2(0.0, vp.y * 0.36), big, HORIZONTAL_ALIGNMENT_CENTER, vp.x, 72, 10, Color(0, 0, 0, ga))
-				draw_string(font, Vector2(0.0, vp.y * 0.36), big, HORIZONTAL_ALIGNMENT_CENTER, vp.x, 72, bigc)
+				_dso(font, Vector2(0.0, vp.y * 0.36), big, HORIZONTAL_ALIGNMENT_CENTER, vp.x, 72, 10, Color(0, 0, 0, ga))
+				_ds(font, Vector2(0.0, vp.y * 0.36), big, HORIZONTAL_ALIGNMENT_CENTER, vp.x, 72, bigc)
 				if timeup:
-					draw_string(font, Vector2(0.0, vp.y * 0.45 + 10.0), end_l1 if end_l1 != "" else L.t("Grietas ganadas: %d") % rifts_n, HORIZONTAL_ALIGNMENT_CENTER, vp.x, 40, Color(1, 1, 1, ga))
-					draw_string(font, Vector2(0.0, vp.y * 0.45 + 50.0), end_l2 if end_l2 != "" else L.t("Derrotaste %d Pokémon") % kills, HORIZONTAL_ALIGNMENT_CENTER, vp.x, 22, Color(1, 1, 1, ga))
+					_ds(font, Vector2(0.0, vp.y * 0.45 + 10.0), end_l1 if end_l1 != "" else L.t("Grietas ganadas: %d") % rifts_n, HORIZONTAL_ALIGNMENT_CENTER, vp.x, 40, Color(1, 1, 1, ga))
+					_ds(font, Vector2(0.0, vp.y * 0.45 + 50.0), end_l2 if end_l2 != "" else L.t("Derrotaste %d Pokémon") % kills, HORIZONTAL_ALIGNMENT_CENTER, vp.x, 22, Color(1, 1, 1, ga))
 				else:
-					draw_string(font, Vector2(0.0, vp.y * 0.45 + 10.0), L.t("Has caído..."), HORIZONTAL_ALIGNMENT_CENTER, vp.x, 40, Color(1, 1, 1, ga))
-					draw_string(font, Vector2(0.0, vp.y * 0.45 + 50.0), L.t("Aguantaste %s y derrotaste %d") % [clock, kills], HORIZONTAL_ALIGNMENT_CENTER, vp.x, 22, Color(1, 1, 1, ga))
+					_ds(font, Vector2(0.0, vp.y * 0.45 + 10.0), L.t("Has fallado el reto...") if ch_mode else L.t("Has caído..."), HORIZONTAL_ALIGNMENT_CENTER, vp.x, 40, Color(1, 1, 1, ga))
+					_ds(font, Vector2(0.0, vp.y * 0.45 + 50.0), L.t("Aguantaste %s y derrotaste %d") % [clock, kills], HORIZONTAL_ALIGNMENT_CENTER, vp.x, 22, Color(1, 1, 1, ga))
 		if dead:
 			if show_end:
-				draw_string(font, Vector2(0.0, vp.y * 0.45 + 96.0), L.t("Pulsa una tecla, un botón o toca la pantalla para volver al menú"), HORIZONTAL_ALIGNMENT_CENTER, vp.x, 20, Color("#ffd33d"))
+				_ds(font, Vector2(0.0, vp.y * 0.45 + 96.0), L.t("Pulsa una tecla, un botón o toca la pantalla para volver al menú"), HORIZONTAL_ALIGNMENT_CENTER, vp.x, 20, Color("#ffd33d"))
 
 
 # ---------------------------------------------------------------
@@ -8885,6 +12019,8 @@ class Stick extends Node2D:
 	func _input(event: InputEvent) -> void:
 		if event is InputEventScreenTouch:
 			if event.pressed and _id == -1:
+				if not fixed and bool(SV.d["settings"].get("manual_aim", false)) and event.position.x > get_viewport_rect().size.x * 0.5:
+					return   # con apuntado manual, la mitad derecha es para apuntar
 				if fixed:
 					var h: Vector2 = _home()
 					if event.position.distance_to(h) > radius * 1.8:

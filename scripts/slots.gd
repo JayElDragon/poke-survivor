@@ -72,7 +72,9 @@ func _gui_input(event: InputEvent) -> void:
 func _input(event: InputEvent) -> void:
 	if not running or not is_visible_in_tree():
 		return
-	if (event is InputEventJoypadButton and event.pressed) or (event is InputEventKey and event.pressed and not event.echo):
+	# Un toque, clic, tecla o boton acelera la animacion. La tirada ya esta hecha antes de empezar (SV.pull), asi que acelerar nunca cobra otra.
+	if (event is InputEventJoypadButton and event.pressed) or (event is InputEventKey and event.pressed and not event.echo) \
+			or (event is InputEventScreenTouch and event.pressed) or (event is InputEventMouseButton and event.pressed):
 		fast = true
 		get_viewport().set_input_as_handled()
 

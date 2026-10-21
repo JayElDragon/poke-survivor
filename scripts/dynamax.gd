@@ -6,7 +6,8 @@ const Aud = preload("res://scripts/audio.gd")
 
 const COOLDOWN := 240.0   # 4 minutos desde que acaba
 const DUR := 60.0
-const MIN_LEVEL := 20
+const MIN_LEVEL := 1
+const MIN_TIME := 180.0   # disponible desde el minuto 3
 const GROW := 1.6
 const STAT_K := 1.3   # +30% a todos los atributos mientras dura
 const HP_BONUS := 0.3

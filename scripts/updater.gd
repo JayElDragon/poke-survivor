@@ -10,7 +10,7 @@ const L = preload("res://scripts/lang.gd")
 const PAD = preload("res://scripts/pad.gd")
 
 const REPO := "JayElDragon/poke-survivor"
-const FALLBACK_VERSION := "4.0.0"
+const FALLBACK_VERSION := "5.4"
 static var APP_VERSION: String = _current()
 
 
@@ -106,7 +106,7 @@ class UpdatePopup extends Control:
 		v.add_theme_constant_override("separation", 14)
 		pc.add_child(v)
 		var t1 := Label.new()
-		t1.text = L.t("New Update Available!")
+		t1.text = L.t("¡Nueva actualización disponible!")
 		t1.add_theme_font_size_override("font_size", 34)
 		t1.add_theme_color_override("font_color", Color("#ffd33d"))
 		t1.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -144,51 +144,18 @@ class UpdatePopup extends Control:
 
 	func _press(what: String) -> void:
 		if what == "go":
-			if _android_download():
-				# La descarga corre en segundo plano (barra de notificaciones de Android); el aviso se queda como confirmacion.
-				msg.text = L.t("Descargando… Cuando termine, toca la notificación de descarga para instalarla encima. Tu progreso se conserva.")
-				(btns[0] as Button).disabled = true
-				(btns[1] as Button).text = L.t("Cerrar")
-				sel = 1
-				(btns[1] as Button).grab_focus()
-				return
+			# Siempre en el navegador externo del telefono (no dentro del juego), para evitar errores de descarga.
 			OS.shell_open(String(info["url"]))
 		queue_free()
 
-	# Descarga el APK con el gestor de descargas de Android, sin salir del juego. Si algo falla, devuelve false
-	# y el aviso abre el enlace en el navegador como respaldo.
-	func _android_download() -> bool:
-		if OS.get_name() != "Android" or not Engine.has_singleton("AndroidRuntime"):
-			return false
-		var url: String = String(info["url"])
-		if not url.to_lower().ends_with(".apk"):
-			return false
-		var rt = Engine.get_singleton("AndroidRuntime")
-		var ctx = rt.call("getApplicationContext")
-		if ctx == null:
-			return false
-		var Uri = JavaClassWrapper.wrap("android.net.Uri")
-		var Req = JavaClassWrapper.wrap("android.app.DownloadManager$Request")
-		if Uri == null or Req == null:
-			return false
-		var uri = Uri.call("parse", url)
-		var rq = Req.call("new", uri) if Req.has_method("new") else Req.call("Request", uri)
-		if rq == null:
-			return false
-		var fname: String = "PokemonSurvivors-%s.apk" % String(info["tag"]).replace("/", "_")
-		rq.call("setTitle", "Pokémon Survivors " + String(info["tag"]))
-		rq.call("setDescription", "Descargando actualización")
-		rq.call("setMimeType", "application/vnd.android.package-archive")
-		rq.call("setNotificationVisibility", 1)
-		rq.call("setDestinationInExternalPublicDir", "Download", fname)
-		var dm = ctx.call("getSystemService", "download")
-		if dm == null:
-			return false
-		var id = dm.call("enqueue", rq)
-		return id != null and int(id) > 0
+	func _process(_d: float) -> void:
+		PAD.stick_tick()
 
 	func _input(event: InputEvent) -> void:
 		if not is_visible_in_tree():
+			return
+		if PAD.stick_event(event):
+			get_viewport().set_input_as_handled()
 			return
 		var pressed: bool = (event is InputEventJoypadButton or event is InputEventKey) and event.pressed
 		if event is InputEventKey and event.echo:

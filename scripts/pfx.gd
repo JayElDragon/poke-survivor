@@ -14,10 +14,16 @@ var slashes: Array = []
 var beams: Array = []
 
 
+# v5.2.1: menos particulas en todo el juego para evitar lag (el nivel Alta ya no es el 100% de antes).
+const BASE_CUT := 0.3   # 5.2.2: otro -50% sobre el recorte anterior (0.6)
+var skip := 0.0   # fraccion de particulas sueltas que se descartan
+
+
 func setup(quality_dens: float) -> void:
-	dens = clampf(quality_dens, 0.35, 1.0)
-	cap_parts = int(1400.0 * dens)
-	cap_sprites = int(320.0 * dens)
+	dens = clampf(quality_dens * BASE_CUT, 0.1, 1.0)
+	skip = clampf(1.0 - quality_dens * 0.35, 0.5, 0.85)
+	cap_parts = int(450.0 * clampf(quality_dens, 0.35, 1.0))
+	cap_sprites = int(100.0 * clampf(quality_dens, 0.35, 1.0))
 
 
 func clear() -> void:
@@ -42,7 +48,7 @@ static func rnd(a: float, b: float) -> float:
 
 # ---------------- creacion ----------------
 func px(pos: Vector2, color: Color, vel: Vector2 = Vector2.ZERO, life: float = 0.4, size: float = 1.0, grav: float = 0.0, drag: float = 0.9) -> void:
-	if parts.size() >= cap_parts:
+	if parts.size() >= cap_parts or randf() < skip:
 		return
 	parts.append({"p": pos, "v": vel, "t": 0.0, "life": life, "c": color, "s": size * PX, "g": grav, "d": drag})
 
@@ -64,7 +70,7 @@ func spark(pos: Vector2, color: Color, dir: Vector2, n: int = 4) -> void:
 
 
 func sp(shape: String, pal: String, pos: Vector2, o: Dictionary = {}) -> void:
-	if sprs.size() >= cap_sprites:
+	if sprs.size() >= cap_sprites or randf() < skip * 0.9:
 		return
 	sprs.append({"shape": shape, "pal": pal, "p": pos, "v": o.get("v", Vector2.ZERO), "t": 0.0, "life": float(o.get("life", 0.4)),
 		"scale": float(o.get("scale", 1.0)), "ang": float(o.get("angle", 0.0)), "spin": float(o.get("spin", 0.0)),
@@ -114,6 +120,10 @@ func slash(pos: Vector2, angle: float, radius: float, arc: float, vis: Dictionar
 			sp("jaws", pal, m, {"life": 0.24, "scale": 1.5, "fr": 9.0, "fade": false})
 		"claw":
 			sp("claw", pal, m, {"life": 0.2, "scale": 1.5, "angle": angle - PI / 4.0})
+		"slashx", "kick", "fist", "hammer", "xmark", "pincer":
+			sp(melee, pal, m, {"life": 0.26, "scale": 2.0, "fr": 10.0, "fade": true, "spin": 0.0})
+			for i in range(3):
+				sp(melee, pal, pos + Vector2.from_angle(angle + rnd(-arc / 2.0, arc / 2.0)) * radius * rnd(0.55, 1.0), {"life": 0.2, "scale": 1.0, "fr": 10.0})
 		"vine", "feather":
 			for i in range(4):
 				var a: float = angle + rnd(-arc / 2.0, arc / 2.0)
@@ -122,6 +132,7 @@ func slash(pos: Vector2, angle: float, radius: float, arc: float, vis: Dictionar
 					{"v": Vector2(cos(a) * 40.0, sin(a) * 40.0 + 20.0), "life": 0.45, "spin": rnd(-8.0, 8.0), "grav": 60.0})
 
 
+# (melee nuevos: ver slash_extra)
 # Rayo recto. vis.beam = forma que viaja por el o "lightning".
 func beam(pos: Vector2, angle: float, length: float, width: float, vis: Dictionary) -> void:
 	var pal: String = String(vis.get("pal", "normal"))

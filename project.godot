@@ -11,10 +11,14 @@ config_version=5
 [application]
 
 config/name="Pokémon Survivors"
-config/version="3.0.0"
+config/version="5.4"
 run/main_scene="res://scenes/menu.tscn"
-config/features=PackedStringArray("4.7", "Mobile")
+config/features=PackedStringArray("4.4", "Mobile")
 config/icon="res://icon.png"
+
+[autoload]
+
+TouchScroll="*res://scripts/touch_scroll.gd"
 
 [display]
 
@@ -23,6 +27,7 @@ window/size/viewport_height=720
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
 window/handheld/orientation=4
+window/subwindows/embed_subwindows=true
 
 [input_devices]
 
@@ -35,6 +40,6 @@ pointing/emulate_touch_from_mouse=true
 [rendering]
 
 textures/canvas_textures/default_texture_filter=0
-rendering_device/driver.windows="d3d12"
+rendering_device/driver.windows="vulkan"
 renderer/rendering_method="mobile"
 textures/vram_compression/import_etc2_astc=true

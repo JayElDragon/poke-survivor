@@ -4,6 +4,7 @@ extends RefCounted
 # y se colorean con la paleta del tipo.
 
 const PX := 2.0
+const V2 := preload("res://scripts/vfx2.gd")
 
 const PAL := {
 	"fire": ["#6b1200", "#b8300a", "#ff6a1f", "#ffb22e", "#fff2a0"],
@@ -90,6 +91,8 @@ static var cache := {}
 
 static func for_move(id: String, type: String) -> Dictionary:
 	var v: Dictionary = MOVE.get(id, {})
+	if V2.MOVE.has(id):
+		v = V2.MOVE[id]
 	var out: Dictionary = {"proj": String(TYPE_SHAPE.get(type, "ball")), "pal": type}
 	for k in v:
 		out[k] = v[k]
@@ -101,10 +104,14 @@ static func for_type(type: String) -> Dictionary:
 
 
 static func is_dir(shape: String) -> bool:
+	if V2.META.has(shape):
+		return bool(V2.META[shape][3])
 	return META.has(shape) and bool(META[shape][3])
 
 
 static func spins(shape: String) -> bool:
+	if V2.META.has(shape):
+		return bool(V2.META[shape][4])
 	return META.has(shape) and bool(META[shape][4])
 
 
@@ -439,15 +446,18 @@ static func _gen(shape: String, P: Grid, f: int) -> void:
 
 
 static func sprite(shape: String, pal: String, frame: int) -> Texture2D:
-	if not META.has(shape):
+	if not META.has(shape) and not V2.META.has(shape):
 		shape = "ball"
-	var m: Array = META[shape]
+	var m: Array = V2.META[shape] if V2.META.has(shape) else META[shape]
 	var f: int = frame % int(m[2])
 	var k: String = "%s|%s|%d" % [shape, pal, f]
 	if cache.has(k):
 		return cache[k]
 	var P := Grid.new(int(m[0]), int(m[1]))
-	_gen(shape, P, f)
+	if V2.META.has(shape):
+		V2.gen(shape, P, f)
+	else:
+		_gen(shape, P, f)
 	var img := Image.create(P.w, P.h, false, Image.FORMAT_RGBA8)
 	var colors: Array = PAL.get(pal, PAL["normal"])
 	for y in range(P.h):

@@ -30,6 +30,11 @@ static func get_font() -> Font:
 static func _set_fallbacks() -> void:
 	if font == null:
 		return
+	# Vietnamita: la fuente pixelada no trae todas las tildes, asi que se usa Inter (OFL) completa.
+	var bp: String = "res://fonts/Inter_vi.otf" if lang_code == "vi" else "res://fonts/PixelifySansFix.ttf"
+	var nb = load(bp)
+	if nb is Font and font.base_font != nb:
+		font.base_font = nb
 	var path: String = CJK.get(lang_code, CJK["ja"])
 	var fb = load(path)
 	var arr: Array[Font] = []

@@ -5,7 +5,7 @@ const SV = preload("res://scripts/save_data.gd")
 const TL = preload("res://scripts/lang.gd")
 const NAMES := ["Xbox", "PlayStation", "Nintendo"]
 # accion -> [texto (clave de traduccion)]
-const ACTIONS := ["prev", "next", "pause", "confirm", "cancel", "reroll", "ban", "swap", "zmove", "dynamax"]
+const ACTIONS := ["prev", "next", "pause", "confirm", "cancel", "reroll", "ban", "swap", "zmove", "dynamax", "slot1", "slot2", "slot3", "slot4", "slot5", "slot6"]
 const LABELS := {
 	"prev": "Movimiento anterior",
 	"next": "Movimiento siguiente",
@@ -17,6 +17,8 @@ const LABELS := {
 	"swap": "Cambiar Pokémon (Modo Equipo)",
 	"zmove": "Movimiento Z",
 	"dynamax": "Dynamax",
+	"slot1": "Elegir movimiento 1", "slot2": "Elegir movimiento 2", "slot3": "Elegir movimiento 3",
+	"slot4": "Elegir movimiento 4", "slot5": "Elegir movimiento 5", "slot6": "Elegir movimiento 6",
 }
 const BTN_NAMES := {
 	0: ["A", "Cross", "B"], 1: ["B", "Circle", "A"], 2: ["X", "Square", "Y"], 3: ["Y", "Triangle", "X"],
@@ -39,7 +41,9 @@ static func defaults(lay: int = -1) -> Dictionary:
 	var ok := JOY_BUTTON_B if lay == 2 else JOY_BUTTON_A
 	var no := JOY_BUTTON_A if lay == 2 else JOY_BUTTON_B
 	return {"prev": JOY_BUTTON_LEFT_SHOULDER, "next": JOY_BUTTON_RIGHT_SHOULDER, "pause": JOY_BUTTON_START,
-		"confirm": ok, "cancel": no, "reroll": JOY_BUTTON_Y, "ban": JOY_BUTTON_X, "swap": JOY_BUTTON_RIGHT_STICK, "zmove": JOY_BUTTON_LEFT_STICK, "dynamax": JOY_BUTTON_BACK}
+		"confirm": ok, "cancel": no, "reroll": JOY_BUTTON_Y, "ban": JOY_BUTTON_X, "swap": JOY_BUTTON_RIGHT_STICK, "zmove": JOY_BUTTON_LEFT_STICK, "dynamax": JOY_BUTTON_BACK,
+		# v5.3: elegir movimiento directo con la cruceta (1-4); los huecos 5 y 6 tambien con los gatillos izquierdo / derecho
+		"slot1": JOY_BUTTON_DPAD_UP, "slot2": JOY_BUTTON_DPAD_RIGHT, "slot3": JOY_BUTTON_DPAD_DOWN, "slot4": JOY_BUTTON_DPAD_LEFT, "slot5": JOY_BUTTON_MISC1, "slot6": JOY_BUTTON_TOUCHPAD}
 
 
 static func btn(action: String) -> int:
@@ -109,7 +113,7 @@ static func is_cancel(event: InputEvent) -> bool:
 	if event is InputEventJoypadButton and event.pressed:
 		return event.button_index == cancel_btn() or (event.button_index == JOY_BUTTON_BACK and not is_mapped(JOY_BUTTON_BACK))
 	if event is InputEventKey and event.pressed and not event.echo:
-		return event.keycode == KEY_ESCAPE or event.keycode == KEY_BACKSPACE
+		return event.keycode == KEY_ESCAPE   # v5.2.1: Retroceso ya no sale de los menus (solo Esc)
 	return false
 
 
@@ -121,6 +125,7 @@ static func _set_joy(action: String, buttons: Array) -> void:
 			InputMap.action_erase_event(action, ev)
 	for b in buttons:
 		var e := InputEventJoypadButton.new()
+		e.device = -1
 		e.button_index = b
 		InputMap.action_add_event(action, e)
 
@@ -129,3 +134,64 @@ static func _set_joy(action: String, buttons: Array) -> void:
 static func apply() -> void:
 	_set_joy("ui_accept", [confirm_btn()])
 	_set_joy("ui_cancel", [cancel_btn()])
+
+
+# ---------------------------------------------------------------
+# Stick izquierdo en los MENUS como una cruceta: una pulsacion = un salto; si se mantiene, repite despues de una espera.
+# (Godot cuenta como "pulsado" cada evento del stick pasado de 0,5, y un stick real manda decenas por segundo.)
+# El movimiento del Pokemon en partida no pasa por aqui.
+# ---------------------------------------------------------------
+const STICK_ON := 0.6       # a partir de aqui el stick cuenta como empujado
+const STICK_OFF := 0.35     # por debajo de aqui se considera suelto (evita rebotes)
+const STICK_DELAY := 0.42   # espera antes de empezar a repetir
+const STICK_REPEAT := 0.16  # segundos entre saltos mientras se mantiene
+static var vertical_only := false   # el stick ignora el eje X (lista de modos)
+static var _sdir := Vector2i.ZERO
+static var _snext := 0.0
+
+
+static func stick_event(event: InputEvent) -> bool:
+	if not (event is InputEventJoypadMotion) or not (event.axis == JOY_AXIS_LEFT_X or event.axis == JOY_AXIS_LEFT_Y):
+		return false
+	var x: float = 0.0 if vertical_only else Input.get_joy_axis(event.device, JOY_AXIS_LEFT_X)
+	var y: float = Input.get_joy_axis(event.device, JOY_AXIS_LEFT_Y)
+	var d := Vector2i.ZERO
+	var thr: float = STICK_ON if _sdir == Vector2i.ZERO else STICK_OFF
+	if maxf(absf(x), absf(y)) >= thr:
+		# solo un eje a la vez: el que mas empuja (las diagonales no saltan dos veces)
+		if absf(x) > absf(y):
+			d = Vector2i(1 if x > 0.0 else -1, 0)
+		else:
+			d = Vector2i(0, 1 if y > 0.0 else -1)
+	if d != _sdir:
+		_sdir = d
+		if d != Vector2i.ZERO:
+			_stick_fire(d)
+			_snext = Time.get_ticks_msec() / 1000.0 + STICK_DELAY
+	return true
+
+
+static func stick_tick() -> void:
+	if _sdir == Vector2i.ZERO:
+		return
+	var now: float = Time.get_ticks_msec() / 1000.0
+	if now >= _snext:
+		_snext = now + STICK_REPEAT
+		_stick_fire(_sdir)
+
+
+static func stick_reset() -> void:
+	_sdir = Vector2i.ZERO
+
+
+static func _stick_fire(d: Vector2i) -> void:
+	var act := "ui_down" if d.y > 0 else ("ui_up" if d.y < 0 else ("ui_right" if d.x > 0 else "ui_left"))
+	var e := InputEventAction.new()
+	e.action = act
+	e.pressed = true
+	e.strength = 1.0
+	Input.parse_input_event(e)
+	var r := InputEventAction.new()
+	r.action = act
+	r.pressed = false
+	Input.parse_input_event(r)

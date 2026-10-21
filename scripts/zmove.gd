@@ -6,7 +6,8 @@ const VFX = preload("res://scripts/vfx.gd")
 const ORDER := ["normal", "fire", "water", "electric", "grass", "ice", "fighting", "poison", "ground", "flying", "psychic", "bug", "rock", "ghost", "dragon", "dark", "steel", "fairy"]
 const NEED := 250
 const COOLDOWN := 240.0   # 4 minutos desde que acaba el movimiento
-const MIN_LEVEL := 15
+const MIN_LEVEL := 1
+const MIN_TIME := 180.0   # disponible desde el minuto 3
 const CINE_T := 2.2
 const DEF := {
 	"normal": {"name": "Carrera Estelar", "desc": "Embistes tres veces a toda velocidad contra los enemigos, atravesando todo a tu paso."},

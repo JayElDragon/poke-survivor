@@ -9,7 +9,115 @@ const UPD = preload("res://scripts/updater.gd")
 
 const ENTRIES := [
 	{
-		"ver": "4.0.0",
+		"ver": "5.4",
+		"date": "2026-10-21",
+		"title": "Poke Survivors 5.4: gran parche de balance y mejoras",
+		"new": [
+			"Bloqueo de objetos: con el interruptor activo, los objetos nuevos se ignoran cuando ya llevas los que quieres (salvo el Caramelo Raro).",
+			"Nuevo botón «Descartar siempre» en la pantalla de objetos: ese objeto no vuelve a aparecer.",
+		],
+		"changes": [
+			"El botón de abrir cofres y cajas aparece en el centro del cofre.",
+			"En las grietas puedes seguir vinculando movimientos tras vencer al jefe y no sales hasta elegir. Si no quedan movimientos que vincular, el vínculo se descarta.",
+			"El resumen de la partida muestra los objetos y lo que hace cada movimiento.",
+			"Gacha: la protección de mala suerte llega a las 90 tiradas (antes 70) y el ticket morado da legendario con menos probabilidad.",
+			"Las barras de desplazamiento son más gruesas para tocarlas mejor.",
+			"Kecleon: el botón de comerciar aparece sobre su cabeza (también con el botón de aceptar) y la tienda ya no activa Dynamax por error.",
+			"Poltchageist ahora suelta Gachapon Coins (y, muy rara vez, una dorada). Gholdengo solo da tickets y Meowth solo monedas; los tres aparecen por turnos.",
+			"Escaldar (Pistola Agua evolucionada) ahora tiene un 30% de probabilidad de quemar.",
+			"Ajustes en PC: nuevo modo de ventana y resolución de la ventana.",
+			"Lanzallamas: más dispersión (abanico más ancho, +1 llama) y un pequeño empuje desde el nivel 1.",
+			"Poké Balls: ahora también puedes capturar jefes normales (no los de grieta) y Pokémon gigantes cuando caen, con un máximo de 2 aliados por partida. Las Poké Balls son menos abundantes (máximo 6).",
+			"Nuevos Pokémon gigantes: Snorlax, Gyarados, Rhyperior, Aggron, Metagross, Golem, Lapras y Dragonite.",
+			"Enamorar: los movimientos Hada ahora tienen un 40% de probabilidad de enamorar y hacen más daño.",
+			"Descripciones de objetos reescritas con sus valores reales (Cinta Elección, Vidasfera, Cascabel Concha, Casco Dentado, Incienso Puro, Gafas Protectoras).",
+			"Al capturar un jefe o gigante, entra en la Poké Ball y sale de ella al unirse. Ahora ataca con sus ataques de jefe (pisotón, embestida, salto, lluvia, rayos, onda y salvas) y se corrigió el parpadeo de su sprite.",
+			"Los movimientos ahora evolucionan solo con subirlos al nivel máximo, sin necesitar mejoras de estadísticas ni objetos.",
+			"Más enemigos al principio de la partida para subir de nivel más rápido.",
+			"Dificultad aún más suave: aparecen menos enemigos y crecen más despacio, para llegar a los 20 minutos con mucha más facilidad.",
+			"Dificultad más suave: los enemigos ganan vida y daño más despacio con el tiempo y los primeros niveles piden menos experiencia.",
+			"Capturar un jefe o gigante muestra un cartel de celebración al unirse como aliado.",
+			"Las mejoras permanentes cuestan un 40% menos.",
+			"El menú de pausa tiene el botón Abandonar partida también en la pestaña Resumen.",
+			"Los movimientos de tipo Normal aparecen menos en las cartas, para que veas más movimientos de tu propio tipo.",
+			"Movimiento Z y Dynamax disponibles desde el minuto 3 (antes nivel 15 y 20).",
+			"Esfera Aural: más daño (24) y atraviesa a un enemigo.",
+			"Mando: ahora puedes elegir cada movimiento directamente (cruceta para los 1-4, gatillos para el 5 y 6) y reasignar los botones en Ajustes. En teclado, teclas 1 a 6.",
+			"El botón de lanzar la Poké Ball aparece dentro del Pokémon caído.",
+			"Menos partículas y efectos en todo el juego para evitar lag (-50% más).",
+			"Veto: ahora puedes mejorar los slots de veto hasta 6 (antes 3), con un coste por nivel más suave.",
+			"Nueva pantalla de pausa: se abre primero el Resumen de la partida con un diseño renovado (estadísticas con iconos y movimientos con daño y derrotas); las opciones están en la pestaña de al lado (LB/RB).",
+			"Economía: los tickets normales y morados son algo más difíciles de conseguir (cofres, jefes, grietas y premios dan menos).",
+		],
+		"fixes": [
+			"Mando en Android TV (Nvidia Shield): ahora se aceptan mandos que no son el índice 0. Pendiente de confirmar en un dispositivo real.",
+			"Aviso con el motivo cuando dos movimientos vinculados no se pueden fusionar.",
+			"Arreglo: al cambiar de modo con arriba/abajo el cursor ya no salta a los modificadores del panel derecho.",
+			"Al pulsar Jugar, la lista de modos empieza siempre arriba, en la Partida normal.",
+			"Arreglo: el botón de acción (Comerciar, Rescatar, Lanzar Poké Ball…) ya no se solapa con el botón Dynamax.",
+			"Arreglo: parpadeo de la pantalla al elegir un Caramelo Raro; ahora pasa directo a la mejora. Con mochila sale una sola carta y no se puede descartar para siempre.",
+			"Arreglo: la tecla Retroceso/Borrar ya no te saca de los menús en PC (solo Esc vuelve atrás).",
+			"Arreglo: al escribir el nombre de entrenador (o en los buscadores) Borrar ya no cierra la pantalla y se puede borrar, copiar y pegar. Vale en PC y en Android.",
+		],
+	},
+	{
+		"ver": "5.1",
+		"date": "2026-10-21",
+		"title": "Poke Survivors 5.1: hotfix de fusiones, Arceus y rendimiento",
+		"new": [
+			"La torre ahora tiene 60 pisos, con un jefe grande cada 5. Arceus espera en el piso 60 y ganas un vínculo de ataque cada 10 pisos.",
+			"Arceus ahora puede ser derrotado en la Sentencia (minuto 30): da una gran recompensa y al salir ganas muchos niveles de experiencia.",
+			"Las bombas ahora eliminan de un golpe a todo lo que hay en pantalla (los jefes pierden el 30% de su vida).",
+		],
+		"changes": [
+			"Fusiones: el movimiento fusionado es único y deja de lanzar los efectos de los dos originales; muchas menos partículas para evitar tirones.",
+			"Los nombres de las 50 fusiones están traducidos a todos los idiomas.",
+		],
+		"fixes": [
+			"Arreglo: ya no se puede atravesar el muro de la arena de Arceus.",
+			"Arreglo: los cofres grandes muestran una barra de progreso clara al abrirse.",
+		],
+	},
+	{
+		"ver": "5.0",
+		"date": "2026-10-20",
+		"title": "Poke Survivors 5.0: nuevo menú de Jugar, retos y modificadores",
+		"new": [
+			"Menú Jugar rediseñado: lista de modos de juego con reglas y una vista previa en video de cómo se juega cada uno.",
+			"Nuevos retos de 10 minutos: 100 retos permanentes, diarios y semanales, dentro del menú Jugar. Dan Gachapon Coins.",
+			"5 modificadores nuevos: Pesado, Mente brillante, Cañón de cristal, Fiebre del oro y Plaga. La vista previa de Modificadores muestra cómo cambian tus estadísticas y las de los enemigos.",
+			"Nueva pestaña Gachapon: una máquina donde las Gachapon Coins (la dorada da 2) desbloquean movimientos nuevos, con animación de moneda, cápsula y discos MT del color del tipo.",
+			"Nuevo botón Apoyar en el menú principal, para apoyar el proyecto de forma voluntaria.",
+			"Nueva burbuja de escudo, más bonita.",
+			"Ticket ×10 morado: la última tirada tiene más probabilidad de ser legendaria.",
+			"Nuevo perfil del jugador (toca tu nombre): Pokémon favoritos, estadísticas, 18 medallas de tipo, tipo favorito, gorra, mochila y temas de interfaz.",
+			"Las fusiones ahora son automáticas al vincular dos movimientos evolucionados al máximo, con un gran aviso «FUSION!» y un ataque especial con animación propia para cada receta.",
+			"Fusiones: 50 recetas de movimientos fusionados y una Fusion Dex que guarda las que descubras.",
+			"Cuevas con altares, laboratorios abandonados con Mewtwo, meteoritos con Deoxys e invasiones nuevas.",
+			"Opción de tamaño de texto en Ajustes.",
+			"Cada movimiento evolucionado tiene ahora un efecto visual y una habilidad propios (125 en total). Los movimientos de apoyo también evolucionan: Danza Espada, Agilidad, Fortaleza, Acua Aro, Danza Dragón, Respiro, Batido, Hipnosis y Come Sueños.",
+			"Menú Pokémon rediseñado: retrato con flechas, ficha con barras e iconos, tarjetas con tipo, favoritos (corazón), buscador y orden. También sirve para elegir compañero, equipo y Pokémon de la fiesta.",
+			"Kecleon vende 29 objetos nuevos, con iconos de pixel art y su propia entrada en el Léxico.",
+			"Los objetos perdidos del mapa tienen usos nuevos: la Bolsa de Poké Balls da Poké Balls, el Elixir da un potenciador al azar y el Cristal Prisma paraliza a los enemigos cercanos.",
+			"Las huchas Poké Ball (cofres de compra) dan una mejora gratis o una Poké Ball, y los paquetes misteriosos reemplazan a las mochilas del mapa.",
+		],
+		"changes": [
+			"La Torre de pisos ahora se llama «La torre».",
+			"El veneno hace menos daño por segundo y se acumula hasta 6 veces.",
+			"Al volver de una pantalla, el menú recuerda el botón que habías elegido (mando y táctil).",
+			"Fusiones: solo puedes tener una por partida, es más fuerte que los evolucionados y reemplaza a los dos movimientos que la forman, que ya no vuelven a ofrecerse.",
+			"Nuevo pixel art para los cofres, cajas de suministro, paquetes y objetos del mapa, para que combinen con el resto del juego.",
+			"La mejora de perfil «Mochila» ahora se llama «Bolso» para no confundirla con la mochila de objetos.",
+		],
+		"fixes": [
+			"Arreglo: tocar el gacha ya no se queda atascado.",
+			"Arreglo táctil: el botón Cerrar ya no abre otro menú y el botón Aceptar del Gachapon funciona.",
+			"Arreglo: las cartas de mejora tienen un margen de 0,7 s para evitar tocarlas sin querer.",
+			"Arreglo: Hipnosis y Come Sueños ahora pueden evolucionar, y la Luna de Sangre se puede conseguir.",
+		],
+	},
+	{
+		"ver": "4.0",
 		"date": "2026-10-15",
 		"title": "Poke Survivors 4.0: movimientos Z, Dynamax y dificultad adaptativa",
 		"new": [
@@ -65,9 +173,9 @@ const ENTRIES := [
 	{
 		"ver": "2.0.0",
 		"date": "2026-10-15",
-		"title": "Poke Survivors 2.0: la Torre de pisos",
+		"title": "Poke Survivors 2.0: la Torre",
 		"new": [
-			"Torre de pisos: sube 30 pisos con un jefe cada 5. Puedes elegir el piso inicial desde el menú.",
+			"La torre: sube 30 pisos con un jefe cada 5. Puedes elegir el piso inicial desde el menú.",
 			"Pisos de descanso: elige cartas de riesgo, un gran poder a cambio de un coste.",
 			"Cartas legendarias doradas: súper raras y sin ningún coste (70% de enfriamiento, 2 objetos, 60% de defensa y daño extra por cada derrota).",
 			"Nuevos jefes: Eternatus en el piso 25 y Arceus en el piso 30. Vence a Arceus para un logro y un título exclusivos.",
@@ -122,6 +230,8 @@ static func fmt_date(iso: String, code: String) -> String:
 	var d: int = int(p[2])
 	if code == "ja" or code.begins_with("zh"):
 		return "%d年%d月%d日" % [y, m, d]
+	if code == "vi":
+		return "%d tháng %d, %d" % [d, m, y]
 	var key: String = code
 	if code.begins_with("es"):
 		key = "es"

@@ -53,6 +53,9 @@ var hits := {}
 var hit_t := 0.0
 var samples: Array = []
 var center := Vector2.ZERO
+var won := false                       # Arceus derrotado: cuenta atras para salir de la arena
+var win_t := 0.0
+const WIN_XP_LEVELS := 15
 
 
 # Arceus en silueta de luz que llena la rueda del titulo (como en el original).
@@ -476,8 +479,15 @@ func fight() -> void:
 	m.progress_event("judge")
 	var floor_hp: float = (3200.0 + m.run_time * 9.0) * 0.35
 	base = maxf(floor_hp, single_dps() * 3.0)
-	m._say("¡Huye de Arceus! Es invencible", 3.0)
-	m.ainfo = {"phase": "jd", "back": m.player.position, "stash_e": m.ainfo.get("stash_e", []), "stash_o": m.ainfo.get("stash_o", [])}
+	m._say(L.t("¡Arceus puede ser derrotado! Aguanta y acaba con él"), 3.4)
+	won = false
+	win_t = 0.0
+	A.max_hp = roundf(base * 30.0)
+	A.hp = A.max_hp
+	A.def["scripted"] = true
+	A.set_meta("jd_arceus", true)
+	m.enemies.append(A)
+	m.ainfo = {"phase": "jd", "back": m.player.position, "stash_e": m.ainfo.get("stash_e", []), "stash_o": m.ainfo.get("stash_o", []), "boss": A}
 
 
 # --- cada fotograma ---------------------------------------------
@@ -526,6 +536,11 @@ func update(dt: float) -> void:
 	if phase != "fight":
 		return
 	flash_a = maxf(0.0, flash_a - dt * 1.1)
+	if won:
+		win_t -= dt
+		if win_t <= 0.0:
+			leave()
+		return
 	arena_t += dt
 	touch_cd -= dt
 	spin += dt
@@ -544,6 +559,8 @@ func target_pos() -> Vector2:
 
 
 func arceus_tick(dt: float) -> void:
+	if A == null or A.dead:
+		return
 	if not casting.is_empty():
 		cast_tick(dt)
 		return
@@ -640,7 +657,14 @@ func keep_inside() -> void:
 		var d: Vector2 = o.position - center
 		if d.length() > mx:
 			o.position = center + d.normalized() * mx
-	clamp_in.call(A)
+	if A != null and is_instance_valid(A):
+		clamp_in.call(A)
+	# El jugador tampoco puede salir de la arena (antes podia atravesar el muro y quedar fuera).
+	var pd: Vector2 = m.player.position - center
+	var pmx: float = (ARENA_R - 2.2) * ARENA.TS
+	if pd.length() > pmx or m.player.position.distance_to(center) > 99999.0:
+		m.player.position = center + pd.normalized() * pmx
+		m.player_vel = Vector2.ZERO
 	for e in m.enemies:
 		if not e.dead:
 			clamp_in.call(e)
@@ -674,6 +698,54 @@ func spawn_boss() -> void:
 	m._ring(pos, 8.0, 120.0, GOLD, 0.6)
 	m._say(L.t("¡%s acude a la Sentencia!") % e.enemy_name, 1.8)
 	Aud.sfx("rift")
+
+
+func arceus_down(e) -> void:
+	if won or phase != "fight":
+		return
+	won = true
+	win_t = 4.5
+	var stt: Dictionary = m.SV.d["stats"]
+	stt["arceusJudge"] = int(stt.get("arceusJudge", 0)) + 1
+	m.PG.grant({"coins": 20000, "t1": 8, "t10": 6})
+	m.SV.save()
+	for k in range(30):
+		m._spawn_orb(e.position, "coin", 10.0)
+	for k in range(4):
+		m._spawn_orb(e.position, "ticket", 1.0)
+	m._spawn_orb(e.position + Vector2(24.0, 0.0), "item", 0.0)
+	m._say(L.t("¡ARCEUS HA SIDO DERROTADO! Recompensa legendaria"), 4.0)
+	Aud.sfx("bossDown")
+	m.shake = 16.0
+	flash_a = 0.8
+	for i in range(4):
+		m._ring(e.position, 10.0 + float(i) * 20.0, 260.0 + float(i) * 140.0, GOLD if i % 2 == 0 else Color("#fff3c8"), 0.5 + float(i) * 0.25)
+	# fuera los legendarios que quedaban
+	for o in m.enemies:
+		if o != e and not o.dead:
+			o.dead = true
+			o.fade = 0.4
+
+
+func leave() -> void:
+	# Salida de la arena: vuelves a la partida con MUCHA experiencia.
+	var stt: Dictionary = m.SV.d["stats"]
+	stt["judgeTime"] = maxi(int(stt.get("judgeTime", 0)), int(arena_t))
+	stt["judgeBosses"] = maxi(int(stt.get("judgeBosses", 0)), downs)
+	won = false
+	phase = ""
+	var pl = m.player
+	m._arena_end(true)
+	for i in range(WIN_XP_LEVELS):
+		pl.level += 1
+		m.pending_levels += 1
+	pl.xp = 0.0
+	pl.xp_next = maxf(1.0, m._xp_need(pl.level))
+	m._say(L.t("¡Sales de la Sentencia con mucha experiencia! +%d niveles") % WIN_XP_LEVELS, 3.6)
+	Aud.sfx("levelup")
+	if A != null and is_instance_valid(A):
+		A.queue_free()
+	A = null
 
 
 func boss_down() -> void:

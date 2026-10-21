@@ -15,11 +15,12 @@ static var starter_by: Dictionary = {}
 static var run_dex := 25
 static var run_mode := "normal"    # normal | daily | rush | party | type | team
 static var run_mods: Array = []
+static var run_chal: Dictionary = {}   # instancia del reto en juego (modo "chal")
 static var run_seed := 0
 static var party_dex := 25
 static var run_type := "fire"      # modo Supervivencia por tipo
 static var team_dex: Array = []    # modo Equipo (2-3 Pokemon)
-const MOD_IDS := ["fast", "horde", "tank", "hard", "frail", "nohealing"]
+const MOD_IDS := ["fast", "horde", "tank", "hard", "frail", "nohealing", "slow", "brainy", "glass", "rich", "plague"]
 static var last_run: Dictionary = {}
 static var reopen := ""
 
@@ -28,28 +29,31 @@ const RARITY_W := [40.0, 30.0, 18.0, 9.0, 3.0]
 const RARITY_NAME := ["Común", "Poco común", "Raro", "Muy raro", "Legendario"]
 const SHINY_PULL := 0.01
 const PULL_RATES := [45.0, 30.0, 17.0, 6.5, 1.5]
-const PITY_5 := 70
+const PITY_5 := 90   # v5.2: antes 70 (la proteccion de mala suerte era demasiado fuerte)
 const REFUND := [15, 30, 60, 120, 300]
 
 # Mejoras permanentes (upgrades.js)
+const UP_COST_MUL := 0.6   # v5.3: todas las mejoras cuestan un 40% menos
 const UPGRADES := [
-	{"id": "hp", "name": "Vitalidad", "unit": "+8 vida", "max": 10, "base": 60.0, "grow": 1.35},
-	{"id": "atk", "name": "Fuerza", "unit": "+4% daño", "max": 10, "base": 80.0, "grow": 1.38},
-	{"id": "spd", "name": "Zancada", "unit": "+3% velocidad", "max": 8, "base": 70.0, "grow": 1.4},
-	{"id": "cd", "name": "Reflejos", "unit": "-3% recarga", "max": 8, "base": 90.0, "grow": 1.42},
-	{"id": "def", "name": "Coraza", "unit": "+2% defensa", "max": 8, "base": 80.0, "grow": 1.4},
-	{"id": "regen", "name": "Síntesis", "unit": "+0,2 vida/s", "max": 5, "base": 120.0, "grow": 1.5},
-	{"id": "magnet", "name": "Imán", "unit": "+12% recogida", "max": 6, "base": 50.0, "grow": 1.4},
-	{"id": "xp", "name": "Sabiduría", "unit": "+5% experiencia", "max": 8, "base": 100.0, "grow": 1.42},
-	{"id": "coins", "name": "Fortuna", "unit": "+8% Pokémonedas", "max": 8, "base": 120.0, "grow": 1.45},
-	{"id": "moves", "name": "Repertorio", "unit": "Empiezas con 2 movimientos", "max": 1, "base": 1500.0, "grow": 1.0},
-	{"id": "crit", "name": "Golpe Crítico", "unit": "+3% de críticos (x1,5 de daño)", "max": 10, "base": 90.0, "grow": 1.4},
-	{"id": "size", "name": "Calibre", "unit": "+8% de tamaño de proyectiles, orbes y áreas", "max": 6, "base": 80.0, "grow": 1.4},
-	{"id": "reroll", "name": "Cambio de cartas", "unit": "+1 cambio de cartas por partida", "max": 5, "base": 150.0, "grow": 1.6},
-	{"id": "tm", "name": "MT", "unit": "Elige tu movimiento inicial (de tus tipos)", "max": 1, "base": 2000.0, "grow": 1.0},
-	{"id": "ban", "name": "Veto", "unit": "Bloquea 1 movimiento: no te sale en las cartas", "max": 3, "base": 300.0, "grow": 1.9},
-	{"id": "revive", "name": "Segunda oportunidad", "unit": "+1 corazón: al caer, revives con la vida completa", "max": 2, "base": 2500.0, "grow": 2.0},
-	{"id": "bag", "name": "Mochila", "unit": "Llevas 2 objetos a la vez por partida", "max": 1, "base": 7500.0, "grow": 1.0},
+	{"id": "hp", "name": "Vitalidad", "unit": "+8 vida", "max": 10, "base": 100.0, "grow": 1.39},
+	{"id": "atk", "name": "Fuerza", "unit": "+4% daño", "max": 10, "base": 130.0, "grow": 1.42},
+	{"id": "spd", "name": "Zancada", "unit": "+3% velocidad", "max": 8, "base": 110.0, "grow": 1.44},
+	{"id": "cd", "name": "Reflejos", "unit": "-3% recarga", "max": 8, "base": 140.0, "grow": 1.46},
+	{"id": "def", "name": "Coraza", "unit": "+2% defensa", "max": 8, "base": 130.0, "grow": 1.44},
+	{"id": "regen", "name": "Síntesis", "unit": "+0,2 vida/s", "max": 5, "base": 190.0, "grow": 1.54},
+	{"id": "magnet", "name": "Imán", "unit": "+12% recogida", "max": 6, "base": 80.0, "grow": 1.44},
+	{"id": "xp", "name": "Sabiduría", "unit": "+5% experiencia", "max": 8, "base": 160.0, "grow": 1.46},
+	{"id": "coins", "name": "Fortuna", "unit": "+8% Pokémonedas", "max": 8, "base": 190.0, "grow": 1.49},
+	{"id": "moves", "name": "Repertorio", "unit": "Empiezas con 2 movimientos", "max": 1, "base": 2400.0, "grow": 1.0},
+	{"id": "crit", "name": "Golpe Crítico", "unit": "+3% de críticos (x1,5 de daño)", "max": 10, "base": 140.0, "grow": 1.44},
+	{"id": "size", "name": "Calibre", "unit": "+8% de tamaño de proyectiles, orbes y áreas", "max": 6, "base": 130.0, "grow": 1.44},
+	{"id": "reroll", "name": "Cambio de cartas", "unit": "+1 cambio de cartas por partida", "max": 5, "base": 240.0, "grow": 1.64},
+	{"id": "tm", "name": "MT", "unit": "Elige tu movimiento inicial (de tus tipos)", "max": 1, "base": 3200.0, "grow": 1.0},
+	{"id": "ban", "name": "Veto", "unit": "Bloquea 1 movimiento: no te sale en las cartas", "max": 6, "base": 480.0, "grow": 1.7},
+	{"id": "revive", "name": "Segunda oportunidad", "unit": "+1 corazón: al caer, revives con la vida completa", "max": 2, "base": 4000.0, "grow": 2.04},
+	{"id": "wslot", "name": "Huecos de arma", "unit": "4 huecos base: +1 por nivel (máximo 6)", "max": 2, "base": 9000.0, "grow": 2.2},
+	{"id": "bag", "name": "Mochila", "unit": "Llevas 2 objetos a la vez por partida", "max": 1, "base": 12000.0, "grow": 1.0},
+	{"id": "bag3", "name": "Mochila grande", "unit": "Llevas 3 objetos a la vez por partida (requiere Mochila)", "max": 1, "base": 28000.0, "grow": 1.0},
 ]
 
 # Misiones y logros: progreso = una estadistica acumulada
@@ -82,9 +86,9 @@ const GOALS := [
 static func default_data() -> Dictionary:
 	return {
 		"v": 1, "created": int(Time.get_unix_time_from_system()), "title": "", "nick": "", "favs": [0, 0, 0], "coins": 600, "tickets": 10, "tickets10": 3, "pity": {}, "legends": {}, "arenas": {}, "lshiny": {}, "owned": {}, "selected": 25, "shiny_on": false,
-		"upgrades": {}, "pup": {}, "claimed": {}, "pban": {}, "pbind": {}, "ptm": {}, "pz": {},
+		"fusions": [], "upgrades": {}, "pup": {}, "claimed": {}, "pban": {}, "pbind": {}, "ptm": {}, "pz": {},
 		"stats": {"runs": 0, "kills": 0, "best_time": 0, "best_level": 1, "bosses": 0, "chests": 0, "pulls": 0, "shinies": 0, "total_time": 0, "coins_total": 0, "defeated_runs": 0, "rifts": 0},
-		"settings": {"master": 80, "music": 70, "sfx": 80, "dmg_numbers": true, "vibration": true, "shake": true, "stick": 1, "stick_fixed": false, "lang": "en", "view": 100, "fov": 165, "pad": 0, "padmap": {}, "mute": false, "quality": 0, "fps": false, "stats_box": false, "adaptive": true},
+		"settings": {"master": 80, "music": 70, "sfx": 80, "dmg_numbers": true, "vibration": true, "shake": true, "stick": 1, "stick_fixed": false, "manual_aim": false, "lang": "en", "view": 100, "fov": 165, "pad": 0, "padmap": {}, "mute": false, "quality": 0, "fps": false, "stats_box": false, "adaptive": true, "mono_bonus": false, "fx_op": 1, "act_side": 0, "text_sz": 0},
 	}
 
 
@@ -122,6 +126,11 @@ static func ensure() -> void:
 	if parsed is Dictionary:
 		d = _merge(d, parsed)
 	_migrate_upgrades()
+	# 6h: regalo unico de 1 Gachapon Coin por la actualizacion
+	if not bool(d.get("gift_6h", false)):
+		d["gift_6h"] = true
+		d["gcoins"] = int(d.get("gcoins", 0)) + 1
+		save()
 	# v1.0.1: sprites al tamano del original (vision 165 %); el valor por defecto antiguo era 140.
 	if not bool(d["settings"].get("fov_v2", false)):
 		d["settings"]["fov_v2"] = true
@@ -273,7 +282,7 @@ static func tm_pool(dex: int) -> Array:
 	var out: Array = []
 	for id in MDd.ORDER:
 		var m: Dictionary = MDd.MOVES[id]
-		if String(m["kind"]) == "buff":
+		if String(m["kind"]) == "buff" or not load("res://scripts/gachapon.gd").playable(String(id)):
 			continue
 		var ty: String = String(m["type"])
 		if dex == 151 or ty == "normal" or types.has(ty):
@@ -299,7 +308,7 @@ static func move_pool(dex: int) -> Array:
 	var out: Array = []
 	for id in MDd.ORDER:
 		var ty: String = String(MDd.MOVES[id]["type"])
-		if id != start and (ty == "normal" or types.has(ty)):
+		if id != start and load("res://scripts/gachapon.gd").playable(String(id)) and (ty == "normal" or types.has(ty)):
 			out.append(String(id))
 	return out
 
@@ -366,7 +375,7 @@ static func up_def(id: String) -> Dictionary:
 
 static func up_cost(id: String, lvl: int) -> int:
 	var u: Dictionary = up_def(id)
-	return int(roundf(float(u["base"]) * pow(float(u["grow"]), float(lvl)) / 10.0)) * 10
+	return int(roundf(float(u["base"]) * pow(float(u["grow"]), float(lvl)) * UP_COST_MUL / 10.0)) * 10
 
 
 static func buy_upgrade(id: String, dex: int = -1) -> bool:
@@ -374,6 +383,8 @@ static func buy_upgrade(id: String, dex: int = -1) -> bool:
 	var lv: int = up_level(id, dex)
 	if lv >= int(u["max"]):
 		return false
+	if id == "bag3" and up_level("bag", dex) < 1:
+		return false   # la Mochila grande requiere la Mochila
 	var c: int = up_cost(id, lv)
 	if int(d["coins"]) < c:
 		return false
@@ -400,6 +411,7 @@ static func perks() -> Dictionary:
 		"xp": 1.0 + float(L.call("xp")) * 0.05,
 		"coins": 1.0 + float(L.call("coins")) * 0.08,
 		"moves": 1 + L.call("moves"),
+		"wslots": L.call("wslot"),
 		"crit": float(L.call("crit")) * 0.03,
 		"size": 1.0 + float(L.call("size")) * 0.08,
 		"rerolls": L.call("reroll"),
@@ -477,6 +489,8 @@ static func _roll_rarity(minr: int = 1) -> int:
 
 # n tiradas: x1 (1 ticket), x10 (10 tickets o 1 ticket x10). Devuelve [] si no hay tickets.
 const Z_CRYSTAL_P := 0.03   # probabilidad de cristal Z por tirada de 10
+const Z_CRYSTAL_P_PURPLE := 0.06   # con el ticket morado ×10 se dobla
+const PURPLE_LEGEND_P := 0.12      # ticket morado: la ultima tirada es legendaria con esta probabilidad (si no, Muy raro o mejor)
 static var last_crystal := ""
 
 
@@ -484,7 +498,8 @@ static func pull(region: int, n: int = 1, use: String = "t1") -> Array:
 	last_crystal = ""
 	if not can_pull(n, use):
 		return []
-	if n == 10 and use == "t10":
+	var purple: bool = n == 10 and use == "t10"
+	if purple:
 		d["tickets10"] = int(d["tickets10"]) - 1
 	else:
 		d["tickets"] = int(d["tickets"]) - n
@@ -501,6 +516,8 @@ static func pull(region: int, n: int = 1, use: String = "t1") -> Array:
 				got4 = true
 		if int(d["pity"][key]) >= PITY_5:
 			want = 5
+		elif purple and i == n - 1:
+			want = 5 if randf() < PURPLE_LEGEND_P else 4   # la ultima del ticket morado: legendaria o, como minimo, Muy raro
 		elif n == 10 and i == n - 1 and not got4:
 			want = _roll_rarity(4)
 		else:
@@ -540,7 +557,7 @@ static func pull(region: int, n: int = 1, use: String = "t1") -> Array:
 	d["stats"]["pulls"] = int(d["stats"]["pulls"]) + n
 	# Premio extra: cristal Z de un tipo que aun no tengas (solo en tiradas de 10)
 	var ZM = load("res://scripts/zmove.gd")
-	if n >= 10 and randf() < Z_CRYSTAL_P:
+	if n >= 10 and randf() < (Z_CRYSTAL_P_PURPLE if purple else Z_CRYSTAL_P):
 		var locked: Array = []
 		for zt in ZM.ORDER:
 			if not ZM.unlocked(String(zt), d["stats"]):
@@ -554,7 +571,7 @@ static func pull(region: int, n: int = 1, use: String = "t1") -> Array:
 # ---- fin de partida ----
 # ---- modos de juego ----
 static func daily_seed() -> int:
-	var t: Dictionary = Time.get_date_dict_from_system()
+	var t: Dictionary = Time.get_datetime_dict_from_unix_time(int(Time.get_unix_time_from_system()) - 4 * 3600)   # hora de Puerto Rico
 	return int(t["year"]) * 10000 + int(t["month"]) * 100 + int(t["day"])
 
 
@@ -593,8 +610,10 @@ static func finish_run(r: Dictionary) -> Dictionary:
 	d["tickets"] = int(d["tickets"]) + tickets
 	var tickets10: int = int(r.get("tickets10", 0))
 	d["tickets10"] = int(d.get("tickets10", 0)) + tickets10
+	d["gcoins"] = int(d.get("gcoins", 0)) + int(r.get("gcoins", 0))
+	d["gold_coins"] = int(d.get("gold_coins", 0)) + int(r.get("gold_gcoins", 0))
 	_add_top({"time": int(r["time"]), "kills": int(r["kills"]), "level": int(r["level"]), "dex": int(r.get("dex", 25)), "judge": int(r.get("judge", {}).get("time", 0)) if r.get("judge", {}) is Dictionary else 0, "date": Time.get_date_string_from_system()})
-	last_run = {"judge": r.get("judge", {}), "time": int(r["time"]), "kills": int(r["kills"]), "level": int(r["level"]), "coins": coins, "tickets": tickets, "tickets10": tickets10, "bosses": int(r["bosses"]), "dex": int(r.get("dex", 25)),
+	last_run = {"judge": r.get("judge", {}), "time": int(r["time"]), "kills": int(r["kills"]), "level": int(r["level"]), "coins": coins, "tickets": tickets, "tickets10": tickets10, "gcoins": int(r.get("gcoins", 0)), "bosses": int(r["bosses"]), "dex": int(r.get("dex", 25)),
 		"dead": bool(r.get("dead", true)), "record": record, "moves": r.get("moves", []), "other_dmg": int(r.get("other_dmg", 0)), "other_kills": int(r.get("other_kills", 0)), "ally_dmg": int(r.get("ally_dmg", 0)), "ally_kills": int(r.get("ally_kills", 0)),
 		"breakdown": "Recogidas %d · Tiempo +%d · Derrotados +%d" % [picked, int(float(r["time"]) / 6.0), int(float(r["kills"]) / 10.0)] + String(r.get("extra", ""))}
 	save()

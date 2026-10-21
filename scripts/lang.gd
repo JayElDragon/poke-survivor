@@ -17,6 +17,7 @@ const LANGS := [
 	["ja", "日本語"],
 	["zh_CN", "中文（普通话）"],
 	["zh_HK", "廣東話（粵語）"],
+	["vi", "Tiếng Việt"],
 ]
 const DEFAULT := "en"
 

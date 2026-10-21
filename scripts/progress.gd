@@ -133,13 +133,14 @@ static func list() -> Array:
 	L2.append(_a("rifts5", "modos", 2, "Pasillo de grietas", "Gana 5 grietas en una Contrarreloj de grietas.", "riftsBest", 5, {"coins": 1500, "t10": 1}))
 	L2.append(_a("rifts8", "modos", 3, "Cazador contrarreloj", "Gana 8 grietas en una Contrarreloj de grietas.", "riftsBest", 8, {"coins": 3500, "t1": 3, "t10": 2}, "Cazador contrarreloj"))
 	L2.append(_a("riftsRuns10", "modos", 2, "Siempre con prisa", "Juega 10 Contrarrelojes de grietas.", "riftsRuns", 10, {"coins": 1500, "t10": 1}))
-	L2.append(_a("tower5", "modos", 1, "Primeros pisos", "Supera el piso 5 de la Torre de pisos.", "towerBest", 5, {"coins": 800, "t1": 3, "t10": 1}))
-	L2.append(_a("tower10", "modos", 2, "Escalando", "Supera el piso 10 de la Torre de pisos.", "towerBest", 10, {"coins": 2000, "t1": 4, "t10": 2}))
-	L2.append(_a("tower15", "modos", 3, "Casi en la cima", "Supera el piso 15 de la Torre de pisos.", "towerBest", 15, {"coins": 4000, "t1": 5, "t10": 3}))
-	L2.append(_a("tower20", "modos", 3, "Escalador", "Supera el piso 20 de la Torre de pisos.", "towerBest", 20, {"coins": 7000, "t1": 6, "t10": 4}, "Escalador"))
-	L2.append(_a("tower30", "modos", 3, "Dueño de la Torre", "Llega al piso 30 de la Torre de pisos, donde espera Arceus.", "towerBest", 29, {"coins": 15000, "t1": 10, "t10": 8}, "Dueño de la Torre"))
-	L2.append(_a("towerArceus", "modos", 3, "Vencedor de Arceus", "Derrota a Arceus, el jefe final del piso 30 de la Torre de pisos.", "arceus", 1, {"coins": 30000, "t1": 15, "t10": 15}, "Vencedor de Arceus"))
-	L2.append(_a("towerRuns10", "modos", 2, "Aprendiz de la Torre", "Juega 10 veces la Torre de pisos.", "towerRuns", 10, {"coins": 1200, "t10": 1}))
+	L2.append(_a("tower5", "modos", 1, "Primeros pisos", "Supera el piso 5 de la Torre.", "towerBest", 5, {"coins": 800, "t1": 3, "t10": 1}))
+	L2.append(_a("tower10", "modos", 2, "Escalando", "Supera el piso 10 de la Torre.", "towerBest", 10, {"coins": 2000, "t1": 4, "t10": 2}))
+	L2.append(_a("tower15", "modos", 3, "Casi en la cima", "Supera el piso 15 de la Torre.", "towerBest", 15, {"coins": 4000, "t1": 5, "t10": 3}))
+	L2.append(_a("tower20", "modos", 3, "Escalador", "Supera el piso 20 de la Torre.", "towerBest", 20, {"coins": 7000, "t1": 6, "t10": 4}, "Escalador"))
+	L2.append(_a("tower30", "modos", 3, "Dueño de la Torre", "Llega al piso 30 de la Torre.", "towerBest", 29, {"coins": 15000, "t1": 10, "t10": 8}, "Dueño de la Torre"))
+	L2.append(_a("tower60", "modos", 3, "Cima de la Torre", "Llega al piso 60 de la Torre.", "towerBest", 59, {"coins": 30000, "t1": 15, "t10": 12}, "Cima de la Torre"))
+	L2.append(_a("towerArceus", "modos", 3, "Vencedor de Arceus", "Derrota a Arceus, el jefe final del piso 60 de la Torre.", "arceus", 1, {"coins": 30000, "t1": 15, "t10": 15}, "Vencedor de Arceus"))
+	L2.append(_a("towerRuns10", "modos", 2, "Aprendiz de la Torre", "Juega 10 veces la Torre.", "towerRuns", 10, {"coins": 1200, "t10": 1}))
 	# uno por legendario
 	for p in legs:
 		var a: Dictionary = _a("leg_%d" % int(p["dex"]), "legendarios", 2, "Vence a %s", "Derrota a %s en una grieta.", "leg", 1, {"t1": 1}, "", String(p["name"]))
@@ -245,7 +246,7 @@ const ZMIS := [
 	["flying", "Juega 5 Desafíos diarios.", "dailyPlays", 5],
 	["psychic", "Encuentra 10 objetos distintos.", "itemsFound", 10],
 	["bug", "Derrota a 4 jefes en el Rush de Jefes.", "rushBest", 4],
-	["rock", "Supera el piso 8 de la Torre de pisos.", "towerBest", 8],
+	["rock", "Supera el piso 8 de la Torre.", "towerBest", 8],
 	["ghost", "Gana 5 peleas en grietas.", "riftWins", 5],
 	["dragon", "Aguanta 12 minutos en una partida.", "bestMin", 12],
 	["dark", "Vence a 3 legendarios distintos.", "legends", 3],
@@ -392,9 +393,9 @@ static func mission_text(m: Dictionary) -> String:
 		"mTeam":
 			return L_t("Aguanta %s minutos en Modo Equipo") % nn
 		"mTower":
-			return L_t("Supera %s pisos de la Torre de pisos") % nn
+			return L_t("Supera %s pisos de la Torre") % nn
 		"wTower":
-			return L_t("Supera %s pisos de la Torre de pisos en una sola partida") % nn
+			return L_t("Supera %s pisos de la Torre en una sola partida") % nn
 		"mRifts":
 			return L_t("Gana %s grietas en la Contrarreloj de grietas") % nn
 		"wType":
@@ -437,11 +438,13 @@ static func _last_sunday(year: int, month: int) -> int:
 	return 0
 
 
+# Reloj unico del juego: hora de Puerto Rico (UTC-4 todo el ano, sin horario de verano).
+static func pr_now() -> int:
+	return int(Time.get_unix_time_from_system()) - 4 * 3600
+
+
 static func madrid_now() -> int:
-	var now: int = int(Time.get_unix_time_from_system())
-	var y: int = int(Time.get_datetime_dict_from_unix_time(now)["year"])
-	var dst: bool = now >= _last_sunday(y, 3) and now < _last_sunday(y, 10)
-	return now + (7200 if dst else 3600)
+	return pr_now()
 
 
 static func period_ids() -> Dictionary:
