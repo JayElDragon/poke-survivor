@@ -1910,7 +1910,7 @@ func _build_main() -> void:
 	row.add_child(left)
 	var logo := TextureRect.new()
 	logo.texture = load("res://assets/ui/logo.png")
-	logo.custom_minimum_size = Vector2(0, 232)
+	logo.custom_minimum_size = Vector2(0, 262)
 	logo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	logo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	logo.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR   # es arte suave, no pixel art
