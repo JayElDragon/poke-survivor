@@ -114,7 +114,8 @@ func spawn(force: String = "") -> bool:
 		return false
 	var ty: String = force
 	if ty == "":
-		var ks: Array = TYPES.keys()
+		# v5.8: solo tipos del Pokemon que se esta usando
+		var ks: Array = (m.player.types as Array).filter(func(k): return TYPES.has(String(k)))
 		# prefiere tipos aun no completados y cuyo efecto no este al maximo
 		var pool: Array = []
 		for k in ks:

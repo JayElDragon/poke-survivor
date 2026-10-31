@@ -54,7 +54,7 @@ const MOVES := {
 	"fairy-wind": {"id": "fairy-wind", "name": "Viento Feérico", "type": "fairy", "kind": "nova", "desc": "Brisa mágica en todas direcciones.", "cd": 1, "dmg": 13, "speed": 230, "count": 10, "pierce": 0, "life": 1.2, "size": 7, "cc": "charm", "ccp": 0.4},
 	"dazzling-gleam": {"id": "dazzling-gleam", "name": "Brillo Mágico", "type": "fairy", "kind": "aura", "desc": "Destello a tu alrededor.", "cd": 0.5, "dmg": 11, "radius": 72, "cc": "charm", "ccp": 0.4},
 	"metal-claw": {"id": "metal-claw", "name": "Garra Metal", "type": "steel", "kind": "melee", "desc": "Zarpazo de acero en arco.", "cd": 0.5, "dmg": 24, "radius": 70, "arc": 2, "knock": 60, "iframes": 0.22},
-	"flash-cannon": {"id": "flash-cannon", "name": "Foco Resplandor", "type": "steel", "kind": "beam", "desc": "Rayo de luz metálica que perfora.", "cd": 1.05, "dmg": 23, "radius": 220, "width": 30},
+	"flash-cannon": {"id": "flash-cannon", "name": "Foco Resplandor", "type": "steel", "kind": "beam", "desc": "Cañonazo de luz metálica, más corto y ancho, que perfora.", "cd": 1.05, "dmg": 23, "radius": 190, "width": 44},
 	"bite": {"id": "bite", "name": "Mordisco", "type": "dark", "kind": "melee", "desc": "Dentellada rápida que hace retroceder.", "cd": 0.45, "dmg": 22, "radius": 64, "arc": 1.88, "knock": 70, "iframes": 0.2},
 	"dark-pulse": {"id": "dark-pulse", "name": "Pulso Umbrío", "type": "dark", "kind": "nova", "desc": "Onda de energía oscura en todas direcciones.", "cd": 1.15, "dmg": 14, "speed": 240, "count": 10, "pierce": 1, "life": 1.1, "size": 8},
 	"night-shade": {"id": "night-shade", "name": "Tinieblas", "type": "dark", "kind": "aura", "desc": "Una sombra te rodea y consume lo cercano.", "cd": 0.5, "dmg": 9, "radius": 72, "cc": "sleep", "ccp": 0.08},

@@ -22,7 +22,8 @@ static func apply(tree: SceneTree) -> void:
 		SV.d["settings"]["view_v"] = 2
 		SV.d["settings"]["view"] = 100
 		SV.save()
-	tree.root.content_scale_factor = 1.0 if menu_mode else float(pct()) / 100.0
+	# v5.8: en PC el unico zoom es la Vision de la camara; este escalado recortaba la interfaz segun la ventana.
+	tree.root.content_scale_factor = 1.0 if menu_mode or is_desktop() else float(pct()) / 100.0
 	# El boton atras de Android lo gestiona el juego (no cierra la app).
 	tree.quit_on_go_back = false
 

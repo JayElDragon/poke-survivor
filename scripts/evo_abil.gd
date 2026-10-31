@@ -23,7 +23,7 @@ const SIG := {
 	"dragon-breath": ["spiral", {"n": 14, "k": 0.5}],
 	"dragon-energy": ["bloom", {"r": 110, "k": 0.4}],
 	"outrage": ["spin", {"n": 6, "k": 1.0}],
-	"dragon-rage": ["comet", {"k": 2.6}],
+	"dragon-rage": ["starfall", {"n": 4, "r": 50, "k": 0.9}],
 	# ---- Hada
 	"fleur-cannon": ["pillars", {"n": 6, "r": 44, "k": 1.2}],
 	"play-rough": ["yank", {"n": 4, "k": 1.4}],
@@ -34,7 +34,6 @@ const SIG := {
 	"high-jump-kick": ["blink", {"k": 2.4}],
 	"hammer-arm": ["shockchain", {"n": 3, "k": 1.1}],
 	"sacred-sword": ["comet", {"k": 2.2}],
-	"karate-chop": ["spin", {"n": 4, "k": 1.3}],
 	"aura-sphere": ["shatterbomb", {"n": 8, "k": 0.8}],
 	# ---- Fuego
 	"blaze-kick": ["rift", {"n": 5, "k": 1.2}],
@@ -83,7 +82,6 @@ const SIG := {
 	"poison-sting": ["swarm", {"n": 8, "k": 0.4}],
 	"toxic": ["spore", {"r": 120, "k": 0.4}],
 	"toxic#alt": ["bloom", {"r": 150, "k": 0.6}],
-	"toxic-spikes": ["crossmines", {"n": 5, "k": 1.0}],
 	# ---- Tierra
 	"drill-run": ["jabs", {"n": 3, "k": 1.3}],
 	"scorching-sands": ["sandtrap", {"r": 100, "k": 0.5}],

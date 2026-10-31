@@ -6,7 +6,10 @@ extends Node2D
 
 const MD = preload("res://scripts/moves_data.gd")
 const LIFT := 18.0
-const MAXP := 900
+const FRONT := 56.0   # los estallidos salen delante del Pokemon, no encima, para que no lo tapen
+const MAXP := [320, 160, 70]          # tope de particulas por nivel de Rendimiento (antes 900: lag en movil)
+const TRAIL_DT := [0.06, 0.1, 0.16]   # cada cuanto suelta estela cada proyectil (antes 0.02)
+const MAXTR := [36, 18, 8]            # proyectiles con estela a la vez (antes 90)
 
 # segundo color por tipo
 const SEC := {"fire": "#ffe066", "water": "#d4f6ff", "grass": "#e2ff9a", "electric": "#fff7b0", "ice": "#ffffff", "fighting": "#ffd6a8",
@@ -28,40 +31,67 @@ var ps: Array = []          # particulas
 var glyphs: Array = []      # simbolos en el suelo
 var tracked: Array = []     # [nodo, firma, temporizador]
 var cache := {}
+var lite := 0          # Rendimiento: 0 normal, 1 ahorro, 2 minimo
+var under: Node2D = null   # capa del suelo (bajo los Pokemon) para los simbolos
+var _idle := false
+
+
+func _ready() -> void:
+	under = Node2D.new()
+	under.draw.connect(_draw_under)
+	main.gfx.add_child(under)
 
 
 func clear() -> void:
 	ps.clear()
 	glyphs.clear()
 	tracked.clear()
+	queue_redraw()
+	if under != null:
+		under.queue_redraw()
+
+
+# fraccion de particulas que se emiten: baja con el modo Rendimiento y cuando el FPS cae (main.fx_load)
+func _dens() -> float:
+	return [1.0, 0.55, 0.3][lite] * float(main.fx_load)
 
 
 # ------------------------------------------------------------------ firma de cada movimiento
 func sig(m: Dictionary) -> Dictionary:
 	var id: String = String(m.get("id", ""))
-	if cache.has(id):
-		return cache[id]
+	var ckey: String = id + ("*" if main.VFX.shiny_on else "")
+	if cache.has(ckey):
+		return cache[ckey]
 	var ty: String = String(m.get("type", "normal"))
 	var h: int = absi(id.hash())
 	var a := Color.html(String(MD.TYPE_COLOR.get(ty, "#b0a99f")))
 	var b := Color.html(String(SEC.get(ty, "#ffffff")))
 	b = b.lerp(a.lightened(0.35), float(h % 5) * 0.1)
+	if main.VFX.shiny_on:
+		a = main.VFX.shiny_col(ty, a)
+		b = main.VFX.shiny_col(ty, b).lightened(0.3)
 	var th: Array = THEME.get(ty, THEME["normal"])
 	var v: int = h % 3
 	var s := {"ty": ty, "a": a, "b": b, "v": v, "h": h, "kind": String(m.get("kind", "")),
 		"pk": String(th[v]), "pk2": String(th[(v + 1) % 3]), "size": 1.0 + float((h >> 3) % 4) * 0.18,
 		"cnt": 22 + (h >> 5) % 12, "spin": 1.0 if (h >> 7) % 2 == 0 else -1.0, "pat": (h >> 9) % 6}
-	cache[id] = s
+	cache[ckey] = s
 	return s
 
 
+func _front() -> Vector2:
+	return main.player.position + Vector2.from_angle(main.player.aim) * FRONT
+
+
 func _pc(m: Dictionary) -> Vector2:
-	return main.player.position + Vector2(0.0, -LIFT)
+	return _front() + Vector2(0.0, -LIFT)
 
 
 # ------------------------------------------------------------------ emision
 func _add(p: Vector2, v: Vector2, life: float, size: float, k: String, c: Color, g: float = 0.0, spin: float = 0.0) -> void:
-	if ps.size() >= MAXP:
+	if ps.size() >= int(float(MAXP[lite]) * float(main.fx_load)):
+		return
+	if k != "flash" and randf() > _dens():
 		return
 	ps.append({"p": p, "v": v, "t": 0.0, "l": life, "s": size, "k": k, "c": c, "g": g, "r": randf() * TAU, "w": spin, "ph": randf() * TAU})
 
@@ -144,23 +174,23 @@ func cast(m: Dictionary) -> void:
 				var a3: float = float(j) / float(n + 10) * TAU
 				var ps2: Vector2 = pc + Vector2.from_angle(a3) * 30.0
 				_add(ps2, Vector2.from_angle(a3 + 1.57 * float(sg["spin"])) * 130.0 + Vector2.from_angle(a3) * 70.0, randf_range(0.5, 0.8), float(sg["size"]) * 5.0, pk if j % 2 == 0 else pk2, _pcol(sg), _gravity(pk), float(sg["spin"]) * 4.0)
-	# destello del tipo alrededor del jugador
-	_add(pc, Vector2.ZERO, 0.28, 120.0, "flash", sg["a"], 0.0, 0.0)
+	# destello del tipo delante del jugador (pequeño: no debe taparlo ni oscurecerlo)
+	_add(pc, Vector2.ZERO, 0.28, 70.0, "flash", sg["a"], 0.0, 0.0)
 	main.shake = maxf(main.shake, 1.5)
-	glyphs.append({"p": main.player.position, "t": 0.0, "l": 0.8, "sg": sg, "r": 60.0 + 12.0 * float(sg["size"]), "dir": aim})
+	glyphs.append({"p": _front(), "t": 0.0, "l": 0.8, "sg": sg, "r": 60.0 + 12.0 * float(sg["size"]), "dir": aim})
 
 
 # nodo (proyectil u orbe) que deja estela con la firma del movimiento
 func track(b: Node, m: Dictionary) -> void:
-	if tracked.size() > 90:
+	if tracked.size() >= int(float(MAXTR[lite]) * float(main.fx_load)):
 		return
 	tracked.append([b, sig(m), randf() * 0.05])
 
 
-# al evolucionar: columna de particulas del tipo, anillos dorados y simbolo grande
+# al evolucionar: columna de particulas del tipo, anillos dorados y simbolo grande (delante del Pokemon)
 func evolve_burst(m: Dictionary) -> void:
 	var sg: Dictionary = sig(m)
-	var pc: Vector2 = main.player.position
+	var pc: Vector2 = _front()
 	for i in range(46):
 		var a: float = randf() * TAU
 		var rr: float = randf_range(8.0, 60.0)
@@ -174,6 +204,13 @@ func evolve_burst(m: Dictionary) -> void:
 
 # ------------------------------------------------------------------ bucle
 func step(delta: float) -> void:
+	if ps.is_empty() and glyphs.is_empty() and tracked.is_empty():
+		if not _idle:
+			_idle = true
+			queue_redraw()
+			under.queue_redraw()
+		return
+	_idle = false
 	var i: int = tracked.size() - 1
 	while i >= 0:
 		var tr: Array = tracked[i]
@@ -183,7 +220,7 @@ func step(delta: float) -> void:
 		else:
 			tr[2] = float(tr[2]) - delta
 			if float(tr[2]) <= 0.0:
-				tr[2] = 0.02
+				tr[2] = float(TRAIL_DT[lite]) / maxf(0.25, float(main.fx_load))
 				var sg: Dictionary = tr[1]
 				var p: Vector2 = nd.position + Vector2(0.0, -LIFT)
 				var back: Vector2 = Vector2.ZERO
@@ -216,14 +253,19 @@ func step(delta: float) -> void:
 			glyphs.remove_at(i)
 		i -= 1
 	queue_redraw()
+	under.queue_redraw()
 
 
 # ------------------------------------------------------------------ dibujo
 func _draw() -> void:
-	for g in glyphs:
-		_draw_glyph(g)
 	for q in ps:
 		_draw_p(q)
+
+
+# los simbolos van en el suelo, bajo los Pokemon: nunca tapan ni oscurecen al jugador
+func _draw_under() -> void:
+	for g in glyphs:
+		_draw_glyph(g)
 
 
 func _draw_glyph(g: Dictionary) -> void:
@@ -233,28 +275,29 @@ func _draw_glyph(g: Dictionary) -> void:
 	var ca: Color = sg["a"]
 	var cb: Color = sg["b"]
 	var r: float = float(g["r"]) * (0.35 + 0.65 * sqrt(k))
-	draw_set_transform((g["p"] as Vector2) + Vector2(0.0, -2.0), 0.0, Vector2(1.0, 0.5))
+	var cv: Node2D = under
+	cv.draw_set_transform((g["p"] as Vector2) + Vector2(0.0, -2.0), 0.0, Vector2(1.0, 0.5))
 	var rot: float = float(sg["spin"]) * k * 2.2
 	match int(sg["v"]):
 		0:   # anillo y rayos
-			draw_arc(Vector2.ZERO, r, 0.0, TAU, 40, Color(ca.r, ca.g, ca.b, a), 3.0)
+			cv.draw_arc(Vector2.ZERO, r, 0.0, TAU, 28, Color(ca.r, ca.g, ca.b, a), 3.0)
 			for i in range(8):
 				var an: float = float(i) / 8.0 * TAU + rot
-				draw_line(Vector2.from_angle(an) * r * 0.45, Vector2.from_angle(an) * r * 0.95, Color(cb.r, cb.g, cb.b, a), 2.0)
+				cv.draw_line(Vector2.from_angle(an) * r * 0.45, Vector2.from_angle(an) * r * 0.95, Color(cb.r, cb.g, cb.b, a), 2.0)
 		1:   # espiral de puntos
-			for i in range(18):
+			for i in range(0, 18, 1 if lite == 0 else 2):
 				var t2: float = float(i) / 18.0
 				var an2: float = t2 * TAU * 1.6 + rot
-				draw_circle(Vector2.from_angle(an2) * r * t2, 2.0 + 2.0 * (1.0 - t2), Color(ca.r, ca.g, ca.b, a * (0.4 + 0.6 * t2)))
-			draw_arc(Vector2.ZERO, r, 0.0, TAU, 40, Color(cb.r, cb.g, cb.b, a * 0.6), 2.0)
+				cv.draw_circle(Vector2.from_angle(an2) * r * t2, 2.0 + 2.0 * (1.0 - t2), Color(ca.r, ca.g, ca.b, a * (0.4 + 0.6 * t2)))
+			cv.draw_arc(Vector2.ZERO, r, 0.0, TAU, 28, Color(cb.r, cb.g, cb.b, a * 0.6), 2.0)
 		_:   # petalos
 			for i in range(6):
 				var an3: float = float(i) / 6.0 * TAU + rot
-				draw_arc(Vector2.from_angle(an3) * r * 0.45, r * 0.45, an3 - 1.2, an3 + 1.2, 10, Color(ca.r, ca.g, ca.b, a), 3.0)
-			draw_circle(Vector2.ZERO, r * 0.14, Color(cb.r, cb.g, cb.b, a))
+				cv.draw_arc(Vector2.from_angle(an3) * r * 0.45, r * 0.45, an3 - 1.2, an3 + 1.2, 8, Color(ca.r, ca.g, ca.b, a), 3.0)
+			cv.draw_circle(Vector2.ZERO, r * 0.14, Color(cb.r, cb.g, cb.b, a))
 	# aro dorado: marca de movimiento evolucionado
-	draw_arc(Vector2.ZERO, r * 1.06, 0.0, TAU, 40, Color(1.0, 0.82, 0.25, a * 0.8), 2.0)
-	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	cv.draw_arc(Vector2.ZERO, r * 1.06, 0.0, TAU, 28, Color(1.0, 0.82, 0.25, a * 0.8), 2.0)
+	cv.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
 func _draw_p(q: Dictionary) -> void:
@@ -265,10 +308,12 @@ func _draw_p(q: Dictionary) -> void:
 	var p: Vector2 = q["p"]
 	var s: float = float(q["s"])
 	var rot: float = float(q["r"])
+	var rich: bool = lite == 0 and float(main.fx_load) > 0.7   # capas extra (brillos) solo si va sobrado
 	match String(q["k"]):
 		"ember", "flame":
 			var rr: float = s * (1.0 - k * 0.7) * 0.5
-			draw_circle(p, rr * 1.5, Color(c.r, c.g, c.b, a * 0.35))
+			if rich:
+				draw_circle(p, rr * 1.5, Color(c.r, c.g, c.b, a * 0.35))
 			draw_circle(p, rr, cc)
 			draw_circle(p, rr * 0.45, Color(1, 1, 0.8, a))
 		"spark", "glint":
@@ -284,7 +329,7 @@ func _draw_p(q: Dictionary) -> void:
 			draw_circle(p + Vector2(-1.5, -1.5) * (s * 0.12), 1.4, Color(1, 1, 1, a))
 		"ripple", "ring":
 			draw_set_transform(p, 0.0, Vector2(1.0, 0.6))
-			draw_arc(Vector2.ZERO, s * (0.5 + k * 1.6), 0.0, TAU, 24, cc, 2.0)
+			draw_arc(Vector2.ZERO, s * (0.5 + k * 1.6), 0.0, TAU, 16, cc, 2.0)
 			draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 		"leaf", "petal":
 			var d: Vector2 = Vector2.from_angle(rot)
@@ -297,7 +342,8 @@ func _draw_p(q: Dictionary) -> void:
 			var seed_f: float = float(q["ph"])
 			for j in range(4):
 				var nx: Vector2 = pv + Vector2(cos(seed_f + float(j) * 2.3) * s * 0.7, sin(seed_f * 1.7 + float(j) * 3.1) * s * 0.7)
-				draw_line(pv, nx, Color(1, 1, 0.8, a), 2.5)
+				if rich:
+					draw_line(pv, nx, Color(1, 1, 0.8, a), 2.5)
 				draw_line(pv, nx, cc, 5.0 * 0.5)
 				pv = nx
 		"snow":
@@ -330,7 +376,8 @@ func _draw_p(q: Dictionary) -> void:
 			draw_circle(p, s * 0.5 * (0.5 + k), Color(c.r, c.g, c.b, a * 0.4))
 		"slash":
 			var d3: Vector2 = Vector2.from_angle(rot)
-			draw_line(p - d3 * s * 0.8, p + d3 * s * 0.8, Color(0.1, 0.05, 0.2, a), 4.0)
+			if rich:
+				draw_line(p - d3 * s * 0.8, p + d3 * s * 0.8, Color(0.1, 0.05, 0.2, a), 4.0)
 			draw_line(p - d3 * s * 0.8, p + d3 * s * 0.8, cc, 2.0)
 		"star":
 			var l2: float = s * (0.6 + 0.4 * sin(k * PI))
@@ -347,6 +394,8 @@ func _draw_p(q: Dictionary) -> void:
 # particulas del tipo en un punto cualquiera (habilidades de los evolucionados)
 func puff(pos: Vector2, m: Dictionary, n: int = 12, up: float = 1.0) -> void:
 	var sg: Dictionary = sig(m)
+	if pos.distance_squared_to(main.player.position) < 40.0 * 40.0:
+		pos = _front()   # sobre el propio Pokemon lo taparia: sale delante
 	for i in range(n):
 		var a: float = randf() * TAU
 		_add(pos + Vector2(cos(a), sin(a) * 0.5) * randf_range(2.0, 22.0), Vector2(cos(a) * 60.0, -randf_range(60.0, 200.0) * up), randf_range(0.4, 0.8),

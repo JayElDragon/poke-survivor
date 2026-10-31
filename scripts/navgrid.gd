@@ -75,9 +75,15 @@ static func move(vp: Viewport, event: InputEvent, items: Array) -> bool:
 	var target: Control = null
 	if dir.x != 0:
 		var row: Array = rows[ri]
-		if row.size() < 2:
-			return false
-		target = row[posmod(ci + dir.x, row.size())]
+		# En el borde de la fila (o fila de un solo control) se salta a la zona vecina en esa direccion
+		# (p. ej. de la rejilla de Pokemon al panel de la izquierda) en vez de dar la vuelta.
+		var at_edge: bool = row.size() < 2 or (dir.x < 0 and ci == 0) or (dir.x > 0 and ci == row.size() - 1)
+		if at_edge:
+			target = _side_jump(f, items, row, dir.x)
+		if target == null:
+			if row.size() < 2:
+				return false
+			target = row[posmod(ci + dir.x, row.size())]
 		sticky_x = target.get_global_rect().get_center().x
 	else:
 		var nr: int = ri + dir.y
@@ -94,3 +100,23 @@ static func move(vp: Viewport, event: InputEvent, items: Array) -> bool:
 	target.grab_focus()
 	sticky_for = target
 	return true
+
+
+# Control mas cercano (en vertical) que queda del todo a un lado de la fila actual; null si no hay.
+static func _side_jump(f: Control, items: Array, row: Array, dx: int) -> Control:
+	var fc: Vector2 = f.get_global_rect().get_center()
+	var best: Control = null
+	var best_d := INF
+	for c in items:
+		var cc := c as Control
+		if row.has(cc) or cc == f:
+			continue
+		var cr: Vector2 = cc.get_global_rect().get_center()
+		var side: float = (cr.x - fc.x) * float(dx)
+		if side < 24.0:
+			continue
+		var d: float = absf(cr.y - fc.y) * 3.0 + side * 0.2
+		if d < best_d:
+			best_d = d
+			best = cc
+	return best

@@ -10,6 +10,9 @@ var main = null
 var acts: Array = []
 var T := 0.0
 var tint: Dictionary = {}   # velo de pantalla/escenario (eclipse, luna)
+var lite := 0   # Rendimiento: 0 normal, 1 ahorro, 2 minimo (menos particulas y capas dibujadas)
+const FRONT := 64.0   # los disparos salen delante del jugador, no desde dentro, para verlo
+var under: Node2D = null   # capa del suelo (bajo los Pokemon): charcos, velos y sombras nunca tapan ni oscurecen al jugador
 
 # [arquetipo, parametros, retraso]
 # cd = recarga (s), k = potencia respecto al daño medio de los dos movimientos, st = estados que aplica
@@ -72,6 +75,14 @@ const DEFAULT_SPEC := {"cd": 8.0, "k": 1.8, "steps": [["nova", {"rings": 2, "rma
 func _ready() -> void:
 	z_index = 12
 	process_mode = Node.PROCESS_MODE_PAUSABLE
+	under = Node2D.new()
+	under.draw.connect(_draw_under)
+	main.gfx.add_child(under)
+
+
+# fraccion de efectos que se dibujan: baja sola cuando el FPS cae (main.fx_load)
+func _ld() -> float:
+	return float(main.fx_load)
 
 
 # ---------------------------------------------------------------
@@ -92,12 +103,16 @@ func tick(m: Dictionary, delta: float) -> void:
 
 
 func cast(m: Dictionary, spec: Dictionary) -> void:
+	if acts.size() > int(float(40 if lite == 0 else (24 if lite == 1 else 14)) * maxf(0.5, _ld())):
+		return   # demasiados efectos a la vez: se salta este lanzamiento (evita tirones)
 	var parts: Array = m["parts"]
 	var d0: float = float(parts[0].get("dmg", 10.0))
 	var d1: float = float(parts[1].get("dmg", 10.0))
 	var ty: String = String(parts[0].get("type", "normal"))
 	var rid: String = String(m.get("recipe", ""))
 	var col: Color = Color.html(String(_rec_col(rid, ty)))
+	if main.VFX.shiny_on:
+		col = main.VFX.shiny_col(ty, col)
 	var sm: Dictionary = {"id": String(m["id"]), "kind": "nova", "type": ty, "lvl": 10, "evolved": true, "knock": 70.0}
 	var st: Dictionary = spec.get("st", {})
 	for k in st:
@@ -106,6 +121,8 @@ func cast(m: Dictionary, spec: Dictionary) -> void:
 		"col2": col.lightened(0.45), "dark": col.darkened(0.35), "id": rid, "coins": 0, "marked": [], "ty": ty}
 	if parts.size() > 1 and String(parts[1].get("type", ty)) != ty:
 		var c2: Color = Color.html(String(main.MD.TYPE_COLOR.get(String(parts[1]["type"]), "#ffffff")))
+		if main.VFX.shiny_on:
+			c2 = main.VFX.shiny_col(String(parts[1]["type"]), c2)
 		ctx["col2"] = c2.lerp(Color.WHITE, 0.25)
 	for s in spec["steps"]:
 		acts.append({"k": String(s[0]), "p": s[1], "ctx": ctx, "wait": float(s[2]), "t": 0.0, "init": false})
@@ -125,6 +142,7 @@ func clear() -> void:
 	acts.clear()
 	tint = {}
 	queue_redraw()
+	under.queue_redraw()
 
 
 func step(delta: float) -> void:
@@ -148,6 +166,7 @@ func step(delta: float) -> void:
 		if float(tint["t"]) >= float(tint["dur"]):
 			tint = {}
 	queue_redraw()
+	under.queue_redraw()
 
 
 # ---------------------------------------------------------------
@@ -155,6 +174,11 @@ func step(delta: float) -> void:
 # ---------------------------------------------------------------
 func _pp() -> Vector2:
 	return main.player.position
+
+
+# Punto de salida de los disparos: delante del jugador (hacia el enemigo mas cercano).
+func _org() -> Vector2:
+	return main.player.position + _aim_dir() * FRONT
 
 
 func _foes(reach: float) -> Array:
@@ -206,10 +230,11 @@ func _pick_targets(a: Dictionary, n: int, mode: String, reach: float = 480.0) ->
 	if mode == "dense":
 		var best = null
 		var bn := -1
-		for e in f:
+		var cand: Array = f.slice(0, 40)   # con cientos de enemigos, comparar todos con todos daba tirones
+		for e in cand:
 			var c := 0
 			for o in f:
-				if o.position.distance_to(e.position) < 110.0:
+				if o.position.distance_squared_to(e.position) < 110.0 * 110.0:
 					c += 1
 			if c > bn:
 				bn = c
@@ -226,13 +251,13 @@ func _pick_targets(a: Dictionary, n: int, mode: String, reach: float = 480.0) ->
 
 
 func _px(pos: Vector2, col: Color, vel: Vector2, life: float, size: float = 1.0, grav: float = 0.0) -> void:
-	if randf() < 0.45:
+	if randf() < (0.6 if lite == 0 else (0.8 if lite == 1 else 0.95)) or randf() > _ld():
 		return
 	main.pfx.px(pos + V0, col, vel, life, size, grav, 0.92)
 
 
 func _burst(pos: Vector2, col: Color, n: int = 10, power: float = 140.0) -> void:
-	main.pfx.burst(pos + V0, col, maxi(2, int(n * 0.5)), power)
+	main.pfx.burst(pos + V0, col, maxi(2, int(float(n) * (0.35 if lite == 0 else (0.2 if lite == 1 else 0.1)) * _ld())), power)
 
 
 func _ringfx(pos: Vector2, r1: float, col: Color, life: float = 0.4, w: float = 4.0) -> void:
@@ -273,7 +298,7 @@ func _start(a: Dictionary) -> void:
 		"pool":
 			pass
 		"vortex":
-			var c: Vector2 = pp
+			var c: Vector2 = _org()   # delante del Pokemon, no encima
 			if String(p.get("at", "")) == "cluster":
 				var d: Array = _pick_targets(a, 1, "dense")
 				if not d.is_empty():
@@ -341,7 +366,7 @@ func _start(a: Dictionary) -> void:
 			for i in n5:
 				var off: float = 0.0 if n5 == 1 else (float(i) / float(n5 - 1) - 0.5) * spr
 				var dvv: Vector2 = base.rotated(off)
-				wl.append({"pos": pp + dvv * 24.0, "dir": dvv, "hit": {}, "dist": 0.0, "tr": 0.0})
+				wl.append({"pos": _org() + dvv * 8.0, "dir": dvv, "hit": {}, "dist": 0.0, "tr": 0.0})
 			a["waves"] = wl
 		"seekers":
 			var n6: int = int(p["n"])
@@ -354,7 +379,7 @@ func _start(a: Dictionary) -> void:
 				if not fs.is_empty():
 					tgt = fs[i % fs.size()]
 				var ang: float = base2 + TAU * float(i) / float(n6)
-				sk.append({"pos": pp, "vel": Vector2.from_angle(ang) * 160.0, "tgt": tgt, "life": 0.0, "at": 0.08 * float(i), "done": false, "trail": []})
+				sk.append({"pos": _org(), "vel": Vector2.from_angle(ang) * 160.0, "tgt": tgt, "life": 0.0, "at": 0.08 * float(i), "done": false, "trail": []})
 			a["sk"] = sk
 			a["combo"] = 0
 		"nova":
@@ -471,15 +496,13 @@ func _u_vortex(a: Dictionary, dt: float) -> bool:
 	var c: Vector2 = a["c"]
 	var r: float = float(p["r"])
 	if String(p.get("at", "")) == "":
-		c = _pp()
-		if float(p.get("move", 0.0)) > 0.0:
-			c = c + a["dir"] * float(p["move"]) * float(a["t"]) * 0.0
+		c = c.lerp(_org(), minf(1.0, dt * 8.0))   # sigue al jugador, siempre por delante de el
 	if float(p.get("move", 0.0)) > 0.0:
 		var sp: float = float(p["move"])
 		if a.has("pos_f"):
 			c = a["pos_f"]
 		else:
-			c = _pp()
+			c = _org()
 		c += a["dir"] * sp * dt
 		a["pos_f"] = c
 	a["c"] = c
@@ -491,17 +514,20 @@ func _u_vortex(a: Dictionary, dt: float) -> bool:
 		a["tk"] = 0.3
 		tick = true
 	var n := 0
+	var reach2: float = r * 1.25 * r * 1.25
 	for e in main.enemies:
 		if e.dead:
 			continue
-		var dd: float = e.position.distance_to(c)
-		if dd <= r * 1.25:
-			if pull > 0.0 and dd > 12.0:
-				var k: float = 0.35 if e.boss else 1.0
-				e.position += (c - e.position).normalized() * pull * dt * k
-			if tick and dd <= r + e.radius * 0.5:
-				_hit(a, e, float(p["d"]), c)
-				n += 1
+		var d2: float = e.position.distance_squared_to(c)
+		if d2 > reach2:
+			continue
+		var dd: float = sqrt(d2)
+		if pull > 0.0 and dd > 12.0:
+			var k: float = 0.35 if e.boss else 1.0
+			e.position += (c - e.position).normalized() * pull * dt * k
+		if tick and dd <= r + e.radius * 0.5:
+			_hit(a, e, float(p["d"]), c)
+			n += 1
 	_drain(a, n)
 	var col: Color = a["ctx"]["col"]
 	for i in 3:
@@ -519,7 +545,7 @@ func _u_beam(a: Dictionary, dt: float) -> bool:
 	if t < wind:
 		a["ang0"] = lerp_angle(float(a["ang0"]), _aim_dir().angle(), minf(1.0, dt * 6.0))
 		if randf() < 0.7:
-			_px(_pp() + Vector2.from_angle(randf() * TAU) * 60.0, a["ctx"]["col2"], Vector2.ZERO, 0.4, 2.0)
+			_px(_org() + Vector2.from_angle(randf() * TAU) * 60.0, a["ctx"]["col2"], Vector2.ZERO, 0.4, 2.0)
 		return false
 	var bt: float = t - wind
 	a["tk"] = float(a["tk"]) - dt
@@ -528,7 +554,7 @@ func _u_beam(a: Dictionary, dt: float) -> bool:
 		var cnt: int = int(p.get("count", 1))
 		for bi in cnt:
 			var ang: float = _beam_ang(a, bi, bt)
-			var o: Vector2 = _pp()
+			var o: Vector2 = _org()
 			var dv: Vector2 = Vector2.from_angle(ang)
 			var len: float = float(p["len"])
 			var hw: float = float(p["w"]) * 0.5
@@ -544,7 +570,7 @@ func _u_beam(a: Dictionary, dt: float) -> bool:
 	if randf() < 0.8:
 		var ang2: float = _beam_ang(a, 0, bt)
 		var dd: float = randf() * float(p["len"])
-		_px(_pp() + Vector2.from_angle(ang2) * dd, a["ctx"]["col2"], Vector2.from_angle(ang2 + randf_range(-1.5, 1.5)) * 70.0, 0.4, 2.0)
+		_px(_org() + Vector2.from_angle(ang2) * dd, a["ctx"]["col2"], Vector2.from_angle(ang2 + randf_range(-1.5, 1.5)) * 70.0, 0.4, 2.0)
 	main.shake = maxf(main.shake, 2.0)
 	return bt >= dur
 
@@ -646,11 +672,13 @@ func _u_prison(a: Dictionary, dt: float) -> bool:
 		for i in 3:
 			_px(c + Vector2.from_angle(randf() * TAU) * r * randf(), a["ctx"]["col2"], Vector2(0.0, -40.0), 0.4, 2.0)
 	# los enemigos no salen del cerco (los jefes, solo frenados)
+	var lo2: float = (r - 6.0) * (r - 6.0)
+	var hi2: float = (r + 40.0) * (r + 40.0)
 	for e in main.enemies:
 		if e.dead:
 			continue
-		var dd: float = e.position.distance_to(c)
-		if dd > r - 6.0 and dd < r + 40.0:
+		var dd2: float = e.position.distance_squared_to(c)
+		if dd2 > lo2 and dd2 < hi2:
 			var inward: Vector2 = (c - e.position).normalized()
 			e.position += inward * 70.0 * dt * (0.4 if e.boss else 1.0)
 	if float(a["t"]) >= dur:
@@ -727,10 +755,12 @@ func _u_orbit(a: Dictionary, dt: float) -> bool:
 			o["life"] = float(o["life"]) - dt
 			if float(o["life"]) > 0.0:
 				live = true
+		var op: Vector2 = o["pos"]
 		for e in main.enemies:
 			if e.dead:
 				continue
-			if e.position.distance_to(o["pos"]) <= 22.0 + e.radius * 0.5:
+			var hr: float = 22.0 + e.radius * 0.5
+			if e.position.distance_squared_to(op) <= hr * hr:
 				var key: int = e.get_instance_id()
 				var last: float = float((o["hit"] as Dictionary).get(key, -9.0))
 				if t - last > (0.45 if not bool(o["launched"]) else 5.0):
@@ -913,7 +943,7 @@ func _u_nova(a: Dictionary, dt: float) -> bool:
 	var ctx: Dictionary = a["ctx"]
 	var n: int = int(p["rings"])
 	var gap: float = float(p.get("gap", 0.4))
-	var pp: Vector2 = _pp()
+	var pp: Vector2 = _org()   # las ondas nacen delante del Pokemon, no sobre el
 	while int(a["ring_i"]) < n and float(a["t"]) >= gap * float(a["ring_i"]):
 		var ri: int = int(a["ring_i"])
 		var col: Color = ctx["col"]
@@ -938,10 +968,14 @@ func _u_nova(a: Dictionary, dt: float) -> bool:
 		var r: float = rmax * (1.0 - pow(1.0 - f, 2.0))
 		var c: Vector2 = rg["c"]
 		var cnt := 0
+		var out2: float = (r + 120.0) * (r + 120.0)   # margen para jefes grandes
 		for e in main.enemies:
 			if e.dead:
 				continue
-			var dd: float = e.position.distance_to(c)
+			var dd2: float = e.position.distance_squared_to(c)
+			if dd2 > out2:
+				continue
+			var dd: float = sqrt(dd2)
 			if dd <= r + e.radius * 0.5 and dd >= float(rg["prev"]) - 30.0 - e.radius * 0.5 and not (rg["hit"] as Dictionary).has(e):
 				rg["hit"][e] = true
 				cnt += 1
@@ -985,16 +1019,12 @@ func _u_sanct(a: Dictionary, dt: float) -> bool:
 # Dibujo
 # ---------------------------------------------------------------
 func _draw() -> void:
-	if not tint.is_empty():
-		_draw_tint()
 	for a in acts:
 		if float(a["wait"]) > 0.0 or not bool(a["init"]):
 			continue
 		match String(a["k"]):
 			"drops":
 				_d_drops(a)
-			"pool":
-				_d_pool(a)
 			"vortex":
 				_d_vortex(a)
 			"beam":
@@ -1015,8 +1045,81 @@ func _draw() -> void:
 				_d_seekers(a)
 			"nova":
 				_d_nova(a)
+
+
+# Capa del suelo (bajo los Pokemon): velos, charcos, sombras, santuario y marcas de impacto.
+# Asi ningun efecto oscuro queda encima del jugador.
+func _draw_under() -> void:
+	if not tint.is_empty():
+		_draw_tint()
+	for a in acts:
+		if float(a["wait"]) > 0.0 or not bool(a["init"]):
+			continue
+		match String(a["k"]):
+			"pool":
+				_d_pool(a)
 			"sanctuary":
 				_d_sanct(a)
+			"vortex":
+				_g_vortex(a)
+			"prison":
+				_g_prison(a)
+			"drops":
+				_g_drops(a)
+			"eruption":
+				_g_eruption(a)
+
+
+func _g_vortex(a: Dictionary) -> void:
+	var p: Dictionary = a["p"]
+	var ctx: Dictionary = a["ctx"]
+	var c: Vector2 = _gp(a["c"])
+	var r: float = float(p["r"])
+	var style: String = String(p["style"])
+	var k: float = clampf(float(a["t"]) / 0.35, 0.0, 1.0) * clampf((float(p["dur"]) - float(a["t"])) / 0.4, 0.0, 1.0)
+	if k <= 0.01:
+		return
+	if style == "dark" or style == "ghostwater":
+		under.draw_colored_polygon(_poly_circle(c, r * 0.9 * k, r * 0.55 * k, 20), _a(Color("#08040e"), 0.45 * k))
+	else:
+		under.draw_colored_polygon(_poly_circle(c, r * k, r * 0.6 * k, 20), _a(ctx["dark"], 0.22 * k))
+	if style == "dark":
+		under.draw_circle(c, 18.0 * k, Color("#000000"))
+
+
+func _g_prison(a: Dictionary) -> void:
+	var p: Dictionary = a["p"]
+	var r: float = float(p["r"])
+	var k: float = clampf(float(a["t"]) / 0.45, 0.0, 1.0) * clampf((float(p["dur"]) - float(a["t"])) / 0.4, 0.0, 1.0)
+	under.draw_colored_polygon(_poly_circle(_gp(a["c"]), r, r * 0.62, 20), _a(a["ctx"]["dark"], 0.18 * k))
+
+
+func _g_drops(a: Dictionary) -> void:
+	var p: Dictionary = a["p"]
+	var col: Color = a["ctx"]["col"]
+	var r: float = float(p["r"])
+	for d in a["drops"]:
+		var lt: float = float(a["t"]) - float(d["at"])
+		if lt < 0.0 or bool(d["done"]):
+			continue
+		var f: float = clampf(lt / float(d["fall"]), 0.0, 1.0)
+		var pos: Vector2 = _gp(d["pos"])
+		under.draw_arc(pos, r * (0.55 + 0.45 * f), 0.0, TAU, 20, _a(col, 0.25 + 0.5 * f), 2.0)
+		under.draw_circle(pos, r * 0.55 * f, _a(col, 0.12 * f))
+
+
+func _g_eruption(a: Dictionary) -> void:
+	var r: float = float(a["p"]["r"])
+	var col: Color = a["ctx"]["col"]
+	for cl in a["cols"]:
+		var lt: float = float(a["t"]) - float(cl["at"])
+		if lt < 0.0 or int(cl["state"]) != 0:
+			continue
+		var pos: Vector2 = _gp(cl["pos"])
+		var f: float = clampf(lt / 0.4, 0.0, 1.0)
+		under.draw_arc(pos, r * (1.1 - 0.3 * f), 0.0, TAU, 20, _a(col, 0.3 + 0.5 * f), 2.0)
+		if f > 0.01:
+			under.draw_colored_polygon(_poly_circle(pos, r * f, r * 0.62 * f, 14), _a(col, 0.18))
 
 
 func _gp(v: Vector2) -> Vector2:
@@ -1096,10 +1199,8 @@ func _d_drops(a: Dictionary) -> void:
 		if bool(d["done"]):
 			continue
 		var f: float = clampf(lt / float(d["fall"]), 0.0, 1.0)
-		# marca de impacto
+		# (la marca de impacto se dibuja en el suelo: _g_drops)
 		var r: float = float(p["r"])
-		draw_arc(pos, r * (0.55 + 0.45 * f), 0.0, TAU, 28, _a(ctx["col"], 0.25 + 0.5 * f), 2.0)
-		draw_circle(pos, r * 0.55 * f, _a(ctx["col"], 0.12 * f))
 		var from: Vector2 = pos + Vector2(-r * 0.6, -460.0)
 		var hp: Vector2 = from.lerp(pos, f * f)
 		_missile(style, hp, (pos - from).normalized(), sz, ctx["col"], ctx["col2"], f, float(d["rot"]))
@@ -1113,9 +1214,9 @@ func _d_pool(a: Dictionary) -> void:
 	var al: float = (1.0 - f) * 0.9 if f > 0.7 else 1.0
 	var r: float = float(p["r"])
 	var pulse: float = 1.0 + 0.04 * sin(T * 6.0)
-	draw_colored_polygon(_poly_circle(c, r * pulse, r * 0.62 * pulse, 20), _a(ctx["dark"], 0.38 * al))
-	draw_colored_polygon(_poly_circle(c, r * 0.7, r * 0.43, 16), _a(ctx["col"], 0.3 * al))
-	draw_polyline(_poly_circle(c, r * pulse, r * 0.62 * pulse, 24) + PackedVector2Array([c + Vector2(r * pulse, 0.0)]), _a(ctx["col2"], 0.7 * al), 2.0)
+	under.draw_colored_polygon(_poly_circle(c, r * pulse, r * 0.62 * pulse, 16), _a(ctx["dark"], 0.38 * al))
+	under.draw_colored_polygon(_poly_circle(c, r * 0.7, r * 0.43, 12), _a(ctx["col"], 0.3 * al))
+	under.draw_polyline(_poly_circle(c, r * pulse, r * 0.62 * pulse, 24) + PackedVector2Array([c + Vector2(r * pulse, 0.0)]), _a(ctx["col2"], 0.7 * al), 2.0)
 
 
 func _d_vortex(a: Dictionary) -> void:
@@ -1128,11 +1229,8 @@ func _d_vortex(a: Dictionary) -> void:
 	var out: float = clampf((float(p["dur"]) - float(a["t"])) / 0.4, 0.0, 1.0)
 	var k: float = tf * out
 	var col: Color = ctx["col"]
-	if style == "dark" or style == "ghostwater":
-		draw_colored_polygon(_poly_circle(c, r * 0.9 * k, r * 0.55 * k, 24), _a(Color("#08040e"), 0.55 * k))
-	else:
-		draw_colored_polygon(_poly_circle(c, r * k, r * 0.6 * k, 24), _a(ctx["dark"], 0.22 * k))
-	var arms := 3
+	# (la sombra del vortice va en el suelo: _g_vortex)
+	var arms := 3 if lite == 0 and _ld() > 0.6 else 2
 	for ai in arms:
 		var pts := PackedVector2Array()
 		for i in 22:
@@ -1143,7 +1241,6 @@ func _d_vortex(a: Dictionary) -> void:
 		draw_polyline(pts, _a(col, 0.55 * k), 7.0)
 		draw_polyline(pts, _a(ctx["col2"], 0.8 * k), 3.0)
 	if style == "dark":
-		draw_circle(c, 18.0 * k, Color("#000000"))
 		draw_arc(c, 22.0 * k, 0.0, TAU, 20, ctx["col2"], 3.0)
 	var nb: int = int(p.get("blades", 0))
 	for bi in nb:
@@ -1155,15 +1252,14 @@ func _d_vortex(a: Dictionary) -> void:
 func _d_beam(a: Dictionary) -> void:
 	var p: Dictionary = a["p"]
 	var ctx: Dictionary = a["ctx"]
-	var o: Vector2 = _gp(_pp())
+	var o: Vector2 = _gp(_org())
 	var wind: float = float(p.get("wind", 0.0))
 	var t: float = float(a["t"])
 	var w: float = float(p["w"])
 	if t < wind:
 		var f: float = t / wind
-		draw_circle(o, w * 0.45 * f, _a(ctx["col"], 0.5))
-		draw_circle(o, w * 0.28 * f, ctx["col2"])
-		draw_circle(o, w * 0.12 * f, Color.WHITE)
+		draw_circle(o, w * 0.28 * f, _a(ctx["col"], 0.35))
+		draw_circle(o, w * 0.1 * f, Color.WHITE)
 		var dv: Vector2 = Vector2.from_angle(float(a["ang0"]))
 		draw_line(o, o + dv * float(p["len"]), _a(ctx["col"], 0.18 + 0.3 * f), 2.0)
 		return
@@ -1175,12 +1271,13 @@ func _d_beam(a: Dictionary) -> void:
 		var dv2: Vector2 = Vector2.from_angle(ang)
 		var tip: Vector2 = o + dv2 * float(p["len"])
 		var fl: float = 1.0 + 0.1 * sin(T * 40.0 + float(bi))
-		draw_line(o, tip, _a(ctx["col"], 0.32 * fade), w * 1.25 * fl)
-		draw_line(o, tip, _a(ctx["col"], 0.7 * fade), w * 0.85 * fl)
-		draw_line(o, tip, _a(ctx["col2"], 0.95 * fade), w * 0.5 * fl)
-		draw_line(o, tip, _a(Color.WHITE, 0.95 * fade), w * 0.2 * fl)
-		draw_circle(o + dv2 * 10.0, w * 0.5 * fade, _a(ctx["col2"], 0.9 * fade))
-		draw_circle(tip, w * 0.35 * fade, _a(ctx["col"], 0.6 * fade))
+		# rayo mas fino y translucido que su zona de daño: se ve el campo (y al Pokemon) a traves
+		if lite == 0 and _ld() > 0.6:
+			draw_line(o, tip, _a(ctx["col"], 0.18 * fade), w * 0.8 * fl)
+		draw_line(o, tip, _a(ctx["col2"], 0.6 * fade), w * 0.38 * fl)
+		draw_line(o, tip, _a(Color.WHITE, 0.8 * fade), w * 0.14 * fl)
+		if lite == 0 and _ld() > 0.6:
+			draw_circle(tip, w * 0.25 * fade, _a(ctx["col"], 0.4 * fade))
 
 
 func _d_bolts(a: Dictionary) -> void:
@@ -1195,15 +1292,15 @@ func _d_bolts(a: Dictionary) -> void:
 		if String(p["style"]) == "holy" and not v.has("arc"):
 			var top: Vector2 = pts[0]
 			var bot: Vector2 = pts[pts.size() - 1]
-			var wd: float = float(v["r"]) * (1.2 - 0.5 * f)
-			draw_line(top, bot, _a(ctx["col"], 0.35 * al), wd * 1.3)
-			draw_line(top, bot, _a(ctx["col2"], 0.7 * al), wd * 0.8)
-			draw_line(top, bot, _a(Color.WHITE, 0.95 * al), wd * 0.35)
-			draw_circle(bot, wd * 0.8, _a(Color.WHITE, 0.6 * al))
+			var wd: float = float(v["r"]) * (0.7 - 0.3 * f)
+			draw_line(top, bot, _a(ctx["col2"], 0.45 * al), wd * 0.8)
+			draw_line(top, bot, _a(Color.WHITE, 0.8 * al), wd * 0.3)
+			draw_circle(bot, wd * 0.6, _a(Color.WHITE, 0.4 * al))
 		else:
-			draw_polyline(pts, _a(ctx["col"], 0.6 * al), 8.0)
-			draw_polyline(pts, _a(ctx["col2"], 0.95 * al), 4.0)
-			draw_polyline(pts, _a(Color.WHITE, al), 2.0)
+			if lite == 0 and _ld() > 0.6:
+				draw_polyline(pts, _a(ctx["col"], 0.45 * al), 6.0)
+			draw_polyline(pts, _a(ctx["col2"], 0.9 * al), 3.0)
+			draw_polyline(pts, _a(Color.WHITE, al), 1.5)
 
 
 func _d_prison(a: Dictionary) -> void:
@@ -1216,7 +1313,6 @@ func _d_prison(a: Dictionary) -> void:
 	var up: float = clampf(float(a["t"]) / 0.45, 0.0, 1.0)
 	var fadeo: float = clampf((float(p["dur"]) - float(a["t"])) / 0.4, 0.0, 1.0)
 	var k: float = up * fadeo
-	draw_colored_polygon(_poly_circle(c, r, r * 0.62, 28), _a(ctx["dark"], 0.18 * k))
 	var tops: Array = []
 	for i in n:
 		var an: float = TAU * float(i) / float(n) + (0.0 if style != "crystal" else float(a["t"]) * 0.3)
@@ -1269,10 +1365,7 @@ func _d_eruption(a: Dictionary) -> void:
 			continue
 		var pos: Vector2 = _gp(cl["pos"])
 		if int(cl["state"]) == 0:
-			var f: float = clampf(lt / 0.4, 0.0, 1.0)
-			draw_arc(pos, r * (1.1 - 0.3 * f), 0.0, TAU, 24, _a(ctx["col"], 0.3 + 0.5 * f), 2.0)
-			draw_colored_polygon(_poly_circle(pos, r * f, r * 0.62 * f, 18), _a(ctx["col"], 0.18))
-			continue
+			continue   # el aviso se dibuja en el suelo: _g_eruption
 		var tt: float = lt - 0.4
 		var rise: float = clampf(tt / 0.18, 0.0, 1.0)
 		var fade: float = clampf((1.0 - tt) / 0.35, 0.0, 1.0)
@@ -1371,11 +1464,12 @@ func _d_slashes(a: Dictionary) -> void:
 			var v1: Vector2 = _gp(sg[1])
 			var reveal: float = clampf(f2 * 4.0, 0.0, 1.0)
 			var ve: Vector2 = v0.lerp(v1, reveal)
-			draw_line(v0, ve, _a(ctx["col"], 0.6 * al), 14.0 * (1.0 - f2 * 0.5))
-			draw_line(v0, ve, _a(ctx["col2"], 0.95 * al), 7.0 * (1.0 - f2 * 0.5))
-			draw_line(v0, ve, _a(Color.WHITE, al), 2.5)
+			if lite == 0 and _ld() > 0.6:
+				draw_line(v0, ve, _a(ctx["col"], 0.4 * al), 10.0 * (1.0 - f2 * 0.5))
+			draw_line(v0, ve, _a(ctx["col2"], 0.9 * al), 5.0 * (1.0 - f2 * 0.5))
+			draw_line(v0, ve, _a(Color.WHITE, al), 2.0)
 		if style == "divine":
-			draw_line(pos + Vector2(0.0, -300.0), pos, _a(Color("#fff0b0"), 0.5 * al), 36.0 * al)
+			draw_line(pos + Vector2(0.0, -300.0), pos, _a(Color("#fff0b0"), 0.3 * al), 22.0 * al)
 
 
 func _d_waves(a: Dictionary) -> void:
@@ -1399,9 +1493,10 @@ func _d_waves(a: Dictionary) -> void:
 					var an: float = ang - sweep + tt * sweep * 2.0
 					var rr: float = wd * (1.0 + (0.0 if style == "tide" else 0.25))
 					pts.append(pos - dv * wd * 0.8 + Vector2.from_angle(an) * rr)
-				draw_polyline(pts, _a(ctx["col"], 0.5 * fade), 16.0)
-				draw_polyline(pts, _a(ctx["col2"], 0.9 * fade), 8.0)
-				draw_polyline(pts, _a(Color.WHITE, 0.9 * fade), 2.5)
+				if lite == 0 and _ld() > 0.6:
+					draw_polyline(pts, _a(ctx["col"], 0.35 * fade), 12.0)
+				draw_polyline(pts, _a(ctx["col2"], 0.8 * fade), 6.0)
+				draw_polyline(pts, _a(Color.WHITE, 0.9 * fade), 2.0)
 				if style == "wing":
 					for fi in 4:
 						var tt2: float = 0.15 + 0.23 * float(fi)
@@ -1482,9 +1577,10 @@ func _d_nova(a: Dictionary) -> void:
 		var c: Vector2 = _gp(rg["c"])
 		var al: float = 1.0 - f
 		var col: Color = rg["col"]
-		draw_arc(c, r, 0.0, TAU, 48, _a(col, 0.35 * al), 26.0)
-		draw_arc(c, r, 0.0, TAU, 48, _a(col, 0.9 * al), 9.0)
-		draw_arc(c, r, 0.0, TAU, 48, _a(Color.WHITE, 0.9 * al), 3.0)
+		if lite == 0 and _ld() > 0.6:
+			draw_arc(c, r, 0.0, TAU, 36, _a(col, 0.3 * al), 22.0)
+		draw_arc(c, r, 0.0, TAU, 36, _a(col, 0.9 * al), 9.0)
+		draw_arc(c, r, 0.0, TAU, 36, _a(Color.WHITE, 0.9 * al), 3.0)
 		if String(p["style"]) == "psychic":
 			for i in 8:
 				var an: float = TAU * float(i) / 8.0 + f * 2.0
@@ -1497,26 +1593,31 @@ func _d_sanct(a: Dictionary) -> void:
 	var c: Vector2 = _gp(a["c"])
 	var r: float = float(p["r"])
 	var f: float = clampf(float(a["t"]) / 0.5, 0.0, 1.0) * clampf((float(p["dur"]) - float(a["t"])) / 0.6, 0.0, 1.0)
-	draw_colored_polygon(_poly_circle(c, r * f, r * 0.62 * f, 28), _a(ctx["col"], 0.2))
-	draw_polyline(_poly_circle(c, r * f, r * 0.62 * f, 32) + PackedVector2Array([c + Vector2(r * f, 0.0)]), _a(ctx["col2"], 0.9 * f), 3.0)
-	draw_polyline(_poly_circle(c, r * 0.6 * f, r * 0.37 * f, 24) + PackedVector2Array([c + Vector2(r * 0.6 * f, 0.0)]), _a(ctx["col2"], 0.7 * f), 2.0)
+	if f <= 0.01:
+		return
+	under.draw_colored_polygon(_poly_circle(c, r * f, r * 0.62 * f, 20), _a(ctx["col"], 0.2))
+	under.draw_polyline(_poly_circle(c, r * f, r * 0.62 * f, 24) + PackedVector2Array([c + Vector2(r * f, 0.0)]), _a(ctx["col2"], 0.9 * f), 3.0)
+	under.draw_polyline(_poly_circle(c, r * 0.6 * f, r * 0.37 * f, 18) + PackedVector2Array([c + Vector2(r * 0.6 * f, 0.0)]), _a(ctx["col2"], 0.7 * f), 2.0)
 	for i in 6:
 		var an: float = float(a["t"]) * 0.7 + TAU * float(i) / 6.0
-		draw_line(c, c + Vector2(cos(an) * r * 0.6 * f, sin(an) * r * 0.37 * f), _a(ctx["col2"], 0.45 * f), 2.0)
+		under.draw_line(c, c + Vector2(cos(an) * r * 0.6 * f, sin(an) * r * 0.37 * f), _a(ctx["col2"], 0.45 * f), 2.0)
 	# cupula
-	draw_arc(c + Vector2(0.0, -4.0), r * 0.5 * f, PI, TAU, 20, _a(Color.WHITE, 0.35 * f), 3.0)
+	under.draw_arc(c + Vector2(0.0, -4.0), r * 0.5 * f, PI, TAU, 16, _a(Color.WHITE, 0.35 * f), 3.0)
 
 
+# Velo de eclipse / luna: va en la capa del suelo (bajo los Pokemon) y mas suave, para no oscurecer al jugador.
 func _draw_tint() -> void:
+	if lite >= 2 or _ld() < 0.5:
+		return
 	var k: String = String(tint["kind"])
 	var f: float = clampf(float(tint["t"]) / float(tint["dur"]), 0.0, 1.0)
 	var al: float = sin(f * PI)
 	var c: Vector2 = _gp(tint["c"])
 	if k == "dark":
-		draw_colored_polygon(_poly_circle(c, 620.0, 380.0, 32), Color(0.03, 0.0, 0.08, 0.5 * al))
-		draw_circle(c + Vector2(0.0, -250.0), 56.0, Color(0.0, 0.0, 0.0, 0.9 * al))
-		draw_arc(c + Vector2(0.0, -250.0), 60.0, 0.0, TAU, 28, Color(1.0, 0.8, 0.4, 0.7 * al), 5.0)
+		under.draw_colored_polygon(_poly_circle(c, 620.0, 380.0, 24), Color(0.03, 0.0, 0.08, 0.32 * al))
+		under.draw_circle(c + Vector2(0.0, -250.0), 56.0, Color(0.0, 0.0, 0.0, 0.9 * al))
+		under.draw_arc(c + Vector2(0.0, -250.0), 60.0, 0.0, TAU, 24, Color(1.0, 0.8, 0.4, 0.7 * al), 5.0)
 	else:
-		draw_colored_polygon(_poly_circle(c, 620.0, 380.0, 32), Color(0.25, 0.0, 0.05, 0.38 * al))
-		draw_circle(c + Vector2(0.0, -260.0), 70.0, Color(0.85, 0.12, 0.2, 0.9 * al))
-		draw_circle(c + Vector2(-14.0, -272.0), 62.0, Color(1.0, 0.35, 0.4, 0.5 * al))
+		under.draw_colored_polygon(_poly_circle(c, 620.0, 380.0, 24), Color(0.25, 0.0, 0.05, 0.26 * al))
+		under.draw_circle(c + Vector2(0.0, -260.0), 70.0, Color(0.85, 0.12, 0.2, 0.9 * al))
+		under.draw_circle(c + Vector2(-14.0, -272.0), 62.0, Color(1.0, 0.35, 0.4, 0.5 * al))

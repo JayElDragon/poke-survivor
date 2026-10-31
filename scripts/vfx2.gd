@@ -15,6 +15,7 @@ const META := {
 	"fist": [11, 11, 2, false, false], "hammer": [13, 13, 1, false, true], "feather": [9, 13, 1, false, false],
 	"plus": [9, 9, 2, false, false], "fang": [9, 13, 1, false, false], "slashx": [13, 13, 2, false, false],
 	"ember2": [9, 9, 2, false, false], "kick": [13, 13, 2, false, false], "lava": [11, 11, 2, false, false],
+	"chop": [13, 11, 1, false, false],
 }
 
 const MOVE := {

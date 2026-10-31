@@ -103,6 +103,8 @@ func trail(kind: String, pal: String, pos: Vector2, vel: Vector2) -> void:
 
 
 func ring(pos: Vector2, r0: float, r1: float, color: Color, life: float = 0.3, width: float = 3.0) -> void:
+	if rings.size() >= 40:
+		return   # tope: cada anillo son decenas de cuadritos
 	rings.append({"p": pos, "r0": r0, "r1": r1, "c": color, "life": life, "t": 0.0, "w": width})
 
 
@@ -120,7 +122,7 @@ func slash(pos: Vector2, angle: float, radius: float, arc: float, vis: Dictionar
 			sp("jaws", pal, m, {"life": 0.24, "scale": 1.5, "fr": 9.0, "fade": false})
 		"claw":
 			sp("claw", pal, m, {"life": 0.2, "scale": 1.5, "angle": angle - PI / 4.0})
-		"slashx", "kick", "fist", "hammer", "xmark", "pincer":
+		"slashx", "kick", "fist", "hammer", "xmark", "pincer", "chop":
 			sp(melee, pal, m, {"life": 0.26, "scale": 2.0, "fr": 10.0, "fade": true, "spin": 0.0})
 			for i in range(3):
 				sp(melee, pal, pos + Vector2.from_angle(angle + rnd(-arc / 2.0, arc / 2.0)) * radius * rnd(0.55, 1.0), {"life": 0.2, "scale": 1.0, "fr": 10.0})
@@ -196,7 +198,7 @@ func _draw() -> void:
 	for r in rings:
 		var k: float = float(r["t"]) / float(r["life"])
 		var rad: float = lerpf(float(r["r0"]), float(r["r1"]), k)
-		var n: int = maxi(10, int(ceil(rad * TAU / (PX * 2.0))))
+		var n: int = clampi(int(ceil(rad * TAU / (PX * 2.0))), 10, 72)   # anillos grandes: puntos mas separados, no cientos
 		var size: float = PX * 2.0 if float(r["w"]) >= 4.0 else PX
 		var pos: Vector2 = r["p"]
 		var col: Color = r["c"]

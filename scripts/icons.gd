@@ -292,12 +292,34 @@ static func _zcrystal_img(type: String) -> Image:
 
 # Textura ampliada por un factor entero (sin suavizar).
 static func tex(name: String, scale: int = 1) -> Texture2D:
+	if name.begins_with("type:"):
+		return _type_tex(name.substr(5), 16.0 * float(maxi(scale, 1)))
 	var key := "%s@%d" % [name, scale]
 	if cache.has(key):
 		return cache[key]
 	var img: Image = image(name)
 	if scale > 1:
 		img.resize(img.get_width() * scale, img.get_height() * scale, Image.INTERPOLATE_NEAREST)
+	var t := ImageTexture.create_from_image(img)
+	cache[key] = t
+	return t
+
+
+# Icono de tipo (assets/ui/types): arte suave, se reduce al tamano exacto en vez de ampliarse por enteros.
+static func _type_tex(ty: String, px: float) -> Texture2D:
+	var n: int = maxi(8, roundi(px))
+	var key := "type:%s#%d" % [ty, n]
+	if cache.has(key):
+		return cache[key]
+	var path := "res://assets/ui/types/%s.png" % ty
+	var img: Image
+	if ResourceLoader.exists(path):
+		img = (load(path) as Texture2D).get_image()
+		if img.is_compressed():
+			img.decompress()
+		img.resize(n, n, Image.INTERPOLATE_LANCZOS)
+	else:
+		img = _emblem(ty, "")
 	var t := ImageTexture.create_from_image(img)
 	cache[key] = t
 	return t
@@ -320,6 +342,9 @@ static func scale_for(name: String, size: float) -> int:
 
 # Dibuja el icono centrado en un rectangulo (para _draw de un CanvasItem).
 static func draw_in(ci: CanvasItem, name: String, center: Vector2, size: float, mod: Color = Color.WHITE) -> void:
+	if name.begins_with("type:"):
+		ci.draw_texture_rect(_type_tex(name.substr(5), size), Rect2((center - Vector2(size, size) * 0.5).round(), Vector2(size, size)), false, mod)
+		return
 	var sc: int = scale_for(name, size)
 	var t: Texture2D = tex(name, 1)
 	var sz := Vector2(t.get_width(), t.get_height()) * float(sc)
@@ -329,7 +354,7 @@ static func draw_in(ci: CanvasItem, name: String, center: Vector2, size: float, 
 # TextureRect listo para meter en un menu.
 static func rect(name: String, size: float) -> TextureRect:
 	var sc: int = scale_for(name, size)
-	var t: Texture2D = tex(name, sc)
+	var t: Texture2D = _type_tex(name.substr(5), size) if name.begins_with("type:") else tex(name, sc)
 	var tr := TextureRect.new()
 	tr.texture = t
 	tr.stretch_mode = TextureRect.STRETCH_KEEP
@@ -342,4 +367,6 @@ static func rect(name: String, size: float) -> TextureRect:
 
 # Icono para el campo "icon" de un Button (ya ampliado).
 static func btn_tex(name: String, size: float) -> Texture2D:
+	if name.begins_with("type:"):
+		return _type_tex(name.substr(5), size)
 	return tex(name, scale_for(name, size))

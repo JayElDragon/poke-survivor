@@ -27,6 +27,10 @@ const PAL := {
 	"normal": ["#3e3834", "#7a7068", "#c4bcb0", "#ece6dc", "#ffffff"],
 	"aura": ["#0c2460", "#1c4cb0", "#3a7cff", "#90d2ff", "#ffffff"],
 }
+# v5.8: tono de los ataques de un Pokemon shiny, por paleta
+const SHINY_HUE := {"fire": 0.60, "water": 0.85, "grass": 0.12, "electric": 0.50, "psychic": 0.40, "ice": 0.92, "fighting": 0.75, "poison": 0.28, "ground": 0.47, "flying": 0.95, "bug": 0.07, "rock": 0.78, "ghost": 0.43, "dragon": 0.98, "dark": 0.82, "steel": 0.13, "fairy": 0.50, "normal": 0.14, "aura": 0.85}
+static var shiny_on := false
+static var _sh_cache := {}
 const IDX := {"o": 0, "d": 1, "m": 2, "l": 3, "w": 4}
 
 # w, h, frames, dir, spin
@@ -58,24 +62,24 @@ const MOVE := {
 	"toxic": {"aura": "bubble", "rise": true}, "mud-shot": {"proj": "blob", "trail": "dirt"},
 	"bulldoze": {"aura": "rock", "rise": true},
 	"gust": {"proj": "wind"}, "wing-attack": {"melee": "feather"},
-	"tackle": {"melee": "impact"}, "body-slam": {"melee": "impact"},
-	"hyper-voice": {"proj": "note"}, "bug-bite": {"melee": "jaws"},
+	"tackle": {"melee": "impact"}, "body-slam": {"melee": "fist"},
+	"hyper-voice": {"proj": "note"}, "bug-bite": {"melee": "pincer"},
 	"string-shot": {"proj": "web"}, "bug-buzz": {"aura": "note"},
 	"rock-throw": {"proj": "rock", "trail": "dirt"}, "rock-slide": {"proj": "rock", "trail": "dirt"},
-	"ice-beam": {"beam": "shard"}, "powder-snow": {"aura": "star"},
-	"karate-chop": {"melee": "impact"},
+	"ice-beam": {"beam": "shard"}, "powder-snow": {"aura": "grain"},
+	"karate-chop": {"melee": "chop"},
 	"aura-sphere": {"proj": "ball", "pal": "aura", "trail": "spark"},
-	"lick": {"melee": "impact"},
+	"lick": {"melee": "blob"},
 	"shadow-ball": {"proj": "shadow", "trail": "wisp"},
 	"dragon-rage": {"beam": "fire"}, "dragon-dance": {"buff": "arrow"},
 	"fairy-wind": {"proj": "star"}, "dazzling-gleam": {"aura": "star"},
-	"metal-claw": {"melee": "claw"}, "flash-cannon": {"beam": "shard"}, "bite": {"melee": "jaws"},
+	"metal-claw": {"melee": "claw"}, "flash-cannon": {"beam": "cannon"}, "bite": {"melee": "jaws"},
 	"dark-pulse": {"proj": "crescent"}, "night-shade": {"aura": "shadow", "rise": true},
 	"swords-dance": {"buff": "arrow", "pal": "fighting"}, "agility": {"buff": "arrow", "pal": "flying"},
 	"harden": {"buff": "arrow", "pal": "steel"},
-	"bonemerang": {"proj": "crescent"}, "psycho-cut": {"proj": "crescent"},
-	"spikes": {"proj": "star"}, "toxic-spikes": {"proj": "star"}, "hail": {"proj": "shard"},
-	"meteor-mash": {"proj": "rock", "trail": "spark"}, "will-o-wisp": {"proj": "ball", "trail": "ember"},
+	"bonemerang": {"proj": "bone"}, "psycho-cut": {"proj": "crescent"},
+	"spikes": {"proj": "rockspike"}, "toxic-spikes": {"proj": "fang", "flip": true}, "hail": {"proj": "iceball"},
+	"meteor-mash": {"proj": "fist", "trail": "spark"}, "will-o-wisp": {"proj": "pyre", "pal": "ghost", "trail": "wisp"},
 	"substitute": {"proj": "star"}, "aerial-ace": {"proj": "wind"},
 	"flame-wheel": {"proj": "fire", "aura": "fire"}, "bubble-beam": {"proj": "bubble"},
 	"hex": {"beam": "shadow", "proj": "shadow"},
@@ -96,6 +100,30 @@ static func for_move(id: String, type: String) -> Dictionary:
 	var out: Dictionary = {"proj": String(TYPE_SHAPE.get(type, "ball")), "pal": type}
 	for k in v:
 		out[k] = v[k]
+	if shiny_on:
+		out["pal"] = "sh_" + String(out["pal"])
+	return out
+
+
+static func shiny_col(type: String, c: Color) -> Color:
+	return Color.from_hsv(float(SHINY_HUE.get(type, 0.14)), maxf(c.s, 0.6), maxf(c.v, 0.7), c.a)
+
+
+# Paleta por nombre; "sh_<paleta>" es su version shiny (mismo brillo, otro tono; el destello sigue claro).
+static func _colors(pal: String) -> Array:
+	if not pal.begins_with("sh_"):
+		return PAL.get(pal, PAL["normal"])
+	if _sh_cache.has(pal):
+		return _sh_cache[pal]
+	var base: String = pal.substr(3)
+	var out: Array = []
+	var src: Array = PAL.get(base, PAL["normal"])
+	for i in range(src.size()):
+		var c := Color.html(String(src[i]))
+		var sat: float = c.s if i == src.size() - 1 else maxf(c.s, 0.6)
+		var val: float = maxf(c.v, 0.2 * float(i + 1))
+		out.append("#" + Color.from_hsv(float(SHINY_HUE.get(base, 0.14)), sat, val).to_html(false))
+	_sh_cache[pal] = out
 	return out
 
 
@@ -445,7 +473,17 @@ static func _gen(shape: String, P: Grid, f: int) -> void:
 			P.outline()
 
 
+# v5.8: puno y palma dibujados como imagen (assets/fx), con mas detalle que las formas generadas.
+const ART_K := 0.25
+const ART := {"fist": "res://assets/fx/fist.png", "chop": "res://assets/fx/palm.png"}
+
+
 static func sprite(shape: String, pal: String, frame: int) -> Texture2D:
+	if ART.has(shape):
+		var ap: String = "res://assets/fx/fist_shadow.png" if shape == "fist" and pal.ends_with("ghost") else String(ART[shape])
+		if not cache.has(ap):
+			cache[ap] = ImageTexture.create_from_image((load(ap) as Texture2D).get_image())
+		return cache[ap]
 	if not META.has(shape) and not V2.META.has(shape):
 		shape = "ball"
 	var m: Array = V2.META[shape] if V2.META.has(shape) else META[shape]
@@ -459,7 +497,7 @@ static func sprite(shape: String, pal: String, frame: int) -> Texture2D:
 	else:
 		_gen(shape, P, f)
 	var img := Image.create(P.w, P.h, false, Image.FORMAT_RGBA8)
-	var colors: Array = PAL.get(pal, PAL["normal"])
+	var colors: Array = _colors(pal)
 	for y in range(P.h):
 		for x in range(P.w):
 			var ch: String = String(P.g[y][x])
@@ -480,7 +518,7 @@ static func sprite(shape: String, pal: String, frame: int) -> Texture2D:
 # Dibuja centrado en pos. angle=0 si no es direccional.
 static func draw(ci: CanvasItem, shape: String, pal: String, pos: Vector2, angle: float, scl: float, frame: int, alpha: float, snap_ang: bool = true) -> void:
 	var tex: Texture2D = sprite(shape, pal, frame)
-	var k: float = PX * scl
+	var k: float = PX * scl * (ART_K if ART.has(shape) else 1.0)
 	var a: float = angle
 	if a != 0.0 and snap_ang:
 		a = roundf(a / (PI / 8.0)) * (PI / 8.0)
@@ -490,5 +528,5 @@ static func draw(ci: CanvasItem, shape: String, pal: String, pos: Vector2, angle
 
 
 static func pc(pal: String, i: int) -> Color:
-	var cols: Array = PAL.get(pal, PAL["normal"])
+	var cols: Array = _colors(pal)
 	return Color.html(String(cols[i]))

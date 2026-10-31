@@ -28,6 +28,8 @@ const REGIONS := ["Kanto", "Johto", "Hoenn", "Sinnoh", "Teselia", "Kalos", "Alol
 const RARITY_W := [40.0, 30.0, 18.0, 9.0, 3.0]
 const RARITY_NAME := ["Común", "Poco común", "Raro", "Muy raro", "Legendario"]
 const SHINY_PULL := 0.01
+const SHINY_PULL_DONE := 0.05   # v5.8: con el banner completo
+const MISSING_MAX := 0.5        # v5.8: tope de probabilidad de redirigir una tirada a un Pokemon que falta
 const PULL_RATES := [45.0, 30.0, 17.0, 6.5, 1.5]
 const PITY_5 := 90   # v5.2: antes 70 (la proteccion de mala suerte era demasiado fuerte)
 const REFUND := [15, 30, 60, 120, 300]
@@ -88,7 +90,7 @@ static func default_data() -> Dictionary:
 		"v": 1, "created": int(Time.get_unix_time_from_system()), "title": "", "nick": "", "favs": [0, 0, 0], "coins": 600, "tickets": 10, "tickets10": 3, "pity": {}, "legends": {}, "arenas": {}, "lshiny": {}, "owned": {}, "selected": 25, "shiny_on": false,
 		"fusions": [], "upgrades": {}, "pup": {}, "claimed": {}, "pban": {}, "pbind": {}, "ptm": {}, "pz": {},
 		"stats": {"runs": 0, "kills": 0, "best_time": 0, "best_level": 1, "bosses": 0, "chests": 0, "pulls": 0, "shinies": 0, "total_time": 0, "coins_total": 0, "defeated_runs": 0, "rifts": 0},
-		"settings": {"master": 80, "music": 70, "sfx": 80, "dmg_numbers": true, "vibration": true, "shake": true, "stick": 1, "stick_fixed": false, "manual_aim": false, "lang": "en", "view": 100, "fov": 165, "pad": 0, "padmap": {}, "mute": false, "quality": 0, "fps": false, "stats_box": false, "adaptive": true, "mono_bonus": false, "fx_op": 1, "act_side": 0, "text_sz": 0},
+		"settings": {"master": 80, "music": 70, "sfx": 80, "dmg_numbers": true, "vibration": true, "shake": true, "stick": 1, "stick_fixed": false, "manual_aim": false, "lang": "en", "view": 100, "fov": 165, "pad": 0, "padmap": {}, "mute": false, "quality": 0, "perf": 0, "fps": false, "stats_box": false, "adaptive": true, "mono_bonus": false, "fx_op": 1, "act_side": 0, "text_sz": 0},
 	}
 
 
@@ -185,6 +187,11 @@ static func reset_all() -> void:
 	d = default_data()
 	last_run = {}
 	save()
+
+
+# Guardados antiguos solo tenian el interruptor "shake".
+static func shake_lv() -> int:
+	return clampi(int(d["settings"].get("shake_lv", 0 if bool(d["settings"]["shake"]) else 2)), 0, 2)
 
 
 static func setting(k: String):
@@ -487,6 +494,31 @@ static func _roll_rarity(minr: int = 1) -> int:
 	return 5
 
 
+static func _missing_of(region: int) -> Array:
+	var out: Array = []
+	for p in region_pool(region):
+		if not owns(int(p["dex"])):
+			out.append(p)
+	return out
+
+
+static func banner_done(region: int) -> bool:
+	return _missing_of(region).is_empty()
+
+
+static func shiny_rate(region: int) -> float:
+	return SHINY_PULL_DONE if banner_done(region) else SHINY_PULL
+
+
+# Sube con lo completado que este el banner: ~6% a la mitad, ~36% al 90%, casi 50% con el ultimo que falta.
+static func missing_chance(region: int) -> float:
+	var total: int = region_pool(region).size()
+	var miss: int = _missing_of(region).size()
+	if total <= 0 or miss == 0:
+		return 0.0
+	return MISSING_MAX * pow(float(total - miss) / float(total), 3.0)
+
+
 # n tiradas: x1 (1 ticket), x10 (10 tickets o 1 ticket x10). Devuelve [] si no hay tickets.
 const Z_CRYSTAL_P := 0.03   # probabilidad de cristal Z por tirada de 10
 const Z_CRYSTAL_P_PURPLE := 0.06   # con el ticket morado ×10 se dobla
@@ -523,12 +555,19 @@ static func pull(region: int, n: int = 1, use: String = "t1") -> Array:
 		else:
 			want = _roll_rarity()
 		var list: Array = _pool_near(want, region)
+		var sp: Dictionary = list[randi() % list.size()]
+		if randf() < missing_chance(region):
+			# Una tirada con rareza garantizada nunca baja de esa rareza
+			var floor_r: int = want if (want >= 4 and (int(d["pity"][key]) >= PITY_5 or i == n - 1)) else 1
+			var cand: Array = _missing_of(region).filter(func(p): return int(p["rarity"]) >= floor_r)
+			if not cand.is_empty():
+				sp = cand[randi() % cand.size()]
+				list = _pool_near(int(sp["rarity"]), region)
 		var rarity: int = int(list[0]["rarity"])
 		if rarity == 5:
 			d["pity"][key] = 0
-		var sp: Dictionary = list[randi() % list.size()]
 		var dex: int = int(sp["dex"])
-		var shiny: bool = randf() < SHINY_PULL and bool(smeta[str(dex)].get("sh", 0))
+		var shiny: bool = randf() < shiny_rate(region) and bool(smeta[str(dex)].get("sh", 0))
 		var shiny_owned: bool = owns(dex) and bool(d["owned"][str(dex)]["shiny"])
 		if shiny and shiny_owned:
 			var missing: Array = []

@@ -1,8 +1,9 @@
 extends RefCounted
 # S57.5-57.6: Kecleon, el comerciante. Seis variantes con catalogo propio de 6 objetos, una compra por visita,
-# un reroll por visita con precio global creciente, un solo Kecleon activo y separacion minima.
+# rerolls sin limite mientras haya monedas (el precio sube en cada visita y se reinicia en la siguiente), un solo Kecleon activo y separacion minima.
 # Los efectos se conectan a las funciones de estadisticas ya existentes en main.gd (no hay pipelines paralelos).
 
+const IC = preload("res://scripts/icons.gd")
 const REROLL := [50, 100, 175, 275, 400, 550]
 const VISIT_TIME := 75.0
 const MIN_SEP := 520.0
@@ -18,46 +19,60 @@ const VAR := {
 	"shiny": {"name": "Kecleon azul shiny", "col": "#7fe8ff", "tint": Color(0.8, 0.95, 1.25), "w": 0.0},
 }
 const ORDER := ["green", "blue", "purple", "red", "gold", "shiny"]
+const RECOLOR := {"blue": Color("#4f8cff"), "purple": Color("#a860ff"), "red": Color("#ff4a4a"), "gold": Color("#ffc81f")}
+const RECOLOR_SHADER := "shader_type canvas_item;\nuniform vec4 tint;\nuniform float shine = 0.0;\nvoid fragment() {\n\tvec4 c = texture(TEXTURE, UV);\n\tfloat l = dot(c.rgb, vec3(0.3, 0.59, 0.11));\n\tvec3 col = tint.rgb * (l * 1.5 + 0.08);\n\tcol = mix(col, vec3(1.0), smoothstep(0.7, 1.0, l) * 0.6);\n\tif (shine > 0.0) {\n\t\tfloat b = pow(0.5 + 0.5 * sin((UV.x + UV.y) * 70.0 - TIME * 4.0), 8.0);\n\t\tcol += vec3(1.0, 0.9, 0.5) * b * 0.55 * shine;\n\t}\n\tCOLOR = vec4(col, COLOR.a);\n}\n"
 
 # id: [nombre, precio, maximo, descripcion]
 const ITEMS := {
-	"fortune": ["Trébol", 120, 1, "+10% de suerte en cofres y premios normales. Nunca cambia las probabilidades fijas."],
-	"sprout": ["Brote Sanador", 100, 2, "Cada 15 derrotas, recuperas el 4% de tu vida máxima (por unidad)."],
-	"thornscarf": ["Bufanda de Espinas", 150, 1, "Al recibir daño, hieres a los enemigos pegados a ti. Recarga 4 s."],
-	"opener": ["Colmillo Inicial", 130, 1, "El primer golpe a cada enemigo normal hace +40% de daño."],
+	"fortune": ["Trébol", 120, 1, "Los cofres dan premios mejores con más frecuencia."],
+	"sprout": ["Brote Sanador", 100, 2, "Cada 15 enemigos derrotados recuperas un 4% de tu vida máxima. Cada copia suma otro 4%."],
+	"thornscarf": ["Bufanda de Espinas", 150, 1, "Cuando te golpean, dañas a los enemigos que tienes muy cerca. Se recarga en 4 s."],
+	"opener": ["Colmillo Inicial", 130, 1, "Tu primer golpe contra cada enemigo hace un 40% más de daño (no en jefes)."],
 	"canteen": ["Cantimplora", 120, 1, "Cada 45 s, recuperas el 12% de tu vida máxima."],
-	"afterimage": ["Imagen Residual", 280, 1, "Al recibir daño, ráfaga de velocidad (+35%, 2,5 s). Recarga 20 s."],
-	"ribbon": ["Cinta Evasiva", 140, 3, "+3% de esquivar un golpe por unidad."],
-	"gustback": ["Ráfaga de Retroceso", 170, 1, "Al recibir daño, empujas lejos a los enemigos cercanos. Recarga 8 s."],
-	"veil": ["Velo Espectral", 220, 1, "Cada 25 s, 1,2 s de invulnerabilidad."],
-	"tailwind": ["Viento de Cola", 180, 1, "Cada derrota te da 0,8 s de +25% de velocidad."],
-	"mystic": ["Orbe Místico", 160, 2, "+10% de daño de estados (veneno y quemadura) por unidad."],
-	"hexing": ["Campana Maldita", 120, 2, "+8% de duración de los estados negativos por unidad."],
+	"afterimage": ["Imagen Residual", 280, 1, "Cuando te golpean, corres un 35% más rápido durante 2,5 s. Se recarga en 20 s."],
+	"ribbon": ["Cinta Evasiva", 140, 3, "Un 3% de probabilidad de esquivar cada golpe. Cada copia suma otro 3%."],
+	"gustback": ["Ráfaga de Retroceso", 170, 1, "Cuando te golpean, empujas lejos a los enemigos cercanos (no a jefes). Se recarga en 8 s."],
+	"veil": ["Velo Espectral", 220, 1, "Cada 25 s eres invulnerable durante 1,2 s."],
+	"tailwind": ["Viento de Cola", 180, 1, "Al derrotar a un enemigo corres un 25% más rápido durante 0,8 s."],
+	"mystic": ["Orbe Místico", 160, 2, "El veneno y las quemaduras hacen un 10% más de daño. Cada copia suma otro 10%."],
+	"hexing": ["Campana Maldita", 120, 2, "Los estados que causas (sueño, parálisis, congelación…) duran un 8% más. Cada copia suma otro 8%."],
 	"echo": ["Eco Resonante", 140, 1, "Cada 12 s, tu siguiente golpe hace +20% de daño."],
-	"binding": ["Runa de Atadura", 200, 1, "15% de ralentizar a enemigos normales en cada golpe."],
-	"ember": ["Colmillo Brasa", 150, 2, "+8% de daño a enemigos con menos del 40% de vida por unidad."],
-	"berserk": ["Banda Rabiosa", 180, 1, "+10% de daño mientras tengas menos del 50% de vida."],
-	"shatter": ["Piedra Quebrantadora", 230, 2, "+10% de daño a élites y jefes por unidad."],
-	"executioner": ["Marca del Verdugo", 220, 1, "Los enemigos normales con menos del 10% de vida caen al instante."],
-	"drum": ["Tambor de Guerra", 280, 1, "10 derrotas en 6 s dan +15% de velocidad de ataque durante 6 s."],
-	"dragonfire": ["Núcleo Dragón", 320, 1, "Cada 25 golpes, una pequeña explosión extra."],
-	"royal": ["Botín Real", 200, 2, "10% de ganar +1 moneda por derrota, por unidad (máx. 300 por partida)."],
-	"tmap": ["Mapa del Tesoro", 240, 1, "+25% de cofres en zonas nuevas."],
-	"seal": ["Sello del Mercader", 150, 1, "-10% en objetos futuros de comerciantes (no en los cambios de ofertas)."],
-	"dice": ["Dados de la Suerte", 200, 1, "Tu próximo cofre da un premio de mayor calidad. Un solo uso."],
-	"crown": ["Corona de la Abundancia", 350, 1, "+160 monedas al derrotar a cada uno de tus 3 primeros jefes."],
-	"chrono": ["Reliquia Cronos", 320, 1, "Cada 40 s, ralentiza 5 s a los enemigos normales cercanos."],
-	"infinity": ["Fragmento Infinito", 450, 1, "Potencia tu mejora más alta (+15% de niveles, mínimo +1)."],
-	"mirror": ["Espejo Doble", 300, 1, "12% de que cada golpe se repita con el 60% de su daño."],
-	"starfall": ["Lluvia Estelar", 350, 1, "Cada 30 s, caen estrellas sobre los 5 enemigos más cercanos."],
+	"binding": ["Runa de Atadura", 200, 1, "Cada golpe tiene un 15% de probabilidad de frenar al enemigo 2 s (no a jefes)."],
+	"ember": ["Colmillo Brasa", 150, 2, "Un 8% más de daño a enemigos con menos del 40% de vida. Cada copia suma otro 8%."],
+	"berserk": ["Banda Rabiosa", 180, 1, "Un 10% más de daño mientras tengas menos de la mitad de tu vida."],
+	"shatter": ["Piedra Quebrantadora", 230, 2, "Un 10% más de daño a élites y jefes. Cada copia suma otro 10%."],
+	"executioner": ["Marca del Verdugo", 220, 1, "Los enemigos con menos del 10% de vida mueren al golpearlos (no los jefes)."],
+	"drum": ["Tambor de Guerra", 280, 1, "Si derrotas a 10 enemigos en 6 s, atacas un 15% más rápido durante 6 s."],
+	"dragonfire": ["Núcleo Dragón", 320, 1, "Cada 25 golpes se produce una pequeña explosión en tu objetivo."],
+	"royal": ["Botín Real", 200, 2, "Cada derrota tiene un 10% de probabilidad de darte 1 moneda extra. Cada copia suma otro 10% (máx. 300 monedas por partida)."],
+	"tmap": ["Mapa del Tesoro", 240, 1, "Aparecen un 25% más de cofres en las zonas que aún no has explorado."],
+	"seal": ["Sello del Mercader", 150, 1, "Los objetos de Kecleon te cuestan un 10% menos a partir de ahora (cambiar ofertas cuesta igual)."],
+	"dice": ["Dados de la Suerte", 200, 1, "Tu próximo cofre te da un objeto seguro. Un solo uso."],
+	"crown": ["Corona de la Abundancia", 350, 1, "Ganas 160 monedas al derrotar a cada uno de tus 3 primeros jefes."],
+	"chrono": ["Reliquia Cronos", 320, 1, "Cada 40 s frena durante 5 s a los enemigos cercanos (no a jefes)."],
+	"infinity": ["Fragmento Infinito", 450, 1, "Todo tu daño aumenta un 12%."],
+	"mirror": ["Espejo Doble", 300, 1, "Cada golpe tiene un 12% de probabilidad de golpear otra vez con el 60% del daño."],
+	"starfall": ["Lluvia Estelar", 350, 1, "Cada 30 s caen estrellas sobre los 5 enemigos más cercanos."],
+	"magnetite": ["Piedra Imán", 110, 2, "Un 20% más de radio para recoger objetos y experiencia. Cada copia suma otro 20%."],
+	"notebook": ["Cuaderno de Notas", 130, 2, "Un 8% más de experiencia. Cada copia suma otro 8%."],
+	"shellplate": ["Caparazón Ligero", 170, 2, "Recibes un 5% menos de daño. Cada copia suma otro 5%."],
+	"swiftboots": ["Botas Veloces", 190, 1, "Corres un 10% más rápido siempre."],
+	"expandlens": ["Lente Expansiva", 190, 2, "Tus proyectiles y áreas son un 10% más grandes. Cada copia suma otro 10%."],
+	"sandglass": ["Reloj de Arena", 210, 2, "Tus movimientos se recargan un 6% más rápido. Cada copia suma otro 6%."],
+	"warhorn": ["Cuerno de Caza", 240, 1, "Un 8% más de daño a enemigos con más del 70% de vida."],
+	"bloodstone": ["Piedra Sangre", 260, 1, "Cada 10 enemigos derrotados recuperas un 2% de tu vida máxima."],
+	"coinpurse": ["Bolsa de Monedas", 220, 1, "Cada jefe derrotado suelta 80 monedas extra."],
+	"luckycharm": ["Amuleto de la Suerte", 260, 1, "Los cofres dan premios todavía mejores. Se suma al Trébol."],
+	"aurora": ["Aura Boreal", 420, 1, "Cada 30 s recuperas un 15% de tu vida máxima y eres invulnerable durante 1 s."],
+	"comet": ["Cometa Errante", 400, 1, "Cada 20 s un cometa golpea con fuerza al enemigo más cercano."],
 }
 const CAT := {
-	"green": ["fortune", "sprout", "thornscarf", "opener", "canteen"],
-	"blue": ["afterimage", "ribbon", "gustback", "veil", "tailwind"],
-	"purple": ["mystic", "hexing", "echo", "binding"],
-	"red": ["ember", "executioner", "berserk", "shatter", "drum", "dragonfire"],
-	"gold": ["royal", "tmap", "seal", "dice", "crown"],
-	"shiny": ["chrono", "infinity", "mirror", "starfall"],
+	"green": ["fortune", "sprout", "thornscarf", "opener", "canteen", "magnetite", "notebook"],
+	"blue": ["afterimage", "ribbon", "gustback", "veil", "tailwind", "shellplate", "swiftboots"],
+	"purple": ["mystic", "hexing", "echo", "binding", "expandlens", "sandglass"],
+	"red": ["ember", "executioner", "berserk", "shatter", "drum", "dragonfire", "warhorn", "bloodstone"],
+	"gold": ["royal", "tmap", "seal", "dice", "crown", "coinpurse", "luckycharm"],
+	"shiny": ["chrono", "infinity", "mirror", "starfall", "aurora", "comet"],
 }
 
 var m = null
@@ -88,11 +103,13 @@ var gust_cd := 0.0
 var canteen_t := 45.0
 var veil_t := 25.0
 var star_t := 30.0
+var blood_n := 0
+var aurora_t := 30.0
+var comet_t := 20.0
 var crown_done := false
 var crown_n := 0
 var royal_got := 0
 var dice_ready := false
-var infinity_id := ""
 var _busy_hit := false
 # interfaz
 var ui = null
@@ -100,6 +117,9 @@ var ui_btns: Array = []
 var ui_info = null
 var ui_coins = null
 var ui_reroll = null
+var ui_cards: Array = []
+var ui_owned = null
+var ui_close = null
 
 
 func n(id: String) -> int:
@@ -121,22 +141,7 @@ func eligible(id: String) -> bool:
 			return not dice_ready
 		"crown":
 			return not crown_done
-		"infinity":
-			return _inf_target() != ""
 	return true
-
-
-func _inf_target() -> String:
-	var best := ""
-	var bl := 0
-	for sid in m.STAT_IDS:
-		if sid == "hp" or sid == "heal" or sid == "rgn":
-			continue
-		var lv: int = int(m.stat_lv.get(sid, 0))
-		if lv > bl and lv < int(m.STATS[sid]["max"]):
-			bl = lv
-			best = String(sid)
-	return best
 
 
 func price(id: String) -> int:
@@ -201,23 +206,22 @@ func _apply(id: String) -> void:
 	match id:
 		"dice":
 			dice_ready = true
-		"infinity":
-			var t: String = _inf_target()
-			infinity_id = t
-			if t != "":
-				var lv: int = int(m.stat_lv.get(t, 0))
-				var add: int = maxi(1, int(ceil(float(lv) * 0.15)))
-				m.stat_lv[t] = mini(int(m.STATS[t]["max"]), lv + add)
-			kc[id] = n(id) + 1
 		_:
 			kc[id] = n(id) + 1
 	m.Aud.sfx("shinyGet")
 	m.add_text(m.player.position + Vector2(0, -m.player.body_h - 20.0), m.L.t(String(ITEMS[id][0])), Color(VAR[variant]["col"]), 22)
 
 
+# Sin alternativas en el catalogo, cambiar ofertas costaria monedas y mostraria lo mismo.
+func can_reroll() -> bool:
+	return pool_of(variant).size() > offers.size()
+
+
 func try_reroll() -> String:
-	if bought or rerolled:
+	if bought:
 		return "ya"
+	if not can_reroll():
+		return "invalido"
 	var p: int = reroll_price()
 	if m.coins < p:
 		return "fondos"
@@ -234,7 +238,7 @@ func try_reroll() -> String:
 
 # ------------------------------------------------------------------ modificadores (se enchufan a main.gd)
 func dmg_mul(e) -> float:
-	var k := 1.0
+	var k := 1.0 + 0.12 * float(n("infinity"))
 	if e != null:
 		if e.hp < e.max_hp * 0.4:
 			k += 0.08 * float(n("ember"))
@@ -243,33 +247,35 @@ func dmg_mul(e) -> float:
 		if n("opener") > 0 and not e.boss and not e.has_meta("kop"):
 			e.set_meta("kop", true)
 			k += 0.4
+	if n("warhorn") > 0 and e != null and e.hp > e.max_hp * 0.7:
+		k += 0.08
 	if n("berserk") > 0 and m.player.hp < m.player.max_hp * 0.5:
 		k += 0.10
 	return k
 
 
 func spd_mul() -> float:
-	return 1.0 + (0.35 if after_t > 0.0 else 0.0) + (0.25 if tail_t > 0.0 else 0.0)
+	return 1.0 + (0.35 if after_t > 0.0 else 0.0) + (0.25 if tail_t > 0.0 else 0.0) + 0.10 * float(n("swiftboots"))
 
 
 func cd_mul() -> float:
-	return 1.0 / (1.0 + (0.15 if drum_t > 0.0 else 0.0))
+	return pow(0.94, float(n("sandglass"))) / (1.0 + (0.15 if drum_t > 0.0 else 0.0))
 
 
 func def_add() -> float:
-	return 0.0
+	return 0.05 * float(n("shellplate"))
 
 
 func xp_mul() -> float:
-	return 1.0
+	return 1.0 + 0.08 * float(n("notebook"))
 
 
 func mag_mul() -> float:
-	return 1.0
+	return 1.0 + 0.20 * float(n("magnetite"))
 
 
 func range_mul() -> float:
-	return 1.0
+	return 1.0 + 0.10 * float(n("expandlens"))
 
 
 func cc_dur() -> float:
@@ -281,7 +287,7 @@ func dot_mul() -> float:
 
 
 func luck() -> float:
-	return 0.10 if n("fortune") > 0 else 0.0
+	return (0.10 if n("fortune") > 0 else 0.0) + (0.10 if n("luckycharm") > 0 else 0.0)
 
 
 func map_mul() -> float:
@@ -347,6 +353,14 @@ func on_kill(e) -> void:
 		if sprout_n >= 15:
 			sprout_n = 0
 			_heal_pct(0.04 * float(n("sprout")))
+	if n("bloodstone") > 0:
+		blood_n += 1
+		if blood_n >= 10:
+			blood_n = 0
+			_heal_pct(0.02)
+	if n("coinpurse") > 0 and e.boss and not e.judge:
+		for i in range(8):
+			m._spawn_orb(e.position, "coin", 10.0)
 	if n("royal") > 0 and royal_got < 300 and randf() < 0.10 * float(n("royal")):
 		m.coins += 1
 		royal_got += 1
@@ -423,6 +437,20 @@ func tick(delta: float) -> void:
 			for o in near:
 				m._ring(o.position, 4.0, 60.0, Color("#ffe14a"), 0.4, 3.0)
 				m._damage_enemy(o, 80.0 + 8.0 * float(m.player.level), Color("#ffe14a"))
+	if n("aurora") > 0:
+		aurora_t -= delta
+		if aurora_t <= 0.0:
+			aurora_t = 30.0
+			_heal_pct(0.15)
+			m.player.invuln = maxf(m.player.invuln, 1.0)
+			m._ring(m.player.position, 6.0, 110.0, Color("#9fffe0"), 0.6, 4.0)
+	if n("comet") > 0:
+		comet_t -= delta
+		if comet_t <= 0.0:
+			comet_t = 20.0
+			for o in m._p_targets(1, 520.0):
+				m._ring(o.position, 4.0, 90.0, Color("#bfe8ff"), 0.5, 4.0)
+				m._damage_enemy(o, 150.0 + 15.0 * float(m.player.level), Color("#bfe8ff"))
 	after_t = maxf(0.0, after_t - delta)
 	after_cd = maxf(0.0, after_cd - delta)
 	drum_t = maxf(0.0, drum_t - delta)
@@ -470,6 +498,27 @@ class Merchant extends Node2D:
 		draw_circle(Vector2(6, -36), 3.0, Color.WHITE)
 		draw_circle(Vector2(-6, -36), 1.5, Color.BLACK)
 		draw_circle(Vector2(6, -36), 1.5, Color.BLACK)
+
+
+# Destellos alrededor del Kecleon dorado.
+class GoldSparks extends Node2D:
+	var t := 0.0
+
+	func _init() -> void:
+		z_index = 5
+
+	func _process(delta: float) -> void:
+		t += delta
+		queue_redraw()
+
+	func _draw() -> void:
+		for i in range(8):
+			var ph: float = fposmod(t * 0.7 + float(i) * 0.125, 1.0)
+			var a: float = float(i) * 2.4
+			var p := Vector2(cos(a) * (18.0 + 14.0 * sin(a * 3.0)), -24.0 + sin(a) * 26.0 - ph * 14.0)
+			var s: float = 7.0 * sin(ph * PI)
+			var c := Color(1.0, 0.95, 0.55, sin(ph * PI))
+			draw_colored_polygon(PackedVector2Array([p + Vector2(0, -s), p + Vector2(s * 0.22, -s * 0.22), p + Vector2(s, 0), p + Vector2(s * 0.22, s * 0.22), p + Vector2(0, s), p + Vector2(-s * 0.22, s * 0.22), p + Vector2(-s, 0), p + Vector2(-s * 0.22, -s * 0.22)]), c)
 
 
 func shiny_chance(t: float) -> float:
@@ -533,6 +582,7 @@ func spawn(pos_ok: Callable, force: String = "") -> bool:
 	offers = pick_offers(v)
 	bought = false
 	rerolled = false
+	reroll_n = 0
 	seen[v] = true
 	m.Aud.sfx("rift")
 	m._say(m.L.t("¡Ha llegado un %s!") % m.L.t(String(VAR[v]["name"])), 3.0)
@@ -546,9 +596,19 @@ func _attach_sprite(mer, v: String) -> void:
 		return
 	var a = m.Actor.new()
 	a.setup(352, m._sm(352), m.flash_shader, 1.0, v == "shiny")
-	a.modulate = VAR[v]["tint"]
 	mer.add_child(a)
 	mer.actor = a
+	# v6.1: cada rareza pinta el sprite entero de su color; el verde y el shiny usan su sprite normal
+	if RECOLOR.has(v):
+		var sh := Shader.new()
+		sh.code = RECOLOR_SHADER
+		var mat := ShaderMaterial.new()
+		mat.shader = sh
+		mat.set_shader_parameter("tint", RECOLOR[v])
+		mat.set_shader_parameter("shine", 1.0 if v == "gold" else 0.0)
+		a.sprite.material = mat
+	if v == "gold":
+		mer.add_child(GoldSparks.new())
 
 
 func depart() -> void:
@@ -561,6 +621,80 @@ func depart() -> void:
 
 
 # ------------------------------------------------------------------ interfaz de la tienda
+# v5.8: tienda segun el arte del puesto (assets/kecleon_shop): fondo y Kecleon pintados; cartas y botones los dibuja el juego.
+const STAGE := Vector2(1280.0, 720.0)
+const KIND_COL := {"dmg": "#e0434f", "def": "#3f8fe8", "heal": "#44b85a", "status": "#a05fe0", "gold": "#e8a820", "special": "#2fc0d8"}
+const KIND := {"fortune": "gold", "sprout": "heal", "thornscarf": "def", "opener": "dmg", "canteen": "heal",
+	"afterimage": "def", "ribbon": "def", "gustback": "def", "veil": "def", "tailwind": "def",
+	"mystic": "status", "hexing": "status", "echo": "dmg", "binding": "status",
+	"ember": "dmg", "berserk": "dmg", "shatter": "dmg", "executioner": "dmg", "drum": "dmg", "dragonfire": "dmg",
+	"royal": "gold", "tmap": "gold", "seal": "gold", "dice": "gold", "crown": "gold",
+	"chrono": "special", "infinity": "special", "mirror": "special", "starfall": "special"}
+
+
+# Lo que sobra a los lados en pantallas que no son 16:9: madera y toldo, a juego con el arte.
+class ShopBg extends Control:
+	var col := Color.WHITE
+
+	func _draw() -> void:
+		draw_rect(Rect2(Vector2.ZERO, size), Color("#24150e"))
+		var x := 0.0
+		var i := 0
+		while x < size.x:
+			draw_rect(Rect2(x, 0.0, 74.0, 34.0), Color("#a82a35") if i % 2 == 0 else Color("#e8c060"))
+			i += 1
+			x += 74.0
+
+
+# Adorno de la carta: esquinas y linea sobre el precio.
+class CardDeco extends Control:
+	var col := Color.WHITE
+
+	func _draw() -> void:
+		var c := Color(col.r, col.g, col.b, 0.55)
+		for q in [Vector2(14, 14), Vector2(size.x - 14, 14)]:
+			draw_colored_polygon(PackedVector2Array([q + Vector2(0, -6), q + Vector2(6, 0), q + Vector2(0, 6), q + Vector2(-6, 0)]), c)
+		draw_line(Vector2(14, size.y - 106), Vector2(size.x - 14, size.y - 106), Color(col.r, col.g, col.b, 0.35), 2.0)
+
+
+# Emblema de la carta: circulo del color de la categoria, icono del objeto y dos destellos dorados.
+class CardIcon extends Control:
+	var col := Color.WHITE
+	var icon := ""
+
+	func _draw() -> void:
+		var c: Vector2 = size * 0.5
+		draw_circle(c, 62.0, Color(col.r, col.g, col.b, 0.14))
+		draw_circle(c, 50.0, col.darkened(0.3))
+		draw_circle(c, 40.0, col.darkened(0.1))
+		draw_arc(c, 50.0, 0.0, TAU, 40, Color("#2a1020"), 4.0)
+		for sx in [-72.0, 72.0]:
+			var q: Vector2 = c + Vector2(sx, 0.0)
+			draw_colored_polygon(PackedVector2Array([q + Vector2(0, -13), q + Vector2(4, -4), q + Vector2(13, 0), q + Vector2(4, 4), q + Vector2(0, 13), q + Vector2(-4, 4), q + Vector2(-13, 0), q + Vector2(-4, -4)]), Color("#ffd86a"))
+		if icon != "":
+			IC.draw_in(self, icon, c, 72.0)
+
+
+# Iconos de los botones de abajo.
+class BtnGlyph extends Control:
+	var kind := "reroll"
+	var col := Color.WHITE
+
+	func _draw() -> void:
+		var c: Vector2 = size * 0.5
+		if kind == "reroll":
+			draw_arc(c, 16.0, 0.3, 2.7, 16, col, 5.0)
+			draw_arc(c, 16.0, 3.44, 5.84, 16, col, 5.0)
+			var a := c + Vector2.from_angle(0.3) * 16.0
+			var b := c + Vector2.from_angle(3.44) * 16.0
+			draw_colored_polygon(PackedVector2Array([a + Vector2(-9, -2), a + Vector2(9, -2), a + Vector2(0, -12)]), col)
+			draw_colored_polygon(PackedVector2Array([b + Vector2(-9, 2), b + Vector2(9, 2), b + Vector2(0, 12)]), col)
+		else:
+			draw_rect(Rect2(c + Vector2(-16, -18), Vector2(20, 36)), col, false, 4.0)
+			draw_line(c + Vector2(-4, 0), c + Vector2(14, 0), col, 5.0)
+			draw_colored_polygon(PackedVector2Array([c + Vector2(12, -9), c + Vector2(24, 0), c + Vector2(12, 9)]), col)
+
+
 func open_ui() -> void:
 	if ui != null or active == null:
 		return
@@ -569,104 +703,281 @@ func open_ui() -> void:
 	layer.layer = 70
 	m.add_child(layer)
 	ui = layer
-	var dim := ColorRect.new()
-	dim.color = Color(0.02, 0.04, 0.12, 0.62)
-	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
-	layer.add_child(dim)
-	var root := CenterContainer.new()
-	root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	var col := Color(String(VAR[variant]["col"]))
+	var bg := ShopBg.new()
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	layer.add_child(bg)
 	var kth := Theme.new()
 	kth.default_font_size = 20
 	load("res://scripts/pxfont.gd").apply(kth)   # misma fuente pixelada que el resto del juego
-	root.theme = kth
-	layer.add_child(root)
-	var panel := PanelContainer.new()
-	var sb := StyleBoxFlat.new()
-	var col := Color(String(VAR[variant]["col"]))
-	sb.bg_color = Color("#27489a")
-	sb.border_color = Color("#f4f8ff")
-	sb.set_border_width_all(3)
-	sb.set_corner_radius_all(14)
-	sb.set_content_margin_all(18)
-	sb.shadow_color = Color("#0b1838")
-	sb.shadow_size = 6
-	panel.add_theme_stylebox_override("panel", sb)
-	root.add_child(panel)
-	var vb := VBoxContainer.new()
-	vb.add_theme_constant_override("separation", 12)
-	panel.add_child(vb)
-	var title := Label.new()
-	title.text = m.L.t(String(VAR[variant]["name"]))
-	title.add_theme_font_size_override("font_size", 40)
-	title.add_theme_color_override("font_color", col)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vb.add_child(title)
-	ui_coins = Label.new()
-	ui_coins.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	ui_coins.add_theme_font_size_override("font_size", 22)
-	vb.add_child(ui_coins)
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 12)
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	vb.add_child(row)
+	var st := Control.new()
+	st.size = STAGE
+	st.theme = kth
+	layer.add_child(st)
+	# El escenario se centra y encoge si la vista es mas pequena que el arte
+	var fit := func():
+		var vs: Vector2 = st.get_viewport_rect().size
+		var k: float = minf(1.0, minf(vs.x / STAGE.x, vs.y / STAGE.y))
+		st.scale = Vector2(k, k)
+		st.position = (vs - STAGE * k) * 0.5
+	bg.resized.connect(fit)
+	fit.call()
+	var art := TextureRect.new()
+	art.texture = load("res://assets/kecleon_shop/bg.png")
+	art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	art.size = STAGE
+	art.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	st.add_child(art)
+	_build_keeper(st)
+	_build_bubble(st, col)
+	_build_coins(st)
 	ui_btns = []
+	ui_cards = []
 	for i in range(3):
-		var b := Button.new()
-		b.custom_minimum_size = Vector2(230, 190)
-		b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		b.add_theme_font_size_override("font_size", 20)
-		_style_btn(b, false)
-		b.pressed.connect(_on_buy.bind(i))
-		row.add_child(b)
-		ui_btns.append(b)
-	ui_info = Label.new()
-	ui_info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	ui_info.add_theme_font_size_override("font_size", 18)
-	vb.add_child(ui_info)
-	var row2 := HBoxContainer.new()
-	row2.add_theme_constant_override("separation", 16)
-	row2.alignment = BoxContainer.ALIGNMENT_CENTER
-	vb.add_child(row2)
+		_build_card(st, i)
+	ui_owned = Label.new()
+	ui_owned.position = Vector2(20.0, 640.0)
+	ui_owned.size = Vector2(350.0, 70.0)
+	ui_owned.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	ui_owned.add_theme_font_size_override("font_size", 16)
+	ui_owned.add_theme_color_override("font_color", Color("#fff2d0"))
+	ui_owned.add_theme_constant_override("outline_size", 5)
+	ui_owned.add_theme_color_override("font_outline_color", Color("#1a0f08"))
+	st.add_child(ui_owned)
 	ui_reroll = Button.new()
-	ui_reroll.custom_minimum_size = Vector2(250, 64)
-	ui_reroll.add_theme_font_size_override("font_size", 24)
+	ui_reroll.position = Vector2(390.0, 611.0)
+	ui_reroll.size = Vector2(469.0, 69.0)
+	ui_reroll.add_theme_font_size_override("font_size", 22)
 	_style_btn(ui_reroll, true)
 	ui_reroll.pressed.connect(_on_reroll)
-	row2.add_child(ui_reroll)
+	st.add_child(ui_reroll)
+	_add_glyph(ui_reroll, "reroll", Color("#3d2a00"))
 	var close := Button.new()
-	close.text = m.L.t("Cerrar")
-	close.custom_minimum_size = Vector2(200, 64)
+	close.text = m.L.t("Salir de la tienda")
+	close.position = Vector2(879.0, 611.0)
+	close.size = Vector2(352.0, 69.0)
 	close.add_theme_font_size_override("font_size", 24)
 	_style_btn(close, false)
 	close.pressed.connect(close_ui)
-	row2.add_child(close)
+	st.add_child(close)
+	_add_glyph(close, "leave", Color.WHITE)
+	ui_close = close
 	_refresh_ui()
-	if not ui_btns.is_empty():
-		(ui_btns[0] as Button).grab_focus()
+	_focus_first()
+
+
+# El Kecleon va pintado en el fondo (verde); las demas variantes tinen encima solo su piel.
+func _build_keeper(st: Control) -> void:
+	if variant == "green":
+		return
+	var skin := TextureRect.new()
+	skin.texture = load("res://assets/kecleon_shop/keeper.png")
+	skin.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	skin.size = STAGE
+	skin.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	skin.modulate = Color(String(VAR[variant]["col"]))
+	skin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	st.add_child(skin)
+
+
+func _add_glyph(b: Button, kind: String, col: Color) -> void:
+	var g := BtnGlyph.new()
+	g.kind = kind
+	g.col = col
+	g.position = Vector2(26.0, 14.0)
+	g.size = Vector2(40.0, 40.0)
+	g.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(g)
+
+
+func _build_bubble(st: Control, col: Color) -> void:
+	var pn := Panel.new()
+	pn.position = Vector2(390.0, 44.0)
+	pn.size = Vector2(690.0, 96.0)
+	pn.add_theme_stylebox_override("panel", _sbx(Color("#101a30"), Color("#f4f8ff"), 3))
+	st.add_child(pn)
+	var tail := Polygon2D.new()
+	tail.polygon = PackedVector2Array([Vector2(0, 66), Vector2(-26, 96), Vector2(0, 84)])
+	tail.color = Color("#f4f8ff")
+	pn.add_child(tail)
+	var tag := Label.new()
+	tag.text = m.L.t(String(VAR[variant]["name"]))
+	tag.position = Vector2(406.0, 22.0)
+	tag.add_theme_font_size_override("font_size", 22)
+	tag.add_theme_color_override("font_color", col)
+	tag.add_theme_constant_override("outline_size", 6)
+	tag.add_theme_color_override("font_outline_color", Color("#101a30"))
+	var tsb := StyleBoxFlat.new()
+	tsb.bg_color = Color("#101a30")
+	tsb.border_color = col
+	tsb.set_border_width_all(2)
+	tsb.set_corner_radius_all(6)
+	tsb.corner_detail = 2
+	tsb.content_margin_left = 12
+	tsb.content_margin_right = 12
+	tag.add_theme_stylebox_override("normal", tsb)
+	st.add_child(tag)
+	ui_info = Label.new()
+	ui_info.position = Vector2(16.0, 14.0)
+	ui_info.size = Vector2(658.0, 76.0)
+	ui_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	ui_info.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	ui_info.add_theme_font_size_override("font_size", 20)
+	pn.add_child(ui_info)
+
+
+func _build_coins(st: Control) -> void:
+	var pn := Panel.new()
+	pn.position = Vector2(1096.0, 44.0)
+	pn.size = Vector2(150.0, 56.0)
+	pn.add_theme_stylebox_override("panel", _sbx(Color("#101a30"), Color("#e8c060"), 3))
+	st.add_child(pn)
+	var ic := IC.rect("coin", 30)
+	ic.position = Vector2(10.0, 13.0)
+	pn.add_child(ic)
+	ui_coins = Label.new()
+	ui_coins.position = Vector2(44.0, 0.0)
+	ui_coins.size = Vector2(98.0, 56.0)
+	ui_coins.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	ui_coins.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	ui_coins.add_theme_font_size_override("font_size", 24)
+	pn.add_child(ui_coins)
+
+
+func _build_card(st: Control, i: int) -> void:
+	var b := Button.new()
+	b.position = Vector2(390.0 + float(i) * 288.0, 157.0)
+	b.size = Vector2(276.0, 440.0)
+	b.pressed.connect(_on_buy.bind(i))
+	st.add_child(b)
+	ui_btns.append(b)
+	var deco := CardDeco.new()
+	deco.set_anchors_preset(Control.PRESET_FULL_RECT)
+	deco.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(deco)
+	var cv := VBoxContainer.new()
+	cv.position = Vector2(12.0, 8.0)
+	cv.size = Vector2(252.0, 424.0)
+	cv.add_theme_constant_override("separation", 6)
+	cv.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(cv)
+	var icon := CardIcon.new()
+	icon.custom_minimum_size = Vector2(0.0, 124.0)
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cv.add_child(icon)
+	var lname := _card_label(22, Color.WHITE)
+	lname.custom_minimum_size = Vector2(0.0, 50.0)
+	lname.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	cv.add_child(lname)
+	var ldesc := _card_label(18, Color.WHITE)
+	ldesc.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	ldesc.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	cv.add_child(ldesc)
+	var lcopies := _card_label(15, Color("#c8d6ee"))
+	cv.add_child(lcopies)
+	var pr := HBoxContainer.new()
+	pr.alignment = BoxContainer.ALIGNMENT_CENTER
+	pr.add_theme_constant_override("separation", 8)
+	pr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var pic := IC.rect("coin", 26)
+	pic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pr.add_child(pic)
+	var lprice := Label.new()
+	lprice.add_theme_font_size_override("font_size", 26)
+	pr.add_child(lprice)
+	cv.add_child(pr)
+	var lbuy := _card_label(22, Color.WHITE)
+	lbuy.custom_minimum_size = Vector2(0.0, 48.0)
+	lbuy.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	cv.add_child(lbuy)
+	ui_cards.append({"box": cv, "deco": deco, "icon": icon, "name": lname, "desc": ldesc, "copies": lcopies, "price": lprice, "buy": lbuy})
+
+
+func _style_card(b: Button, c: Color) -> void:
+	b.add_theme_stylebox_override("normal", _sbx(Color("#101a30"), c, 4))
+	b.add_theme_stylebox_override("hover", _sbx(c.darkened(0.62), c.lightened(0.25), 5))
+	b.add_theme_stylebox_override("pressed", _sbx(c.darkened(0.72), c, 5))
+	b.add_theme_stylebox_override("focus", _sbx(c.darkened(0.62), Color("#ffc23f"), 6))
+	b.add_theme_stylebox_override("disabled", _sbx(Color("#141a28"), c.darkened(0.55), 4))
+
+
+# El primer objeto que se pueda pagar; si no hay ninguno, Salir (el mando no se queda sin foco).
+func _focus_first() -> void:
+	for b in ui_btns:
+		if (b as Button).visible and not (b as Button).disabled:
+			(b as Button).grab_focus()
+			return
+	if ui_close != null:
+		ui_close.grab_focus()
+
+
+func _band(l: Label, c: Color) -> void:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = c
+	sb.set_corner_radius_all(6)
+	sb.corner_detail = 2
+	sb.content_margin_left = 6
+	sb.content_margin_right = 6
+	l.add_theme_stylebox_override("normal", sb)
+
+
+func _card_label(sz: int, col: Color) -> Label:
+	var l := Label.new()
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	l.add_theme_font_size_override("font_size", sz)
+	l.add_theme_color_override("font_color", col)
+	return l
 
 
 func _refresh_ui() -> void:
 	if ui == null:
 		return
-	ui_coins.text = "%s: %d" % [m.L.t("Monedas"), m.coins]
+	ui_coins.text = str(m.coins)
 	for i in range(3):
 		var b: Button = ui_btns[i]
 		if i < offers.size():
 			var id: String = String(offers[i])
 			var it: Array = ITEMS[id]
+			var p: int = price(id)
+			var c := Color(String(KIND_COL[KIND[id]]))
+			var ls: Dictionary = ui_cards[i]
 			b.visible = true
-			b.text = "%s\n\n%s\n\n%d  (%d/%d)" % [m.L.t(String(it[0])), m.L.t(String(it[3])), price(id), n(id), int(it[2])]
-			b.disabled = bought or m.coins < price(id)
+			_style_card(b, c)
+			ls["deco"].col = c
+			ls["deco"].queue_redraw()
+			ls["icon"].col = c
+			ls["icon"].icon = "kec:" + id
+			ls["icon"].queue_redraw()
+			ls["name"].text = m.L.t(String(it[0]))
+			_band(ls["name"], c.darkened(0.25))
+			ls["desc"].text = m.L.t(String(it[3]))
+			ls["copies"].text = m.L.t("Copias: %d de %d") % [n(id), int(it[2])] if int(it[2]) > 1 else ""
+			ls["price"].text = str(p)
+			b.disabled = bought or m.coins < p
+			ls["box"].modulate = Color(0.65, 0.65, 0.7) if b.disabled else Color.WHITE
+			_band(ls["buy"], Color("#3a4560") if b.disabled else c)
+			if bought:
+				ls["buy"].text = ""
+			elif m.coins < p:
+				ls["buy"].text = m.L.t("Te faltan %d") % (p - m.coins)
+			else:
+				ls["buy"].text = m.L.t("Comprar")
 		else:
 			b.visible = false
-	ui_reroll.text = "%s  (%d)" % [m.L.t("Cambiar ofertas"), reroll_price()]
-	ui_reroll.disabled = bought or rerolled or m.coins < reroll_price()
+	var have: Array = []
+	for id in kc:
+		if n(String(id)) > 0:
+			have.append(m.L.t(String(ITEMS[id][0])) + (" x%d" % n(String(id)) if n(String(id)) > 1 else ""))
+	ui_owned.text = (m.L.t("Ya tienes: ") + ", ".join(have)) if not have.is_empty() else ""
+	ui_reroll.text = m.L.t("Cambiar ofertas (%d monedas)") % reroll_price()
+	ui_reroll.disabled = bought or not can_reroll() or m.coins < reroll_price()
 	if bought:
 		ui_info.text = m.L.t("¡Gracias por tu compra!")
 	elif rerolled:
-		ui_info.text = m.L.t("Solo una recarga por visita")
+		ui_info.text = m.L.t("¡Ofertas nuevas! Puedes seguir cambiándolas mientras tengas monedas. Al comprar, me marcho.")
 	else:
-		ui_info.text = m.L.t("Solo puedes comprar un objeto por visita")
+		ui_info.text = m.L.t("¡Echa un vistazo! Puedes comprar una mejora permanente para esta partida y cambiar las ofertas mientras tengas monedas. Al comprar, me marcho.")
 
 
 func _on_buy(i: int) -> void:
@@ -686,8 +997,7 @@ func _on_reroll() -> void:
 	if r == "":
 		m.Aud.sfx("coin")
 	_refresh_ui()
-	if not ui_btns.is_empty() and (ui_btns[0] as Button).visible:
-		(ui_btns[0] as Button).grab_focus()
+	_focus_first()
 
 
 static func _sbx(bg: Color, border: Color, bw: int) -> StyleBoxFlat:
@@ -695,13 +1005,14 @@ static func _sbx(bg: Color, border: Color, bw: int) -> StyleBoxFlat:
 	s.bg_color = bg
 	s.border_color = border
 	s.set_border_width_all(bw)
-	s.set_corner_radius_all(12)
+	s.set_corner_radius_all(8)
+	s.corner_detail = 2   # esquinas escalonadas, como pixel art
 	s.content_margin_left = 14
 	s.content_margin_right = 14
 	s.content_margin_top = 8
 	s.content_margin_bottom = 8
 	s.shadow_color = Color("#0b1838")
-	s.shadow_size = 3
+	s.shadow_size = 0
 	return s
 
 

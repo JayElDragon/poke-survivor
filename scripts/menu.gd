@@ -75,6 +75,9 @@ var support_top: Button
 var support_focus: Button
 var news_box: VBoxContainer
 var news_scroll: ScrollContainer
+var news_list: VBoxContainer
+var news_btns: Array = []
+var news_sel := 0
 
 # estado de pantallas
 var dex_gen := 0
@@ -111,7 +114,7 @@ var tm_open := false
 var main_prev: Preview
 var main_card: PanelContainer
 var main_info: Label
-var main_stats: Label
+var main_stats: VBoxContainer
 var test_box: VBoxContainer
 var test_idx := 0
 var test_scores := {}
@@ -127,6 +130,7 @@ class Preview extends Control:
 	var dex := 25
 	var shiny := false
 	var scale_k := 5.0
+	var fit_k := 0.92     # cuanto puede ocupar el fotograma respecto al cuadro (trae margen transparente)
 	var dark := false
 	var t := 0.0
 	var frame := 0
@@ -191,7 +195,7 @@ class Preview extends Control:
 		var h: float = float(info["h"])
 		var k: float = scale_k
 		# ajusta para que no se salga del cuadro
-		k = minf(k, minf(size.x / w, size.y / h) * 0.92)
+		k = minf(k, minf(size.x / w, size.y / h) * fit_k)
 		var pos := Vector2(size.x * 0.5 - float(info["ax"]) * k, size.y * 0.5 + h * k * 0.5 - (h - float(info["ay"])) * k * 0.0 - float(info["ay"]) * k + (float(info["ay"]) * k) * 0.0)
 		pos = Vector2(size.x * 0.5 - float(info["ax"]) * k, size.y * 0.84 - float(info["ay"]) * k)
 		draw_set_transform(Vector2(size.x * 0.5, size.y * 0.84), 0.0, Vector2(1.0, 0.35))
@@ -670,13 +674,13 @@ class Portrait extends Control:
 	func _init() -> void:
 		clip_contents = true
 
-	func setup(d: int, col: Color) -> void:
+	func setup(d: int, col: Color, k: float = 3.0) -> void:
 		edge = col
 		if mon != null:
 			mon.queue_free()
 		mon = Mon.new()
 		add_child(mon)
-		mon.setup(d, 3.0, false, Rect2(60.0, 120.0, 80.0, 24.0), false)
+		mon.setup(d, k, false, Rect2(60.0, 120.0, 80.0, 24.0), false)
 		mon.dir = 0
 		mon.ysort = true   # sin z_index propio: nunca queda por encima de menus y resultados
 		_layout()
@@ -710,7 +714,7 @@ class Pips extends Control:
 
 	func _draw() -> void:
 		for i in range(mx):
-			draw_rect(Rect2(float(i) * 18.0, 1.0, 14.0, 8.0), Color("#ffd23f") if i < lv else Color("#0e1a40"))
+			draw_rect(Rect2(float(i) * 18.0, 1.0, 14.0, 8.0), Color("#ffd23f") if i < lv else Color("#46558a"))
 
 
 # ---------------------------------------------------------------
@@ -834,7 +838,7 @@ func _ready() -> void:
 	credit_box.custom_minimum_size = Vector2(118, 0)
 	credit_box.add_child(credit_lbl)
 	var ver_lbl := Label.new()
-	ver_lbl.text = L.t("Versión") + " " + UPD.APP_VERSION + " · " + L.t("Hotfix y mejoras QoL")
+	ver_lbl.text = L.t("Versión") + " " + UPD.APP_VERSION
 	ver_lbl.add_theme_font_size_override("font_size", 16)
 	ver_lbl.add_theme_color_override("font_color", Color("#c8d6ee"))
 	ver_lbl.add_theme_color_override("font_outline_color", Color.BLACK)
@@ -978,7 +982,7 @@ func _gap(w: float) -> Control:
 # Capsula oscura con borde claro (pildora de la barra superior del original).
 func _pill() -> PanelContainer:
 	var pc := PanelContainer.new()
-	var sbx := _sb(Color("#0d1b3d"), Color("#f4f8ff"), 2, 24)
+	var sbx := _sb(Color("#0f2268"), Color("#b5cdfb"), 3, 24)
 	sbx.content_margin_left = 16
 	sbx.content_margin_right = 16
 	sbx.content_margin_top = 6
@@ -1015,9 +1019,9 @@ func _icon_btn(icon: String, cb: Callable) -> Button:
 	b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	b.expand_icon = false
 	b.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	b.add_theme_stylebox_override("normal", _sb(Color(0.05, 0.1, 0.22, 0.55), Color(1, 1, 1, 0.45), 2, 12))
-	b.add_theme_stylebox_override("hover", _sb(Color(0.12, 0.2, 0.4, 0.8), Color.WHITE, 2, 12))
-	b.add_theme_stylebox_override("pressed", _sb(Color(0.02, 0.05, 0.12, 0.9), Color.WHITE, 2, 12))
+	b.add_theme_stylebox_override("normal", _sb(Color("#0f2268"), Color("#b5cdfb"), 3, 14))
+	b.add_theme_stylebox_override("hover", _sb(Color("#1c3e94"), Color.WHITE, 3, 14))
+	b.add_theme_stylebox_override("pressed", _sb(Color("#0b1a55"), Color.WHITE, 3, 14))
 	b.add_theme_stylebox_override("focus", _sb(Color(0.12, 0.2, 0.4, 0.8), C_GOLD, 3, 12))
 	b.pressed.connect(func():
 		Aud.sfx("click")
@@ -1274,7 +1278,7 @@ func _modes_to_top() -> void:
 		await get_tree().process_frame
 		if cur != "modes" or modes_box == null or not is_instance_valid(modes_box):
 			return
-		var msc: Node = modes_box.get_parent()
+		var msc: Node = modes_box.get_parent().get_parent()
 		if msc is ScrollContainer and modes_sel == String(MODE_LIST[0][0]):
 			(msc as ScrollContainer).scroll_vertical = 0
 
@@ -1652,8 +1656,7 @@ func _input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		call_deferred("_follow_focus")
 		return
-	if cur == "news" and news_scroll != null and (event.is_action_pressed("ui_down", true) or event.is_action_pressed("ui_up", true)):
-		news_scroll.scroll_vertical += 130 if event.is_action_pressed("ui_down", true) else -130
+	if cur == "news" and news_scroll != null and _news_nav(event):
 		get_viewport().set_input_as_handled()
 		return
 	if (cur == "lexicon" or cur == "goals") and (event.is_action_pressed("ui_down", true) or event.is_action_pressed("ui_up", true)) and screens.has(cur):
@@ -1809,6 +1812,32 @@ func _in_any_screen(c: Control) -> bool:
 func _grid_nav(event: InputEvent) -> bool:
 	if _popup_open() or listening != "":
 		return false
+	# Pokemon: ir a la izquierda desde el borde de la rejilla lleva al boton Elegir (companero) del panel izquierdo.
+	if cur == "dex" and event.is_action_pressed("ui_left") and dex_detail != null and dex_foot != null:
+		var df: Control = get_viewport().gui_get_focus_owner()
+		if df != null and not dex_detail.is_ancestor_of(df) and not dex_foot.is_ancestor_of(df) and df.get_global_rect().position.x > 500.0:
+			var cy: float = df.get_global_rect().get_center().y
+			var cx: float = df.get_global_rect().get_center().x
+			var at_left := true
+			for it in _grid_items():
+				var ic := it as Control
+				if ic == df or ic.get_global_rect().position.x <= 500.0:
+					continue
+				var ir: Rect2 = ic.get_global_rect()
+				if absf(ir.get_center().y - cy) <= 10.0 and ir.get_center().x < cx - 4.0:
+					at_left = false
+					break
+			if at_left:
+				var tgt: Control = null
+				for root in [dex_foot, dex_detail]:
+					for c in NAVG.focusables(root):
+						tgt = c
+						break
+					if tgt != null:
+						break
+				if tgt != null:
+					tgt.grab_focus()
+					return true
 	# v5.2.1: ciclando modos con arriba/abajo solo cuentan los modos. Antes los botones del panel derecho
 	# (elegir companero, cambiar tipo, Jugar...) formaban filas intermedias y el cursor saltaba a los modificadores.
 	var gf: Control = get_viewport().gui_get_focus_owner()
@@ -1865,67 +1894,161 @@ func _type_text(dex: int) -> String:
 # ---------------------------------------------------------------
 func _build_main() -> void:
 	var s: Control = _screen("main")
+	s.add_theme_constant_override("margin_top", 58 + int(DSP.insets(get_tree()).y))
 	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 14)
 	s.add_child(row)
+	var orn := SetArt.new(true)
+	orn.lift = -6.0
+	orn.corners = true
+	s.add_child(orn)
 	# columna izquierda: titulo + Pokemon
 	var left := VBoxContainer.new()
 	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	left.alignment = BoxContainer.ALIGNMENT_CENTER
+	left.add_theme_constant_override("separation", 4)
 	row.add_child(left)
-	var title := _label("Pokémon Survivors", 56, C_GOLD)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_color_override("font_outline_color", Color("#7a3d00"))
-	title.add_theme_constant_override("outline_size", 12)
-	left.add_child(title)
-	var sub := _label("MYSTERY DUNGEON", 22, Color.WHITE)
-	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	left.add_child(sub)
+	var logo := TextureRect.new()
+	logo.texture = load("res://assets/ui/logo.png")
+	logo.custom_minimum_size = Vector2(0, 232)
+	logo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	logo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	logo.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR   # es arte suave, no pixel art
+	logo.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	left.add_child(logo)
 	# S58.5: frase aleatoria y amable (se elige una sola vez al construir el menu)
 	var tags: Array = ["¡Ahora con más hierba que cortar!", "Cuidado: Meowth podría robarte el almuerzo.", "Hoy es un buen día para evolucionar.", "Recomendado por 9 de cada 10 Pikachu.", "¡Sobrevive un minuto más!", "No alimentes a los Snorlax salvajes.", "Kecleon acepta monedas, no cumplidos.", "Las Poké Balls no incluyen puntería.", "Un Charmander nunca duerme: solo parpadea.", "Cada Pokémon es un poco brillante por dentro."]
-	var tg := _label(L.t(String(tags[randi() % tags.size()])), 18, Color("#9fd0ff"))
+	var tg := _label(L.t(String(tags[randi() % tags.size()])), 18, Color.WHITE)
 	tg.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	tg.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	tg.add_theme_color_override("font_outline_color", Color("#0b1a55"))
+	tg.add_theme_constant_override("outline_size", 6)
 	left.add_child(tg)
 	var card := PanelContainer.new()
-	card.add_theme_stylebox_override("panel", _sb(Color("#0f1a34"), Color("#ff9a4d"), 4, 10))
-	card.custom_minimum_size = Vector2(360, 260)
+	var cds := _sb(Color("#0f1f60"), Color("#f6c433"), 4, 18)
+	cds.content_margin_top = 4
+	cds.content_margin_bottom = 4
+	card.add_theme_stylebox_override("panel", cds)
+	card.custom_minimum_size = Vector2(420, 206)
 	card.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	left.add_child(card)
+	card.add_child(MainStage.new())
 	main_card = card
-	main_info = _label("", 26)
+	var ipl := PanelContainer.new()
+	ipl.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	ipl.custom_minimum_size = Vector2(420, 0)
+	var ips := _sb(Color("#0f2268"), Color("#b5cdfb"), 3, 24)
+	ips.content_margin_top = 3
+	ips.content_margin_bottom = 3
+	ipl.add_theme_stylebox_override("panel", ips)
+	left.add_child(ipl)
+	var iph := HBoxContainer.new()
+	iph.add_theme_constant_override("separation", 10)
+	ipl.add_child(iph)
+	iph.add_child(IC.rect("ball", 34))
+	main_info = _label("", 24)
+	main_info.autowrap_mode = TextServer.AUTOWRAP_OFF
 	main_info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	left.add_child(main_info)
+	main_info.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	main_info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	iph.add_child(main_info)
+	main_type = HBoxContainer.new()
+	main_type.add_theme_constant_override("separation", 4)
+	iph.add_child(main_type)
+	main_title = PanelContainer.new()
+	main_title.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	var tts := _sb(Color("#0b1a55"), Color("#f6c433"), 2, 6)
+	tts.content_margin_top = 1
+	tts.content_margin_bottom = 1
+	tts.content_margin_left = 24
+	tts.content_margin_right = 24
+	main_title.add_theme_stylebox_override("panel", tts)
+	left.add_child(main_title)
+	var ttl := _label("", 20, Color("#ffd23f"))
+	ttl.autowrap_mode = TextServer.AUTOWRAP_OFF
+	main_title.add_child(ttl)
 	# columna derecha: menu
 	var right := VBoxContainer.new()
-	right.custom_minimum_size = Vector2(380, 0)
+	right.custom_minimum_size = Vector2(390, 0)
+	right.add_theme_constant_override("separation", 8)
 	row.add_child(right)
 	var p := PanelContainer.new()
+	p.theme = _set_theme()
+	var pfs := _sb(Color("#17307f"), SET_LINE, 4, 18)
+	pfs.content_margin_left = 10
+	pfs.content_margin_right = 10
+	pfs.content_margin_top = 10
+	pfs.content_margin_bottom = 10
+	p.add_theme_stylebox_override("panel", pfs)
 	right.add_child(p)
 	var mv := VBoxContainer.new()
+	mv.add_theme_constant_override("separation", 6)
 	p.add_child(mv)
 	var entries := [["Jugar", "play", "flag"], ["Pokémon", "dex", "ball"], ["Mejoras", "up", "up"], ["Gacha", "gacha", "ballLux"], ["TM Gachapon", "gachapon", "gcoin"], ["Misiones y logros", "goals", "trophy"], ["Léxico", "lexicon", "book"], ["Ajustes", "settings", "gear"]]
 	var first := true
 	for e in entries:
 		var key: String = String(e[1])
-		var b := _btn(String(e[0]), func(): _menu_pick(key), Vector2(0, 52))
+		var b := _btn(String(e[0]), func(): _menu_pick(key), Vector2(0, 50))
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		b.icon = IC.btn_tex(String(e[2]), 36)
 		b.add_theme_constant_override("icon_max_width", 40)
 		b.add_theme_constant_override("h_separation", 14)
 		b.add_theme_font_size_override("font_size", 24)
+		var bst := SetGlyph.new("stripes_dim", 34.0)
+		bst.set_anchors_preset(Control.PRESET_CENTER_RIGHT)
+		bst.offset_left = -50.0
+		bst.offset_right = -16.0
+		bst.offset_top = -17.0
+		bst.offset_bottom = 17.0
+		b.add_child(bst)
 		mv.add_child(b)
 		if first:
 			first = false
 			main_play_btn = b
+			_set_btn(b, "gold")
 		main_btns[key] = b
 		if key == "goals":
 			goals_btn = b
-	main_stats = _label("", 16, Color("#c8d6ee"))
-	main_stats.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	main_stats.custom_minimum_size = Vector2(340, 0)
+			b.add_theme_font_size_override("font_size", 20)   # el nombre largo no pisa las franjas
+	main_stats = VBoxContainer.new()
+	main_stats.add_theme_constant_override("separation", 2)
 	var sp2 := PanelContainer.new()
+	var sps := _sb(Color("#17307f"), SET_LINE, 4, 16)
+	sps.content_margin_top = 6
+	sps.content_margin_bottom = 6
+	sp2.add_theme_stylebox_override("panel", sps)
 	right.add_child(sp2)
 	sp2.add_child(main_stats)
+
+
+# Fondo del Pokemon en la portada: Poke Ball tenue y plataforma iluminada.
+class MainStage extends Control:
+	func _init() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		resized.connect(queue_redraw)
+
+	func _ellipse(c: Vector2, rx: float, ry: float, col: Color) -> void:
+		var pts := PackedVector2Array()
+		for i in range(32):
+			var a: float = TAU * float(i) / 32.0
+			pts.append(c + Vector2(cos(a) * rx, sin(a) * ry))
+		draw_colored_polygon(pts, col)
+
+	func _draw() -> void:
+		var c: Vector2 = size * 0.5
+		var wc := Color(0.4, 0.55, 1.0, 0.16)
+		var r: float = size.y * 0.42
+		draw_arc(c, r * 0.8, 0.0, TAU, 48, wc, r * 0.38)
+		draw_line(c - Vector2(r, 0.0), c - Vector2(r * 0.34, 0.0), wc, r * 0.16)
+		draw_line(c + Vector2(r * 0.34, 0.0), c + Vector2(r, 0.0), wc, r * 0.16)
+		draw_circle(c, r * 0.16, wc)
+		var f := Vector2(c.x, size.y * 0.84)
+		_ellipse(f, size.x * 0.34, size.y * 0.1, Color(0.2, 0.45, 1.0, 0.35))
+		_ellipse(f, size.x * 0.24, size.y * 0.065, Color(0.35, 0.65, 1.0, 0.5))
+
+
+var main_type: HBoxContainer
+var main_title: PanelContainer
 var main_play_btn: Button
 var main_btns: Dictionary = {}
 var last_pick := "play"
@@ -1949,6 +2072,8 @@ func _menu_pick(key: String) -> void:
 # La vista previa es una ilustracion animada (no ejecuta la partida: no gasta recursos ni toca ningun reloj).
 var modes_box: VBoxContainer
 var mp_title: Label
+var mp_icon: TextureRect
+var mp_play_ic: Control
 var mp_rules: VBoxContainer
 var mp_prev: Control
 var mp_opts_sc: ScrollContainer
@@ -2325,57 +2450,134 @@ class ModePrev extends Control:
 
 func _build_modes() -> void:
 	var s: Control = _screen("modes")
+	var ins: Vector4 = DSP.insets(get_tree())
+	s.add_theme_constant_override("margin_left", 10 + int(ins.x))
+	s.add_theme_constant_override("margin_right", 10 + int(ins.z))
+	s.add_theme_constant_override("margin_top", 66 + int(ins.y))
+	s.add_theme_constant_override("margin_bottom", 10 + int(ins.w))
 	var pc := PanelContainer.new()
+	pc.theme = _set_theme()
+	var fr := _sb(Color("#17307f"), SET_LINE, 4, 20)
+	fr.content_margin_left = 14
+	fr.content_margin_right = 12
+	fr.content_margin_top = 8
+	fr.content_margin_bottom = 6
+	pc.add_theme_stylebox_override("panel", fr)
 	s.add_child(pc)
+	pc.add_child(SetArt.new())
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 8)
 	pc.add_child(v)
-	v.add_child(_label("Elige un modo", 34, C_GOLD))
+	var rib := PanelContainer.new()
+	rib.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	rib.add_theme_stylebox_override("panel", _ribbon_sb(Color("#2a56c4"), Color("#b5cdfb"), 44))
+	v.add_child(rib)
+	var rh := HBoxContainer.new()
+	rh.add_theme_constant_override("separation", 12)
+	rib.add_child(rh)
+	rh.add_child(IC.rect("ball", 38))
+	var tt := _label("Elige un modo", 30)
+	tt.autowrap_mode = TextServer.AUTOWRAP_OFF
+	rh.add_child(tt)
 	var hb := HBoxContainer.new()
 	hb.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	hb.add_theme_constant_override("separation", 14)
+	hb.add_theme_constant_override("separation", 12)
 	v.add_child(hb)
+	var orn_gap := Control.new()   # hueco para la Poke Ball del adorno de abajo
+	orn_gap.custom_minimum_size = Vector2(0, 40)
+	orn_gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	v.add_child(orn_gap)
 	var sc := ScrollContainer.new()
-	sc.custom_minimum_size = Vector2(400, 0)
+	sc.custom_minimum_size = Vector2(390, 0)
 	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	sc.follow_focus = true
 	hb.add_child(sc)
+	var mm := MarginContainer.new()
+	mm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	mm.add_theme_constant_override("margin_right", 22)   # la barra de desplazamiento no tapa los modos
+	sc.add_child(mm)
 	modes_box = VBoxContainer.new()
 	modes_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	modes_box.add_theme_constant_override("separation", 8)
-	sc.add_child(modes_box)
+	mm.add_child(modes_box)
 	# panel derecho: reglas arriba, vista previa, datos, opciones y Jugar
-	var rp := PanelContainer.new()
+	var rp := VBoxContainer.new()
 	rp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	rp.add_theme_stylebox_override("panel", _sb(Color(0.05, 0.1, 0.26, 0.6), Color("#33498f"), 2, 14))
+	rp.add_theme_constant_override("separation", 6)
 	hb.add_child(rp)
+	var orn := SetArt.new(true)
+	orn.lift = 18.0
+	pc.add_child(orn)
 	# Todo el panel derecho se desplaza de arriba abajo (con rueda, dedo o mando) para que nada quede tapado ni fuera de pantalla.
 	var rsc := ScrollContainer.new()
 	rsc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	rsc.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	rsc.follow_focus = true
 	rp.add_child(rsc)
+	var rm := MarginContainer.new()
+	rm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	rm.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	rm.add_theme_constant_override("margin_right", 22)   # la barra de desplazamiento no tapa el contenido
+	rsc.add_child(rm)
 	var rv := VBoxContainer.new()
 	rv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	rv.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	rv.add_theme_constant_override("separation", 8)
-	rsc.add_child(rv)
-	mp_title = _label("", 30, C_GOLD)
-	rv.add_child(mp_title)
+	rv.add_theme_constant_override("separation", 6)
+	rm.add_child(rv)
+	var tban := PanelContainer.new()
+	var tbs := _sb(Color("#1c3e94"), SET_LINE, 3, 22)
+	tbs.content_margin_top = 4
+	tbs.content_margin_bottom = 4
+	tban.add_theme_stylebox_override("panel", tbs)
+	rv.add_child(tban)
+	var tbr := HBoxContainer.new()
+	tbr.add_theme_constant_override("separation", 12)
+	tban.add_child(tbr)
+	mp_icon = TextureRect.new()
+	mp_icon.custom_minimum_size = Vector2(38, 38)
+	mp_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	mp_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	mp_icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	tbr.add_child(mp_icon)
+	mp_title = _label("", 28)
+	mp_title.autowrap_mode = TextServer.AUTOWRAP_OFF
+	mp_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tbr.add_child(mp_title)
+	tbr.add_child(SetGlyph.new("stripes", 38.0))
+	var rtab := PanelContainer.new()
+	rtab.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	rtab.add_theme_stylebox_override("panel", _ribbon_sb(Color("#2a56c4"), SET_LINE, 26))
+	rv.add_child(rtab)
+	var rth := HBoxContainer.new()
+	rth.add_theme_constant_override("separation", 8)
+	rtab.add_child(rth)
+	rth.add_child(SetGlyph.new("clip", 26.0))
+	var rtl := _label("Reglas", 20)
+	rtl.autowrap_mode = TextServer.AUTOWRAP_OFF
+	rth.add_child(rtl)
 	var rbox := PanelContainer.new()
-	rbox.add_theme_stylebox_override("panel", _sb(Color(0, 0, 0, 0.28), Color(1, 1, 1, 0.12), 1, 10))
+	var rbs := _sb(Color(0.05, 0.09, 0.32, 0.85), SET_LINE, 2, 12)
+	rbs.content_margin_top = 6
+	rbs.content_margin_bottom = 6
+	rbox.add_theme_stylebox_override("panel", rbs)
 	rv.add_child(rbox)
-	var rbv := VBoxContainer.new()
-	rbv.add_theme_constant_override("separation", 3)
-	rbox.add_child(rbv)
-	rbv.add_child(_label("Reglas", 17, Color("#8fa3d0")))
 	mp_rules = VBoxContainer.new()
 	mp_rules.add_theme_constant_override("separation", 2)
-	rbv.add_child(mp_rules)
+	rbox.add_child(mp_rules)
+	var pfr := PanelContainer.new()
+	pfr.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	var pfs := _sb(Color("#0f1f60"), Color("#f6c433"), 3, 12)
+	pfs.content_margin_left = 3
+	pfs.content_margin_right = 3
+	pfs.content_margin_top = 3
+	pfs.content_margin_bottom = 3
+	pfr.add_theme_stylebox_override("panel", pfs)
+	rv.add_child(pfr)
 	mp_prev = load("res://scripts/menu.gd").ModePrev.new()
 	mp_prev.custom_minimum_size = Vector2(0, 190)
 	mp_prev.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	mp_prev.clip_contents = true
-	rv.add_child(mp_prev)
+	pfr.add_child(mp_prev)
 	mp_stat = _label("", 18, Color("#cfd9f5"))
 	rv.add_child(mp_stat)
 	mp_opts_sc = ScrollContainer.new()
@@ -2386,9 +2588,39 @@ func _build_modes() -> void:
 	mp_opts.add_theme_constant_override("separation", 6)
 	mp_opts.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	mp_opts_sc.add_child(mp_opts)
-	mp_play = _btn("Jugar", func(): _modes_play(), Vector2(0, 52))
-	mp_play.add_theme_font_size_override("font_size", 26)
-	rv.add_child(mp_play)
+	mp_play = _btn("Jugar", func(): _modes_play(), Vector2(0, 60))
+	mp_play.add_theme_font_size_override("font_size", 30)
+	_set_btn(mp_play, "gold")
+	mp_play.add_theme_stylebox_override("normal", _sb(Color("#f6c433"), Color("#fff0a8"), 3, 26))
+	mp_play.add_theme_stylebox_override("hover", _sb(Color("#ffd44f"), Color("#fff0a8"), 3, 26))
+	mp_play.add_theme_stylebox_override("pressed", _sb(Color("#dcae22"), Color("#fff0a8"), 3, 26))
+	mp_play.add_theme_stylebox_override("focus", _sb(Color("#ffd44f"), Color.WHITE, 4, 26))
+	mp_play.add_theme_stylebox_override("disabled", _sb(Color("#5f6a8c"), Color("#8c96b5"), 3, 26))
+	mp_play.add_theme_color_override("font_disabled_color", Color("#d5dbea"))
+	mp_play_ic = SetGlyph.new("play", 36.0, Color("#2b1a00"))
+	mp_play_ic.anchor_left = 0.5
+	mp_play_ic.anchor_right = 0.5
+	mp_play_ic.anchor_top = 0.5
+	mp_play_ic.anchor_bottom = 0.5
+	mp_play_ic.offset_top = -18.0
+	mp_play_ic.offset_bottom = 18.0
+	mp_play.add_child(mp_play_ic)
+	var pm := MarginContainer.new()
+	pm.add_theme_constant_override("margin_right", 22)
+	pm.add_child(mp_play)
+	rp.add_child(pm)   # siempre visible, fuera de la parte que se desplaza
+
+
+# Cinta de titulo: esquinas sesgadas como las secciones de Ajustes.
+func _ribbon_sb(bg: Color, edge: Color, right: int) -> StyleBoxFlat:
+	var sb := _sb(bg, edge, 3, 8)
+	sb.corner_radius_top_left = 18
+	sb.corner_radius_bottom_right = 24
+	sb.content_margin_top = 2
+	sb.content_margin_bottom = 2
+	sb.content_margin_left = 10
+	sb.content_margin_right = right
+	return sb
 
 
 func _mode_tile(m: Array) -> Button:
@@ -2403,6 +2635,13 @@ func _mode_tile(m: Array) -> Button:
 	b.focus_mode = Control.FOCUS_ALL
 	b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	b.add_theme_font_size_override("font_size", 22)
+	var wm := SetGlyph.new("watermark", 30.0)
+	wm.set_anchors_preset(Control.PRESET_CENTER_RIGHT)
+	wm.offset_left = -44.0
+	wm.offset_right = -14.0
+	wm.offset_top = -15.0
+	wm.offset_bottom = 15.0
+	b.add_child(wm)
 	b.pressed.connect(func():
 		Aud.sfx("click")
 		_modes_select(id)
@@ -2445,8 +2684,17 @@ func _refresh_modes() -> void:
 	for m in MODE_LIST:
 		if String(m[3]) != group:
 			group = String(m[3])
-			var gl := _label(group, 18, Color("#8fa3d0"))
-			modes_box.add_child(gl)
+			var gr := PanelContainer.new()
+			gr.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+			gr.add_theme_stylebox_override("panel", _ribbon_sb(Color("#2a56c4"), SET_LINE, 30))
+			var gh := HBoxContainer.new()
+			gh.add_theme_constant_override("separation", 10)
+			gr.add_child(gh)
+			gh.add_child(IC.rect("ball", 26))
+			var gl := _label(group, 20)
+			gl.autowrap_mode = TextServer.AUTOWRAP_OFF
+			gh.add_child(gl)
+			modes_box.add_child(gr)
 		var tb: Button = _mode_tile(m)
 		if first == null or String(m[0]) == modes_sel:
 			if first == null or String(m[0]) == modes_sel:
@@ -2474,17 +2722,60 @@ func _mode_def(id: String) -> Array:
 	return MODE_LIST[0]
 
 
+# Al pulsar un boton del panel derecho (p. ej. "Cambiar tipo") el panel se reconstruye: se devuelve el foco al
+# mismo boton para no tener que volver a bajar hasta el con el mando.
 func _modes_select(id: String) -> void:
+	var fo: Control = get_viewport().gui_get_focus_owner()
+	var keep := -1
+	if fo != null and mp_opts != null and mp_opts.is_ancestor_of(fo):
+		var bl: Array = []
+		for c in mp_opts.get_children():
+			if c is Button and (c as Button).focus_mode == Control.FOCUS_ALL:
+				bl.append(c)
+		keep = bl.find(fo)
+	_modes_select_impl(id)
+	if keep >= 0:
+		call_deferred("_restore_opts_focus", keep)
+
+
+func _restore_opts_focus(idx: int) -> void:
+	if mp_opts == null or not is_instance_valid(mp_opts):
+		return
+	var bl: Array = []
+	for c in mp_opts.get_children():
+		if c is Button and (c as Button).focus_mode == Control.FOCUS_ALL and not (c as Button).disabled and not c.is_queued_for_deletion():
+			bl.append(c)
+	if bl.is_empty():
+		return
+	(bl[clampi(idx, 0, bl.size() - 1)] as Control).grab_focus()
+
+
+func _modes_select_impl(id: String) -> void:
 	modes_sel = id
 	var m: Array = _mode_def(id)
 	for k in mode_tiles:
 		var tb: Button = mode_tiles[k]
 		if is_instance_valid(tb):
-			_gold_btn(tb, k == id)
+			if k == id:
+				_set_btn(tb, "gold")
+			else:
+				for st in ["normal", "hover", "pressed", "focus"]:
+					tb.remove_theme_stylebox_override(st)
+				for fc in ["font_color", "font_hover_color", "font_focus_color", "font_pressed_color"]:
+					tb.remove_theme_color_override(fc)
 	mp_title.text = L.t(String(m[1]))
+	mp_icon.texture = IC.btn_tex(String(m[2]), 38)
 	_clear(mp_rules)
 	for r in m[4]:
-		mp_rules.add_child(_label("• " + L.t(String(r)), 19))
+		var rl := _label(L.t(String(r)), 18)
+		var rsb := StyleBoxEmpty.new()
+		rsb.content_margin_left = 22
+		rl.add_theme_stylebox_override("normal", rsb)
+		var dot := SetGlyph.new("dot", 12.0)
+		dot.position = Vector2(2, 7)
+		dot.size = Vector2(12, 12)
+		rl.add_child(dot)
+		mp_rules.add_child(rl)
 	_clear(mp_opts)
 	mp_stat.text = ""
 	mp_play.visible = true
@@ -2655,11 +2946,15 @@ func _modes_select(id: String) -> void:
 		mp_play.disabled = false
 	if id == "team" and SV.owned_count() < 2:
 		mp_play.disabled = true
-	(mp_prev as Control).visible = not id.begins_with("chal_")
+	(mp_prev.get_parent() as Control).visible = not id.begins_with("chal_")
 	mp_opts_sc.custom_minimum_size = Vector2.ZERO
 	mp_opts_sc.visible = mp_opts.get_child_count() > 0
-	mp_prev.custom_minimum_size = Vector2(0, 150 if id == "mods" else 230)
+	mp_prev.custom_minimum_size = Vector2(0, 150 if id == "mods" else 170)
 	(mp_prev as Control).call("setup", pm, info)
+	# El triangulo de Jugar va pegado al texto, que cambia de largo segun el modo
+	var ptw: float = mp_play.get_theme_font("font").get_string_size(mp_play.text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, mp_play.get_theme_font_size("font_size")).x
+	mp_play_ic.offset_left = -ptw * 0.5 - 46.0
+	mp_play_ic.offset_right = -ptw * 0.5 - 10.0
 
 
 func _modes_play() -> void:
@@ -2842,19 +3137,34 @@ func _refresh_main() -> void:
 	if is_instance_valid(main_prev):
 		main_prev.queue_free()
 	main_prev = Preview.new()
-	main_prev.custom_minimum_size = Vector2(340, 240)
+	main_prev.custom_minimum_size = Vector2(340, 190)
+	main_prev.fit_k = 1.25
 	main_card.add_child(main_prev)
 	main_prev.setup(dex, shn, 6.0)
 	main_info.text = "%s · %s" % [_name_of(dex), _type_text(dex)]
+	_clear(main_type)
+	for dty in SV.dex_by[dex]["types"]:
+		main_type.add_child(IC.rect("type:" + String(dty), 36))
 	var ttl: String = String(SV.d.get("title", ""))
-	if ttl != "":
-		main_info.text += "\n" + L.t(ttl)
+	main_title.visible = ttl != ""
+	(main_title.get_child(0) as Label).text = L.t(ttl) if ttl != "" else ""
 	PG.ensure()
 	PG.check()
 	var pn: int = PG.pending()
 	goals_btn.text = L.t("Misiones y logros") + ("  (%d)" % pn if pn > 0 else "")
 	var st: Dictionary = SV.d["stats"]
-	main_stats.text = L.t("Partidas %d · Mejor tiempo %d:%02d\nMejor nivel %d · Derrotados %d\nPokémon %d / %d") % [int(st["runs"]), int(st["best_time"]) / 60, int(st["best_time"]) % 60, int(st["best_level"]), int(st["kills"]), SV.owned_count(), SV.dex_list.size()]
+	var stx: String = L.t("Partidas %d · Mejor tiempo %d:%02d\nMejor nivel %d · Derrotados %d\nPokémon %d / %d") % [int(st["runs"]), int(st["best_time"]) / 60, int(st["best_time"]) % 60, int(st["best_level"]), int(st["kills"]), SV.owned_count(), SV.dex_list.size()]
+	_clear(main_stats)
+	var sln: PackedStringArray = stx.split("\n")
+	for si in range(sln.size()):
+		var sr := HBoxContainer.new()
+		sr.add_theme_constant_override("separation", 10)
+		main_stats.add_child(sr)
+		sr.add_child(IC.rect(["clock", "crown", "ball"][mini(si, 2)], 26))
+		var sl := _label(sln[si], 17)
+		sl.autowrap_mode = TextServer.AUTOWRAP_OFF
+		sl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		sr.add_child(sl)
 	var lb = main_btns.get(last_pick, null)
 	focus_first = lb if lb != null and is_instance_valid(lb) else main_play_btn
 
@@ -3298,6 +3608,7 @@ class DexBack extends Control:
 
 
 var dex_search := ""
+var dex_type := ""
 var dex_sort := 0
 var dex_cards: Dictionary = {}
 var dex_hearts: Dictionary = {}
@@ -3454,8 +3765,26 @@ func _build_dex() -> void:
 	se.add_theme_stylebox_override("focus", _sb(Color("#12265a"), C_GOLD, 3, 10))
 	se.text_changed.connect(func(t: String): dex_search = t.strip_edges().to_lower(); dex_page = 0; _refresh_dex())
 	frow.add_child(se)
+	# v6.1: filtro por tipo, con el icono de cada tipo en la lista
+	var tf := OptionButton.new()
+	tf.custom_minimum_size = Vector2(112, 44)
+	tf.clip_text = true
+	tf.fit_to_longest_item = false
+	tf.add_theme_font_size_override("font_size", 18)
+	tf.add_item(L.t("Tipo"))
+	var tkeys: Array = MD.TYPE_NAME.keys()
+	for ty in tkeys:
+		tf.add_icon_item(IC.btn_tex("type:" + String(ty), 30.0), L.t(String(MD.TYPE_NAME[ty])))
+	tf.select(tkeys.find(dex_type) + 1)
+	tf.item_selected.connect(func(ix: int):
+		dex_type = "" if ix == 0 else String(tkeys[ix - 1])
+		dex_page = 0
+		_refresh_dex())
+	frow.add_child(tf)
 	var so := OptionButton.new()
-	so.custom_minimum_size = Vector2(230, 44)
+	so.custom_minimum_size = Vector2(170, 44)
+	so.clip_text = true
+	so.fit_to_longest_item = false
 	so.add_theme_font_size_override("font_size", 18)
 	for o in ["Número (asc.)", "Número (desc.)", "Nombre (A-Z)", "Rareza", "Favoritos primero"]:
 		so.add_item(L.t(String(o)))
@@ -3495,6 +3824,8 @@ func _dex_filtered() -> Array:
 		if (dex_only_owned or dex_pick_team or dex_pick_coop) and not dex_pick_party and not SV.owns(dxo):
 			continue
 		if not SV.smeta.has(str(dxo)):
+			continue
+		if dex_type != "" and not (p["types"] as Array).has(dex_type):
 			continue
 		if q != "":
 			var known: bool = SV.owns(dxo) or dex_pick_party
@@ -3609,7 +3940,7 @@ func _dex_card(p: Dictionary, owned: bool) -> Button:
 		th.add_theme_constant_override("separation", 4)
 		th.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		tg.add_child(th)
-		var ti: TextureRect = IC.rect("type:" + String(types[0]), 16)
+		var ti: TextureRect = IC.rect("type:" + String(types[0]), 20)
 		ti.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		th.add_child(ti)
 		var tl := _label(L.t(String(MD.TYPE_NAME[String(types[0])])).to_upper(), 12, Color.WHITE)
@@ -3617,7 +3948,7 @@ func _dex_card(p: Dictionary, owned: bool) -> Button:
 		tl.autowrap_mode = TextServer.AUTOWRAP_OFF
 		th.add_child(tl)
 		if types.size() > 1:
-			var t2: TextureRect = IC.rect("type:" + String(types[1]), 16)
+			var t2: TextureRect = IC.rect("type:" + String(types[1]), 20)
 			t2.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			th.add_child(t2)
 	if owned:
@@ -3891,19 +4222,71 @@ func _dex_detail() -> void:
 # ---------------------------------------------------------------
 func _build_up() -> void:
 	var s: Control = _screen("up")
+	var ins: Vector4 = DSP.insets(get_tree())
+	s.add_theme_constant_override("margin_left", 10 + int(ins.x))
+	s.add_theme_constant_override("margin_right", 10 + int(ins.z))
+	s.add_theme_constant_override("margin_top", 66 + int(ins.y))
+	s.add_theme_constant_override("margin_bottom", 10 + int(ins.w))
 	var pc := PanelContainer.new()
+	pc.theme = _set_theme()
+	var fr := _sb(Color("#17307f"), SET_LINE, 4, 20)
+	fr.content_margin_left = 14
+	fr.content_margin_right = 12
+	fr.content_margin_top = 8
+	fr.content_margin_bottom = 6
+	pc.add_theme_stylebox_override("panel", fr)
 	s.add_child(pc)
+	pc.add_child(SetArt.new())
 	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 8)
 	pc.add_child(v)
-	v.add_child(_label("Mejoras permanentes", 32, C_GOLD))
+	var rib := PanelContainer.new()
+	rib.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	var rs := _sb(Color("#2a56c4"), Color("#b5cdfb"), 3, 8)
+	rs.corner_radius_top_left = 20
+	rs.corner_radius_bottom_right = 26
+	rs.content_margin_top = 2
+	rs.content_margin_bottom = 2
+	rs.content_margin_left = 10
+	rs.content_margin_right = 44
+	rib.add_theme_stylebox_override("panel", rs)
+	v.add_child(rib)
+	var rh := HBoxContainer.new()
+	rh.add_theme_constant_override("separation", 12)
+	rib.add_child(rh)
+	rh.add_child(IC.rect("ball", 38))
+	var tt := _label("Mejoras permanentes", 30)
+	tt.autowrap_mode = TextServer.AUTOWRAP_OFF
+	rh.add_child(tt)
 	var sc := ScrollContainer.new()
 	sc.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	v.add_child(sc)
+	var um := MarginContainer.new()
+	um.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	um.add_theme_constant_override("margin_right", 24)   # la barra de desplazamiento no tapa las tarjetas
+	sc.add_child(um)
 	up_box = VBoxContainer.new()
 	up_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	up_box.add_theme_constant_override("separation", 12)
-	sc.add_child(up_box)
+	up_box.add_theme_constant_override("separation", 10)
+	um.add_child(up_box)
+	var orn_gap := Control.new()   # hueco para la Poke Ball del adorno de abajo
+	orn_gap.custom_minimum_size = Vector2(0, 34)
+	orn_gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	v.add_child(orn_gap)
+	var orn := SetArt.new(true)
+	orn.lift = 18.0
+	pc.add_child(orn)
+
+
+# Tarjeta azul oscura de la pantalla de mejoras.
+func _up_card_sb() -> StyleBoxFlat:
+	var sb := _sb(Color(0.05, 0.09, 0.32, 0.92), SET_LINE, 3, 14)
+	sb.content_margin_left = 8
+	sb.content_margin_right = 8
+	sb.content_margin_top = 6
+	sb.content_margin_bottom = 6
+	return sb
 
 
 const UP_ICON := {"hp": "heart", "atk": "fist", "spd": "boot", "cd": "clock", "def": "shield", "regen": "sprout", "magnet": "magnet", "xp": "book", "coins": "coin", "moves": "cards", "crit": "star", "size": "size", "reroll": "bond", "ban": "ban", "revive": "revive", "bag": "bag", "bag3": "bag", "tm": "tm", "wslot": "cards"}
@@ -3964,20 +4347,42 @@ func _refresh_up() -> void:
 	var head := HBoxContainer.new()
 	head.add_theme_constant_override("separation", 16)
 	up_box.add_child(head)
+	var pfr := PanelContainer.new()
+	var pfs := _sb(Color("#0f1f60"), Color("#ff9a2e"), 4, 14)
+	pfs.content_margin_left = 4
+	pfs.content_margin_right = 4
+	pfs.content_margin_top = 4
+	pfs.content_margin_bottom = 4
+	pfr.add_theme_stylebox_override("panel", pfs)
+	head.add_child(pfr)
 	var por := Portrait.new()
-	por.custom_minimum_size = Vector2(190, 160)
-	head.add_child(por)
+	por.custom_minimum_size = Vector2(170, 136)
+	pfr.add_child(por)
 	var tcol := Color("#ff7b3d")
 	var types: Array = SV.dex_by[up_dex]["types"]
 	if not types.is_empty():
 		tcol = Color.html(String(MD.TYPE_COLOR.get(String(types[0]), "#ff7b3d")))
-	por.setup(up_dex, tcol)
+	por.setup(up_dex, tcol, 4.5)
 	var hv := VBoxContainer.new()
 	hv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	hv.alignment = BoxContainer.ALIGNMENT_CENTER
+	hv.add_theme_constant_override("separation", 8)
 	head.add_child(hv)
-	hv.add_child(_label("Cada Pokémon tiene sus propias mejoras: solo cuentan cuando juegas con él.", 20, Color("#c8d6ee")))
+	var inf := PanelContainer.new()
+	var ifs := _sb(Color(0.05, 0.09, 0.32, 0.92), SET_LINE, 2, 18)
+	ifs.content_margin_top = 4
+	ifs.content_margin_bottom = 4
+	inf.add_theme_stylebox_override("panel", ifs)
+	hv.add_child(inf)
+	var irow := HBoxContainer.new()
+	irow.add_theme_constant_override("separation", 10)
+	inf.add_child(irow)
+	irow.add_child(SetGlyph.new("info", 26.0))
+	var itx := _label("Cada Pokémon tiene sus propias mejoras: solo cuentan cuando juegas con él.", 18)
+	itx.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	irow.add_child(itx)
 	var orow := HBoxContainer.new()
+	orow.add_theme_constant_override("separation", 8)
 	hv.add_child(orow)
 	var owned: Array = _up_owned()
 	var cur_i: int = maxi(owned.find(up_dex), 0)
@@ -4012,6 +4417,26 @@ func _refresh_up() -> void:
 		var ab := _btn(ab_txt, func(): _up_all(all_cost), Vector2(0, 52))
 		ab.disabled = int(SV.d["coins"]) < all_cost
 		ab.set_meta("fk", "upall")
+		ab.icon = IC.tex("coin", IC.scale_for("coin", 26))
+		ab.custom_minimum_size.y = 46
+		ab.add_theme_color_override("font_disabled_color", Color("#dfe8ff"))
+		if up_all_ok:
+			_set_btn(ab, "gold")
+		else:
+			for st in ["normal", "disabled"]:
+				ab.add_theme_stylebox_override(st, _sb(Color(0.05, 0.09, 0.32, 0.95), Color("#f6c433"), 3, 22))
+			ab.add_theme_stylebox_override("hover", _sb(Color("#1c3e94"), Color("#ffe07a"), 3, 22))
+			ab.add_theme_stylebox_override("pressed", _sb(Color("#142f75"), Color("#f6c433"), 3, 22))
+			ab.add_theme_stylebox_override("focus", _sb(Color("#1c3e94"), Color.WHITE, 4, 22))
+		for sd in [0, 1]:
+			var bl := IC.rect("ball", 32)
+			bl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			bl.set_anchors_preset(Control.PRESET_CENTER_LEFT if sd == 0 else Control.PRESET_CENTER_RIGHT)
+			bl.offset_left = 8.0 if sd == 0 else -40.0
+			bl.offset_right = 40.0 if sd == 0 else -8.0
+			bl.offset_top = -16.0
+			bl.offset_bottom = 16.0
+			ab.add_child(bl)
 		up_box.add_child(ab)
 	# --- tarjetas de mejoras
 	var grid := GridContainer.new()
@@ -4028,20 +4453,21 @@ func _refresh_up() -> void:
 		var mx: int = int(u["max"])
 		var card := PanelContainer.new()
 		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		card.add_theme_stylebox_override("panel", _card_sb())
+		card.add_theme_stylebox_override("panel", _up_card_sb())
 		grid.add_child(card)
 		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 12)
+		row.add_theme_constant_override("separation", 10)
 		card.add_child(row)
-		var uic := IC.rect(String(UP_ICON.get(id, "star")), 36)
-		uic.custom_minimum_size.x = 44
+		var uic := IC.rect(String(UP_ICON.get(id, "star")), 46)
+		uic.custom_minimum_size.x = 52
 		row.add_child(uic)
 		var col := VBoxContainer.new()
 		col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		col.add_theme_constant_override("separation", 2)
+		col.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		col.add_theme_constant_override("separation", 1)
 		row.add_child(col)
-		col.add_child(_label(String(u["name"]), 22))
-		col.add_child(_label(String(u["unit"]), 16, Color("#c8d6ee")))
+		col.add_child(_label(String(u["name"]), 21))
+		col.add_child(_label(String(u["unit"]), 15, Color("#dfe8ff")))
 		var pips := Pips.new()
 		pips.setup(lv, mx)
 		col.add_child(pips)
@@ -4113,7 +4539,7 @@ func _refresh_up() -> void:
 # MT: elige el movimiento con el que empiezas cada partida (gratis cambiarlo cuando quieras).
 func _tm_panel() -> Control:
 	var pc := PanelContainer.new()
-	pc.add_theme_stylebox_override("panel", _card_sb())
+	pc.add_theme_stylebox_override("panel", _up_card_sb())
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 8)
 	pc.add_child(v)
@@ -4143,7 +4569,7 @@ func _tm_panel() -> Control:
 # Veto: toca los movimientos que no quieres que te salgan en las cartas de este Pokemon.
 func _ban_panel(max_n: int) -> Control:
 	var pc := PanelContainer.new()
-	pc.add_theme_stylebox_override("panel", _card_sb())
+	pc.add_theme_stylebox_override("panel", _up_card_sb())
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 8)
 	pc.add_child(v)
@@ -4176,7 +4602,7 @@ func _ban_panel(max_n: int) -> Control:
 # Atajos: que movimiento va siempre en cada hueco (teclas 1-4 o iconos de abajo).
 func _bind_panel() -> Control:
 	var pc := PanelContainer.new()
-	pc.add_theme_stylebox_override("panel", _card_sb())
+	pc.add_theme_stylebox_override("panel", _up_card_sb())
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 8)
 	pc.add_child(v)
@@ -4722,7 +5148,7 @@ func _refresh_gacha() -> void:
 	var sn := _label("Shiny", 20)
 	sn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	sr.add_child(sn)
-	var s32 := _label("1%", 20, Color("#dfe8ff"))
+	var s32 := _label("%d%%" % roundi(SV.shiny_rate(gacha_region) * 100.0), 20, Color("#dfe8ff"))
 	s32.autowrap_mode = TextServer.AUTOWRAP_OFF
 	sr.add_child(s32)
 	ov.add_child(sr)
@@ -4752,6 +5178,10 @@ func _refresh_gacha() -> void:
 	ov.add_child(_label(L.t("· Ticket ×10 morado: la última tirada tiene un %d%% de ser legendaria (si no, Muy raro o mejor) y el cristal Z sube al %d%%.") % [roundi(SV.PURPLE_LEGEND_P * 100.0), roundi(SV.Z_CRYSTAL_P_PURPLE * 100.0)], 16, Color("#d9a8ff")))
 	ov.add_child(_label(L.t("· A las %d tiradas sin legendario en un banner, la siguiente lo es.") % SV.PITY_5, 16, Color("#c8d6ee")))
 	ov.add_child(_label(L.t("· Los repetidos dan Pokémonedas. Los shiny no se repiten."), 16, Color("#c8d6ee")))
+	if SV.banner_done(gacha_region):
+		ov.add_child(_label(L.t("· ¡Banner completado! Shiny al %d%% en lugar del %d%%.") % [roundi(SV.SHINY_PULL_DONE * 100.0), roundi(SV.SHINY_PULL * 100.0)], 16, C_GOLD))
+	else:
+		ov.add_child(_label(L.t("· Cuanto más completes el banner, más salen los Pokémon que te faltan: ahora %d%% por tirada.") % roundi(SV.missing_chance(gacha_region) * 100.0), 16, Color("#c8d6ee")))
 	ov.add_child(_label(L.t("· Los tickets se consiguen jugando: algunos Pokémon los sueltan al caer, y los jefes y los cofres a veces dan tickets ×10."), 16, Color("#c8d6ee")))
 	focus_first = first
 
@@ -4880,21 +5310,41 @@ func _refresh_profile() -> void:
 
 func _build_goals() -> void:
 	var s: Control = _screen("goals")
+	var ins: Vector4 = DSP.insets(get_tree())
+	s.add_theme_constant_override("margin_left", 10 + int(ins.x))
+	s.add_theme_constant_override("margin_right", 10 + int(ins.z))
+	s.add_theme_constant_override("margin_top", 66 + int(ins.y))
+	s.add_theme_constant_override("margin_bottom", 10 + int(ins.w))
 	var pc := PanelContainer.new()
+	pc.theme = _set_theme()
+	var fr := _sb(Color("#17307f"), SET_LINE, 4, 20)
+	fr.content_margin_left = 14
+	fr.content_margin_right = 12
+	fr.content_margin_top = 10
+	fr.content_margin_bottom = 6
+	pc.add_theme_stylebox_override("panel", fr)
 	s.add_child(pc)
+	pc.add_child(SetArt.new())
 	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 12)
 	pc.add_child(v)
 	goals_tabs = HBoxContainer.new()
+	goals_tabs.add_theme_constant_override("separation", 10)
 	v.add_child(goals_tabs)
-	for t in [["m", "Misiones"], ["a", "Logros"], ["h", "Medallas"], ["z", "Cristales Z"], ["p", "Perfil"], ["r", "Récords"]]:
+	for t in [["m", "Misiones", "m_daily"], ["a", "Logros", "medal1"], ["h", "Medallas", "star"], ["z", "Cristales Z", "zc:ice"], ["p", "Perfil", "star"], ["r", "Récords", "trophy"]]:
 		var k: String = String(t[0])
-		var tb := _btn(String(t[1]), func(): goals_tab = k; _refresh_goals(); _gf(tab_sel), Vector2(200, 46))
-		if k == "a":
-			tb.icon = IC.btn_tex("medal1", 28)
-			tb.expand_icon = false
-		elif k == "z":
-			tb.icon = IC.btn_tex("zc:ice", 28)
-			tb.expand_icon = false
+		var tb := _btn(String(t[1]), func(): goals_tab = k; _refresh_goals(); _gf(tab_sel), Vector2(0, 52))
+		tb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		tb.icon = IC.btn_tex(String(t[2]), 30)
+		tb.expand_icon = false
+		tb.add_theme_font_size_override("font_size", 22)
+		var ptr := SetGlyph.new("pointer", 1.0)
+		ptr.anchor_left = 0.5
+		ptr.anchor_right = 0.5
+		ptr.anchor_top = 1.0
+		ptr.anchor_bottom = 1.0
+		ptr.visible = false
+		tb.add_child(ptr)
 		if k == "p":
 			tb.visible = false
 		goals_tabs.add_child(tb)
@@ -4902,10 +5352,60 @@ func _build_goals() -> void:
 	sc.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	v.add_child(sc)
+	var gm := MarginContainer.new()
+	gm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	gm.add_theme_constant_override("margin_right", 24)   # la barra de desplazamiento no tapa las filas
+	sc.add_child(gm)
 	goals_box = VBoxContainer.new()
 	goals_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	goals_box.add_theme_constant_override("separation", 8)
-	sc.add_child(goals_box)
+	gm.add_child(goals_box)
+	var orn_gap := Control.new()   # hueco para la Poke Ball del adorno de abajo
+	orn_gap.custom_minimum_size = Vector2(0, 34)
+	orn_gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	v.add_child(orn_gap)
+	var orn := SetArt.new(true)
+	orn.lift = 18.0
+	pc.add_child(orn)
+
+
+# Titulo de seccion de Misiones y logros: cinta con Poke Ball y franjas.
+func _goal_sec(title: String, sz: int = 26) -> void:
+	var rib := PanelContainer.new()
+	rib.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	rib.add_theme_stylebox_override("panel", _ribbon_sb(Color("#2a56c4"), Color("#b5cdfb"), 14))
+	goals_box.add_child(rib)
+	var h := HBoxContainer.new()
+	h.add_theme_constant_override("separation", 10)
+	rib.add_child(h)
+	h.add_child(IC.rect("ball", 34))
+	var l := _label(title, sz)
+	l.autowrap_mode = TextServer.AUTOWRAP_OFF
+	h.add_child(l)
+	h.add_child(SetGlyph.new("stripes", 30.0))
+
+
+# Barra de progreso con el estilo de la pantalla.
+func _goal_pb(pb: ProgressBar) -> void:
+	var bg := _sb(Color("#0b1a55"), SET_LINE, 2, 7)
+	bg.content_margin_top = 0
+	bg.content_margin_bottom = 0
+	var fill := _sb(Color("#3fd45c"), Color.TRANSPARENT, 0, 6)
+	fill.content_margin_top = 0
+	fill.content_margin_bottom = 0
+	pb.add_theme_stylebox_override("background", bg)
+	pb.add_theme_stylebox_override("fill", fill)
+
+
+# Linea de ayuda con icono de informacion.
+func _goal_info(text: String) -> void:
+	var r := HBoxContainer.new()
+	r.add_theme_constant_override("separation", 10)
+	goals_box.add_child(r)
+	r.add_child(SetGlyph.new("info", 26.0))
+	var l := _label(text, 16, Color("#dfe8ff"))
+	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	r.add_child(l)
 
 
 # ---------------------------------------------------------------
@@ -4923,14 +5423,14 @@ const LEX_NEW := [
 	["Objetos con tiempo de recarga", "Los objetos con recarga (Baya Zidra, Banda Focus, Política Débil...) aparecen en una caja en pantalla con su tiempo restante, o \"Listo\" cuando se pueden usar.", "clock"],
 	["Dificultad progresiva", "A partir del minuto 20 los enemigos ganan más vida, daño y velocidad, y aparecen más élites. A los 60 min el reto es máximo.", "r_berserk"],
 	["Bonus de terreno", "Si pisas un líquido de tu tipo (agua, lava, pantano, hielo, veneno o chispas), ganas un +12% de velocidad mientras estés en él.", "boot"],
-	["Movimientos de vínculo", "Une como máximo 2 movimientos en un solo hueco y se lanzarán a la vez. Si los dos están evolucionados y al nivel máximo, se te ofrece fusionarlos en un Movimiento de Vínculo mucho más potente. Los originales se pierden el resto de la partida, pero puedes cancelar y conservarlos. Ocupa un solo hueco.", "bond"],
+	["Movimientos de vínculo", "Une dos movimientos en un solo hueco y se lanzarán a la vez; cada nuevo vínculo crea otra pareja con los movimientos que te queden libres. Si los dos están evolucionados y al nivel máximo, se fusionan en un Movimiento de Vínculo mucho más potente (una vez por partida); los originales se pierden el resto de la partida.", "bond"],
 	["Enamorado", "Los movimientos de tipo Hada pueden enamorar a un enemigo durante 20 s (26 s con Pluma Hada). Un enemigo enamorado pelea de tu lado: ataca a otros enemigos y no te hace daño. Los jefes son inmunes y, al acabarse, el enemigo no puede volver a enamorarse enseguida.", "heart"],
 	["Resumen de la partida", "En la pausa, el botón Resumen muestra cada movimiento con su tipo, nivel, daño total, derrotas y DPS de los últimos 20 s, además de tus mejoras y objetos.", "book"],
-	["Partida Normal hasta Eternatus", "La partida Normal ya no termina a los 30 min. 00:30 pequeña oleada; 01:00 primera Grieta garantizada; 02:00 un Meowth que huye con monedas; 03:00 el primer jefe; 04:00 cambio único al siguiente mapa (cuando el jefe cae). Si hay una Grieta o un jefe activo, el evento espera su turno. Después aparecen mini-jefes gigantes raros (Tyranitar, Wailord, Onix, Steelix). A los 60:00 despierta ETERNATUS, el jefe final: la pelea sigue hasta que caiga, mueras o abandones. Los demás modos no cambian.", "tex:eter"],
+	["Partida Normal: Sentencia de Arceus", "La partida Normal termina a los 30 min con la Sentencia de Arceus. 00:30 pequeña oleada; 01:00 primera Grieta garantizada; 02:00 un Meowth que huye con monedas; 03:00 el primer jefe; 04:00 cambio único al siguiente mapa (cuando el jefe cae). Entre medias aparecen mini-jefes gigantes raros (Tyranitar, Wailord, Onix, Steelix y más). A los 30:00 llega ARCEUS: una arena enorme, Arceus invencible y un legendario cada 5 s con el doble de vida y daño que el anterior. Esa pelea no tiene límite de tiempo. Los demás modos no cambian.", "tex:eter"],
 	["Objetos perdidos y paquetes", "Por el mapa aparecen objetos pequeños que se recogen solos al tocarlos: la Bolsa de Poké Balls (+3 Poké Balls), el Elixir (un potenciador al azar durante 25 s) y el Cristal Prisma (paraliza 2,5 s a los enemigos cercanos: una salida de emergencia). Si no te sirven en ese momento (Poké Balls al máximo, ya tienes un potenciador o no hay enemigos cerca) se quedan en el suelo. Los paquetes misteriosos se abren con el botón de acción (E, A del mando o el botón dorado en pantalla). Dan oro, experiencia, curación, un consumible o, rara vez, un ticket. Desaparecen con el tiempo.", "tex:pack"],
 	["Cofres de pago y trampa", "Las huchas Poké Ball cuestan monedas de la partida (cuestan más con cada una que abres y cambian de tipo de bola). Acércate y pulsa el botón de acción: el precio se ve en el botón. Si no te alcanza, no se cobra. Cada hucha da una MEJORA gratis (subes de nivel y eliges una carta) o una Poké Ball; las más caras pueden dar las dos. Otras huchas son trampas: unas lucen sospechosas (ojos rojos) y otras están disfrazadas de hucha normal (fíjate en un colmillo). Si la abres sale una emboscada pequeña, pero puedes huir.", "tex:paid"],
 	["Cajas de suministro", "Un aviso anuncia una caja que cae cerca. Llega hasta ella y pulsa el botón de acción antes de que se agote el tiempo (30 s). Hay cuatro tipos: médico y de recursos (sin enemigos extra), raro y excepcional (atraen enemigos, pero no hace falta derrotarlos). Solo hay una caja a la vez.", "tex:crate"],
-	["Kecleon, el comerciante", "Un Kecleon de colores visita el mapa por un rato (60-75 s). Acércate y pulsa el botón de acción \"Comerciar\": te ofrece 3 objetos de su catálogo a cambio de monedas de la partida. Solo puedes comprar uno por visita y cambiar las ofertas una vez (el precio del cambio sube cada vez que lo usas). Cada color vende objetos distintos; el azul shiny es raro y vende los mejores. Solo hay un Kecleon a la vez.", "dex:352"],
+	["Kecleon, el comerciante", "Un Kecleon de colores visita el mapa por un rato (60-75 s). Acércate y pulsa el botón de acción \"Comerciar\": te ofrece 3 mejoras permanentes para esta partida a cambio de monedas. Solo puedes comprar una por visita y cambiar las ofertas mientras tengas monedas (el precio sube con cada cambio y se reinicia en la siguiente visita). Cada color vende mejoras distintas; el azul shiny es raro y vende las mejores. Solo hay un Kecleon a la vez.", "dex:352"],
 	["Menú Pokémon renovado", "En Pokémon ves a tu compañero en un retrato con flechas para pasar al anterior o al siguiente, su tipo, sus barras de PS, Velocidad y Ataque, su habilidad y su movimiento inicial. A la derecha, pestañas por región, «Solo los míos», un buscador (por nombre, tipo o número) y un orden (número, nombre, rareza o favoritos). Toca el corazón de una tarjeta para marcar un favorito; la estrella indica a tu compañero. La misma pantalla sirve para elegir equipo, compañero cooperativo y Pokémon de la fiesta.", "ball"],
 	["Rescates de Pokémon", "De vez en cuando aparece un Pokémon salvaje que necesita ayuda (sin entrenadores). Herido: quédate a su lado unos segundos. Amenazado: derrota a los 4 enemigos que lo atacan. Perdido: sigue la flecha, encuéntralo y pulsa el botón de acción. Si lo logras, te da las gracias, te regala un premio (monedas, EXP, ticket, curación u objeto) y se marcha; nunca se une a tu equipo. Si no llegas a tiempo, simplemente se va. Solo hay un rescate a la vez.", "tex:rescue"],
 	["Poké Ball y Alfas", "A veces ronda un Alfa: un Pokémon enorme, rojizo y muy resistente. Es opcional. Si lo derrotas, queda aturdido 8 segundos: pulsa el botón de acción para lanzarle UNA Poké Ball (80% de éxito). Si lo logras, se une a ti como aliado el resto de la partida (se recupera poco a poco y ocupa el mismo hueco que el aliado del altar legendario). Con el apuntado manual activado, el lanzamiento debe apuntar al Alfa; si fallas el tiro, no se gasta la bola. Las Poké Balls son raras: salen a veces de cofres, mochilas, cajas de suministro y al cortar hierba. El número que llevas aparece junto a tus monedas.", "tex:ball"],
@@ -5550,9 +6050,16 @@ func _refresh_goals() -> void:
 	var tbs: Array = goals_tabs.get_children()
 	for i in range(tbs.size()):
 		var key: String = ["m", "a", "h", "z", "p", "r"][i]
-		_gold_btn(tbs[i], key == goals_tab)
-		if key == goals_tab:
+		var on: bool = key == goals_tab
+		if on:
+			_set_btn(tbs[i], "gold")
 			tab_sel = tbs[i]
+		else:
+			for st in ["normal", "hover", "pressed", "focus"]:
+				tbs[i].remove_theme_stylebox_override(st)
+			for fc in ["font_color", "font_hover_color", "font_focus_color", "font_pressed_color"]:
+				tbs[i].remove_theme_color_override(fc)
+		tbs[i].get_child(0).visible = on
 	tab_row = goals_tabs
 	if goals_tab == "m":
 		first = _goals_missions()
@@ -5572,39 +6079,54 @@ func _refresh_goals() -> void:
 
 func _mission_row(m: Dictionary, weekly: bool, idx: int) -> Button:
 	var def: Dictionary = PG.def_of(String(m["id"]))
+	var card := PanelContainer.new()
+	card.add_theme_stylebox_override("panel", _up_card_sb())
+	goals_box.add_child(card)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 10)
-	goals_box.add_child(row)
+	card.add_child(row)
 	var gic := IC.rect("flag", 36)
 	gic.custom_minimum_size.x = 48
 	row.add_child(gic)
 	var col := VBoxContainer.new()
 	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	col.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	col.add_theme_constant_override("separation", 4)
 	row.add_child(col)
-	col.add_child(_label(PG.mission_text(m), 22))
+	col.add_child(_label(PG.mission_text(m), 20))
 	var pb := ProgressBar.new()
 	pb.max_value = float(m["goal"])
 	pb.value = minf(float(m["prog"]), float(m["goal"]))
-	pb.custom_minimum_size = Vector2(0, 16)
+	pb.custom_minimum_size = Vector2(0, 14)
 	pb.show_percentage = false
+	_goal_pb(pb)
 	col.add_child(pb)
-	row.add_child(_reward_box(def["reward"]))
+	var rwd := _reward_box(def["reward"])
+	rwd.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(rwd)
 	var out: Button = null
 	var mm: Dictionary = m
 	if not weekly and not PG.m_done(m) and not bool(SV.d["missions"].get("rerolled", false)):
-		var rb := _btn("Cambiar", func(): _reroll(idx), Vector2(120, 46))
+		var rb := _btn("Cambiar", func(): _reroll(idx), Vector2(140, 44))
+		rb.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		row.add_child(rb)
+		_btn_glyph(rb, "swap", Color.WHITE)   # ya en el arbol, para que tome el estilo azul del tema
 		out = rb
 	var b: Button
 	if bool(m["claimed"]):
-		b = _btn("Reclamado", func(): pass, Vector2(160, 46))
+		b = _btn("Reclamado", func(): pass, Vector2(140, 44))
 		b.disabled = true
 	elif PG.m_done(m):
-		b = _btn("¡Reclamar!", func(): _claim_mission(mm, weekly), Vector2(160, 46))
+		b = _btn("¡Reclamar!", func(): _claim_mission(mm, weekly), Vector2(140, 44))
+		_set_btn(b, "gold")
 		out = b
 	else:
-		b = _btn("%d / %d" % [mini(int(m["prog"]), int(m["goal"])), int(m["goal"])], func(): pass, Vector2(160, 46))
+		b = _btn("%d / %d" % [mini(int(m["prog"]), int(m["goal"])), int(m["goal"])], func(): pass, Vector2(140, 44))
 		b.disabled = true
+	if b.disabled:
+		b.add_theme_stylebox_override("disabled", _sb(Color("#0f2268"), SET_LINE, 2, 10))
+		b.add_theme_color_override("font_disabled_color", Color.WHITE)
+	b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(b)
 	return out
 
@@ -5612,19 +6134,19 @@ func _mission_row(m: Dictionary, weekly: bool, idx: int) -> Button:
 func _goals_missions() -> Button:
 	var first: Button = null
 	var M: Dictionary = SV.d["missions"]
-	goals_box.add_child(_label("Misiones diarias", 28, C_GOLD))
+	_goal_sec("Misiones diarias")
 	var i := 0
 	for m in M["daily"]:
 		var b: Button = _mission_row(m, false, i)
 		if first == null and b != null:
 			first = b
 		i += 1
-	goals_box.add_child(_label("Misiones semanales", 28, C_GOLD))
+	_goal_sec("Misiones semanales")
 	for m in M["weekly"]:
 		var b2: Button = _mission_row(m, true, 0)
 		if first == null and b2 != null:
 			first = b2
-	goals_box.add_child(_label("Cambian a las 00:00 (hora de Puerto Rico). Puedes cambiar una diaria al día.", 16, Color("#c8d6ee")))
+	_goal_info("Cambian a las 00:00 (hora de Puerto Rico). Puedes cambiar una diaria al día.")
 	return first
 
 
@@ -5643,14 +6165,18 @@ func _claim_mission(m: Dictionary, weekly: bool) -> void:
 
 func _goals_medals() -> Button:
 	const ACHM = preload("res://scripts/ach.gd")
-	goals_box.add_child(_label(L.t("Medallas: %d / %d") % [ACHM.count_got(), ACHM.LIST.size()], 28, C_GOLD))
-	goals_box.add_child(_label(L.t("Medallas de tipo"), 22, Color("#9fd0ff")))
-	goals_box.add_child(_label(L.t("Derrota %d Pokémon de un tipo para ganar su medalla.") % ZM.NEED, 16, Color("#c8d6ee")))
+	_goal_sec(L.t("Medallas: %d / %d") % [ACHM.count_got(), ACHM.LIST.size()])
+	_goal_sec(L.t("Medallas de tipo"), 22)
+	_goal_info(L.t("Derrota %d Pokémon de un tipo para ganar su medalla.") % ZM.NEED)
+	var tgp := PanelContainer.new()
+	tgp.add_theme_stylebox_override("panel", _up_card_sb())
+	goals_box.add_child(tgp)
 	var tg := GridContainer.new()
-	tg.columns = 6
-	tg.add_theme_constant_override("h_separation", 10)
+	tg.columns = 9
+	tg.add_theme_constant_override("h_separation", 12)
 	tg.add_theme_constant_override("v_separation", 10)
-	goals_box.add_child(tg)
+	tg.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	tgp.add_child(tg)
 	for ty2 in TYPE_IDS:
 		var tcard := VBoxContainer.new()
 		tcard.add_child(_medal_icon(String(ty2), 84))
@@ -5661,17 +6187,42 @@ func _goals_medals() -> Button:
 		tg.add_child(tcard)
 	var first: Button = null
 	for c in ACHM.CATS:
-		goals_box.add_child(_label(L.t(String(c[1])), 22, Color("#9fd0ff")))
+		_goal_sec(L.t(String(c[1])), 22)
+		var mg := GridContainer.new()
+		mg.columns = 2
+		mg.add_theme_constant_override("h_separation", 10)
+		mg.add_theme_constant_override("v_separation", 8)
+		mg.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		goals_box.add_child(mg)
 		for a in ACHM.LIST:
 			if String(a[1]) != String(c[0]):
 				continue
 			var e: Dictionary = ACHM.entry(String(a[0]))
 			var got: bool = bool(e["got"])
 			var prog: int = mini(int(e["prog"]), int(a[4]))
-			var txt: String = ("★ " if got else "☆ ") + L.t(String(a[2])) + "  (" + str(prog) + "/" + str(int(a[4])) + ")\n" + L.t(String(a[3]))
-			var lb := _label(txt, 20, C_GOLD if got else Color(0.7, 0.7, 0.75))
-			lb.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-			goals_box.add_child(lb)
+			var mc := PanelContainer.new()
+			mc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			var ms := _up_card_sb()
+			if got:
+				ms.border_color = Color("#f6c433")
+			mc.add_theme_stylebox_override("panel", ms)
+			mg.add_child(mc)
+			var mr := HBoxContainer.new()
+			mr.add_theme_constant_override("separation", 10)
+			mc.add_child(mr)
+			var mi := IC.rect("medal1" if got else "medalOff", 52)
+			mi.custom_minimum_size.x = 56
+			mr.add_child(mi)
+			var mv := VBoxContainer.new()
+			mv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			mv.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			mv.add_theme_constant_override("separation", 2)
+			mr.add_child(mv)
+			mv.add_child(_label(L.t(String(a[2])), 20, C_GOLD if got else Color.WHITE))
+			mv.add_child(_label(L.t(String(a[3])), 15, Color("#dfe8ff")))
+			var mpb := _set_pill("%d/%d" % [prog, int(a[4])])
+			mpb.get_parent().size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			mr.add_child(mpb.get_parent())
 	return first
 
 
@@ -5682,7 +6233,7 @@ func _goals_ach() -> Button:
 	for a in all:
 		if ach.has(String(a["id"])):
 			total += 1
-	goals_box.add_child(_label(L.t("Logros: %d / %d") % [total, all.size()], 28, C_GOLD))
+	_goal_sec(L.t("Logros: %d / %d") % [total, all.size()])
 	var chips := HFlowContainer.new()
 	chips.add_theme_constant_override("h_separation", 8)
 	chips.add_theme_constant_override("v_separation", 8)
@@ -5698,7 +6249,8 @@ func _goals_ach() -> Button:
 				if ach.has(String(a["id"])):
 					d += 1
 		var cb := _btn("%s  %d/%d" % [L.t(String(c[1])), d, n], func(): ach_cat = ck; _refresh_goals(), Vector2(0, 44))
-		_gold_btn(cb, ck == ach_cat)
+		if ck == ach_cat:
+			_set_btn(cb, "gold")
 		chips.add_child(cb)
 		if first == null:
 			first = cb
@@ -5720,7 +6272,7 @@ func _goals_ach() -> Button:
 				legs.append(a)
 				if ach.has(String(a["id"])):
 					beaten += 1
-		goals_box.add_child(_label(L.t("Legendarios vencidos %d / %d") % [beaten, legs.size()], 24, Color.WHITE))
+		_goal_sec(L.t("Legendarios vencidos %d / %d") % [beaten, legs.size()], 22)
 		var lg := GridContainer.new()
 		lg.columns = 10
 		lg.add_theme_constant_override("h_separation", 6)
@@ -5731,7 +6283,7 @@ func _goals_ach() -> Button:
 			var ok: bool = ach.has(String(a["id"]))
 			var cell := PanelContainer.new()
 			cell.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			cell.add_theme_stylebox_override("panel", _sb(Color(0, 0, 0, 0.25), Color(1.0, 0.82, 0.25, 0.5) if ok else Color.TRANSPARENT, 2, 8))
+			cell.add_theme_stylebox_override("panel", _sb(Color(0.05, 0.09, 0.32, 0.92), Color("#f6c433") if ok else SET_LINE, 2, 10))
 			var cv := VBoxContainer.new()
 			cv.alignment = BoxContainer.ALIGNMENT_CENTER
 			cell.add_child(cv)
@@ -5757,9 +6309,8 @@ func _goals_zcrystals() -> Button:
 	for zm in zl:
 		if PG.zdone(zm):
 			nd += 1
-	goals_box.add_child(_label(L.t("Cristales Z: %d / %d") % [nd, zl.size()], 28, C_GOLD))
-	var hint := _label(L.t("Cumple la misión de un tipo para desbloquear su movimiento Z. También se desbloquea derrotando a 250 Pokémon de ese tipo o con un cristal del gacha."), 16, Color("#b9cbf0"))
-	goals_box.add_child(hint)
+	_goal_sec(L.t("Cristales Z: %d / %d") % [nd, zl.size()])
+	_goal_info(L.t("Cumple la misión de un tipo para desbloquear su movimiento Z. También se desbloquea derrotando a 250 Pokémon de ese tipo o con un cristal del gacha."))
 	var grid := GridContainer.new()
 	grid.columns = 3
 	grid.add_theme_constant_override("h_separation", 10)
@@ -5771,17 +6322,25 @@ func _goals_zcrystals() -> Button:
 	return null
 
 
+# Tarjeta de logro o cristal: borde dorado si esta conseguido.
+func _goal_card_sb(done: bool) -> StyleBoxFlat:
+	var sb := _up_card_sb()
+	if done:
+		sb.border_color = Color("#f6c433")
+	return sb
+
+
 func _zmis_card(zm: Dictionary, done: bool) -> PanelContainer:
 	var t: String = String(zm["type"])
 	var card := PanelContainer.new()
 	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	card.size_flags_vertical = Control.SIZE_FILL
-	card.add_theme_stylebox_override("panel", _sb(Color(0, 0, 0, 0.2), Color(1.0, 0.82, 0.25, 0.6) if done else Color(0.96, 0.97, 1.0, 0.1), 2, 8))
+	card.add_theme_stylebox_override("panel", _goal_card_sb(done))
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 10)
 	card.add_child(row)
-	var mi := IC.rect("zc:" + t, 48)
-	mi.custom_minimum_size.x = 52
+	var mi := IC.rect("zc:" + t, 64)
+	mi.custom_minimum_size.x = 68
 	if not done:
 		mi.modulate = Color(0.35, 0.35, 0.4, 0.55)
 	row.add_child(mi)
@@ -5798,6 +6357,7 @@ func _zmis_card(zm: Dictionary, done: bool) -> PanelContainer:
 		pb.value = float(v)
 		pb.custom_minimum_size = Vector2(0, 12)
 		pb.show_percentage = false
+		_goal_pb(pb)
 		col.add_child(pb)
 	var fl := HFlowContainer.new()
 	fl.add_theme_constant_override("h_separation", 6)
@@ -5816,12 +6376,12 @@ func _ach_card(a: Dictionary, done: bool) -> PanelContainer:
 	var card := PanelContainer.new()
 	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	card.size_flags_vertical = Control.SIZE_FILL
-	card.add_theme_stylebox_override("panel", _sb(Color(0, 0, 0, 0.2), Color(1.0, 0.82, 0.25, 0.6) if done else Color(0.96, 0.97, 1.0, 0.1), 2, 8))
+	card.add_theme_stylebox_override("panel", _goal_card_sb(done))
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 10)
 	card.add_child(row)
-	var mi := IC.rect(("medal%d" % int(a["tier"])) if done else "medalOff", 36)
-	mi.custom_minimum_size.x = 48
+	var mi := IC.rect(("medal%d" % int(a["tier"])) if done else "medalOff", 60)
+	mi.custom_minimum_size.x = 64
 	row.add_child(mi)
 	var col := VBoxContainer.new()
 	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -5839,6 +6399,7 @@ func _ach_card(a: Dictionary, done: bool) -> PanelContainer:
 		pb.value = float(v)
 		pb.custom_minimum_size = Vector2(0, 12)
 		pb.show_percentage = false
+		_goal_pb(pb)
 		col.add_child(pb)
 	var fl := HFlowContainer.new()
 	fl.add_theme_constant_override("h_separation", 6)
@@ -6494,31 +7055,75 @@ func _show_card() -> void:
 
 # Ranking local: tus 10 mejores partidas (tiempo aguantado) guardadas en este dispositivo.
 func _goals_records() -> Button:
-	goals_box.add_child(_label("Tus mejores partidas", 28, C_GOLD))
+	_goal_sec("Tus mejores partidas")
 	var top: Array = SV.d.get("top", [])
 	if top.is_empty():
-		goals_box.add_child(_label("Aún no hay partidas. ¡Juega una para aparecer aquí!", 20, Color("#c8d6ee")))
+		_goal_info("Aún no hay partidas. ¡Juega una para aparecer aquí!")
 		return null
 	for i in range(top.size()):
 		var e: Dictionary = top[i]
+		var rc := PanelContainer.new()
+		rc.add_theme_stylebox_override("panel", _goal_card_sb(i == 0))
+		goals_box.add_child(rc)
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 12)
-		goals_box.add_child(row)
-		var rk := _label("#%d" % (i + 1), 26, C_GOLD if i == 0 else Color.WHITE)
-		rk.custom_minimum_size.x = 56
+		rc.add_child(row)
+		# Puesto: laureles de oro, plata y bronce (con corona el primero); el resto, en una pastilla
+		var badge := Control.new()
+		badge.custom_minimum_size = Vector2(104, 54)
+		row.add_child(badge)
+		if i < 3:
+			var lau := SetGlyph.new("laurel", 54.0, [Color("#f6c433"), Color("#cfe0f5"), Color("#e39a55")][i])
+			lau.crown = i == 0
+			lau.set_anchors_preset(Control.PRESET_FULL_RECT)
+			badge.add_child(lau)
+		else:
+			var bp := Panel.new()
+			bp.add_theme_stylebox_override("panel", _sb(Color("#1c3e94"), SET_LINE, 2, 18))
+			bp.anchor_right = 1.0
+			bp.anchor_top = 0.5
+			bp.anchor_bottom = 0.5
+			bp.offset_left = 6.0
+			bp.offset_right = -6.0
+			bp.offset_top = -17.0
+			bp.offset_bottom = 17.0
+			badge.add_child(bp)
+		var rk := _label("#%d" % (i + 1), 24, Color.WHITE)
 		rk.autowrap_mode = TextServer.AUTOWRAP_OFF
-		row.add_child(rk)
+		rk.set_anchors_preset(Control.PRESET_FULL_RECT)
+		rk.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		rk.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		badge.add_child(rk)
 		var pv := Preview.new()
-		pv.custom_minimum_size = Vector2(56, 48)
+		pv.custom_minimum_size = Vector2(96, 72)
 		row.add_child(pv)
-		pv.setup(int(e.get("dex", 25)), false, 1.0)
+		pv.fit_k = 1.3
+		pv.setup(int(e.get("dex", 25)), false, 4.0)
+		var sep := ColorRect.new()
+		sep.color = Color(1, 1, 1, 0.35)
+		sep.custom_minimum_size = Vector2(2, 40)
+		sep.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(sep)
 		var tm: int = int(e["time"])
 		var col := VBoxContainer.new()
 		col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		col.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		col.add_theme_constant_override("separation", 0)
 		row.add_child(col)
 		var nm: String = _name_of(int(e.get("dex", 25))) if SV.dex_by.has(int(e.get("dex", 25))) else "?"
-		col.add_child(_label("%02d:%02d · %s" % [tm / 60, tm % 60, nm], 24))
-		col.add_child(_label(L.t("Nv. %d") % int(e["level"]) + "  ·  " + L.t("Derrotados: %d") % int(e["kills"]) + "  ·  " + String(e.get("date", "")), 16, Color("#c8d6ee")))
+		var th := HBoxContainer.new()
+		th.add_theme_constant_override("separation", 8)
+		col.add_child(th)
+		th.add_child(IC.rect("clock", 26))
+		var tl := _label("%02d:%02d" % [tm / 60, tm % 60], 24, C_GOLD)
+		tl.autowrap_mode = TextServer.AUTOWRAP_OFF
+		th.add_child(tl)
+		var nl := _label("·  " + nm, 24)
+		nl.autowrap_mode = TextServer.AUTOWRAP_OFF
+		th.add_child(nl)
+		col.add_child(_label(L.t("Nv. %d") % int(e["level"]) + "  ·  " + L.t("Derrotados: %d") % int(e["kills"]) + "  ·  " + String(e.get("date", "")), 16, Color("#dfe8ff")))
+		row.add_child(SetGlyph.new("stripes", 34.0))
+		row.add_child(SetGlyph.new("watermark", 36.0))
 	return null
 
 
@@ -6570,7 +7175,7 @@ func _set_title(t: String) -> void:
 # Ajustes
 # ---------------------------------------------------------------
 var set_tab := 0
-var set_tabs_row: HFlowContainer
+var set_tabs_row: HBoxContainer
 var listening := ""
 var last_act := ""
 var import_armed := false
@@ -6578,100 +7183,590 @@ const SET_TABS := ["Sonido", "Gráficos", "Controles", "Cuenta", "Acerca de"]
 const REPO_URL := "https://github.com/JayElDragon/poke-survivor"
 # Enlace de donaciones (Ko-fi).
 const SUPPORT_URL := "https://ko-fi.com/jayeldragon"
+const SET_TAB_ICON := ["speaker", "image", "pad", "card", "info"]
+const SET_SEC_ICON := {"Sonido": "phones", "Idioma": "globe", "Calidad": "spark", "Pantalla": "monitor", "En móvil o tableta": "monitor", "Mando": "pad", "Cuenta": "card", "Copia de seguridad": "save", "Zona peligrosa": "warn"}
+const SET_LINE := Color("#7fa8f5")
+
+
+# Dibujos vectoriales de la pantalla de Ajustes (iconos que no existen como sprite).
+class SetGlyph extends Control:
+	var kind := ""
+	var col := Color.WHITE
+	var crown := false
+
+	func _init(k: String = "", px: float = 28.0, c: Color = Color.WHITE) -> void:
+		kind = k
+		col = c
+		custom_minimum_size = Vector2(px, px)
+		size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _p(pts: Array, k: float, o: Vector2, c: Color) -> void:
+		var out := PackedVector2Array()
+		for q in pts:
+			out.append(o + (q as Vector2) * k)
+		draw_colored_polygon(out, c)
+
+	func _draw() -> void:
+		var k: float = minf(size.x, size.y) / 28.0
+		var o: Vector2 = size * 0.5
+		match kind:
+			"speaker", "mute":
+				_p([Vector2(-11, -4), Vector2(-5, -4), Vector2(2, -10), Vector2(2, 10), Vector2(-5, 4), Vector2(-11, 4)], k, o, col)
+				if kind == "mute":
+					draw_line(o + Vector2(-11, 10) * k, o + Vector2(11, -10) * k, col, 3.0 * k)
+				else:
+					draw_arc(o + Vector2(2, 0) * k, 5.0 * k, -0.9, 0.9, 10, col, 2.0 * k)
+					draw_arc(o + Vector2(2, 0) * k, 9.5 * k, -0.9, 0.9, 12, col, 2.0 * k)
+			"music":
+				draw_circle(o + Vector2(-7, 8) * k, 4.5 * k, col)
+				draw_circle(o + Vector2(7, 5) * k, 4.5 * k, col)
+				_p([Vector2(-4, 8), Vector2(-4, -8), Vector2(11, -11), Vector2(11, 5), Vector2(9, 5), Vector2(9, -6), Vector2(-2, -4), Vector2(-2, 8)], k, o, col)
+			"spark":
+				var y := Color("#ffd23f")
+				for st in [[Vector2(-3, 1), 10.0], [Vector2(8, -8), 5.0], [Vector2(9, 9), 4.0]]:
+					var c0: Vector2 = st[0]
+					var r: float = st[1]
+					_p([c0 + Vector2(0, -r), c0 + Vector2(r * 0.25, -r * 0.25), c0 + Vector2(r, 0), c0 + Vector2(r * 0.25, r * 0.25), c0 + Vector2(0, r), c0 + Vector2(-r * 0.25, r * 0.25), c0 + Vector2(-r, 0), c0 + Vector2(-r * 0.25, -r * 0.25)], k, o, y)
+			"image":
+				draw_rect(Rect2(o + Vector2(-12, -10) * k, Vector2(24, 20) * k), col, false, 2.5 * k)
+				_p([Vector2(-10, 8), Vector2(-3, -2), Vector2(2, 4), Vector2(5, 1), Vector2(10, 8)], k, o, col)
+				draw_circle(o + Vector2(5, -5) * k, 2.5 * k, col)
+			"pad":
+				_p([Vector2(-8, -7), Vector2(8, -7), Vector2(13, 3), Vector2(12, 8), Vector2(8, 8), Vector2(4, 3), Vector2(-4, 3), Vector2(-8, 8), Vector2(-12, 8), Vector2(-13, 3)], k, o, col)
+				var dk := Color("#17307f")
+				draw_rect(Rect2(o + Vector2(-9, -3) * k, Vector2(6, 2) * k), dk)
+				draw_rect(Rect2(o + Vector2(-7, -5) * k, Vector2(2, 6) * k), dk)
+				draw_circle(o + Vector2(5, -3) * k, 1.5 * k, dk)
+				draw_circle(o + Vector2(8, -1) * k, 1.5 * k, dk)
+			"card":
+				draw_rect(Rect2(o + Vector2(-13, -9) * k, Vector2(26, 18) * k), col)
+				var bk := Color("#17307f")
+				draw_circle(o + Vector2(-6, -2) * k, 3.0 * k, bk)
+				draw_rect(Rect2(o + Vector2(-10, 2) * k, Vector2(8, 4) * k), bk)
+				for ly in [-5.0, -1.0, 3.0]:
+					draw_rect(Rect2(o + Vector2(1, ly) * k, Vector2(9, 2) * k), bk)
+			"info":
+				draw_circle(o, 12.0 * k, col)
+				var ib := Color("#17307f")
+				draw_circle(o + Vector2(0, -6) * k, 2.0 * k, ib)
+				draw_rect(Rect2(o + Vector2(-2, -2) * k, Vector2(4, 10) * k), ib)
+			"phones":
+				var g := Color("#ffc83d")
+				draw_arc(o + Vector2(0, 1) * k, 10.0 * k, PI, TAU, 18, g, 3.0 * k)
+				draw_rect(Rect2(o + Vector2(-13, 1) * k, Vector2(6, 10) * k), g)
+				draw_rect(Rect2(o + Vector2(7, 1) * k, Vector2(6, 10) * k), g)
+			"globe":
+				draw_arc(o, 11.0 * k, 0.0, TAU, 24, col, 2.5 * k)
+				draw_line(o + Vector2(-11, 0) * k, o + Vector2(11, 0) * k, col, 2.0 * k)
+				draw_line(o + Vector2(0, -11) * k, o + Vector2(0, 11) * k, col, 2.0 * k)
+				draw_arc(o, 5.0 * k, 0.0, TAU, 18, col, 1.5 * k)
+			"monitor":
+				draw_rect(Rect2(o + Vector2(-13, -10) * k, Vector2(26, 16) * k), col, false, 2.5 * k)
+				draw_rect(Rect2(o + Vector2(-2, 6) * k, Vector2(4, 4) * k), col)
+				draw_rect(Rect2(o + Vector2(-7, 10) * k, Vector2(14, 2) * k), col)
+			"save":
+				draw_rect(Rect2(o + Vector2(-11, -11) * k, Vector2(22, 22) * k), col)
+				draw_rect(Rect2(o + Vector2(-6, -11) * k, Vector2(12, 8) * k), Color("#17307f"))
+				draw_rect(Rect2(o + Vector2(-7, 2) * k, Vector2(14, 9) * k), Color("#17307f"))
+			"warn":
+				_p([Vector2(0, -12), Vector2(13, 11), Vector2(-13, 11)], k, o, Color("#ffc83d"))
+				draw_rect(Rect2(o + Vector2(-1.5, -4) * k, Vector2(3, 8) * k), Color("#2b1a00"))
+				draw_circle(o + Vector2(0, 7.5) * k, 1.8 * k, Color("#2b1a00"))
+			"x":
+				draw_line(o + Vector2(-8, -8) * k, o + Vector2(8, 8) * k, col, 4.0 * k)
+				draw_line(o + Vector2(8, -8) * k, o + Vector2(-8, 8) * k, col, 4.0 * k)
+			"pointer":
+				draw_colored_polygon(PackedVector2Array([Vector2(-9, 0), Vector2(9, 0), Vector2(0, 9)]), Color("#f6c433"))
+			"laurel":
+				var lc: Vector2 = size * 0.5 + Vector2(0.0, 2.0)
+				for sd in [-1.0, 1.0]:
+					for li in range(6):
+						var la: float = -0.9 + float(li) * 0.36
+						var lp: Vector2 = lc + Vector2(sd * cos(la) * 38.0, sin(la) * 20.0)
+						var ld: Vector2 = Vector2(-sd * sin(la) * 38.0, cos(la) * 20.0).normalized()
+						var ls: Vector2 = ld.orthogonal() * 3.5
+						draw_colored_polygon(PackedVector2Array([lp - ld * 6.0, lp + ls, lp + ld * 6.0, lp - ls]), col)
+				if crown:
+					var cc := Vector2(size.x * 0.5, 7.0)
+					draw_colored_polygon(PackedVector2Array([cc + Vector2(-10, 6), cc + Vector2(-11, -5), cc + Vector2(-4, 0), cc + Vector2(0, -7), cc + Vector2(4, 0), cc + Vector2(11, -5), cc + Vector2(10, 6)]), col)
+			"stripes_dim":
+				for i in range(2):
+					var dx: float = -10.0 + float(i) * 11.0
+					_p([Vector2(dx, 10), Vector2(dx + 6, 10), Vector2(dx + 14, -10), Vector2(dx + 8, -10)], k, o, Color(1, 1, 1, 0.14))
+			"swap":
+				draw_arc(o, 9.0 * k, -2.6, 0.2, 14, col, 2.5 * k)
+				draw_arc(o, 9.0 * k, 0.55, 3.35, 14, col, 2.5 * k)
+				_p([Vector2(5, 1), Vector2(13, 1), Vector2(9, 6)], k, o, col)
+				_p([Vector2(-5, -1), Vector2(-13, -1), Vector2(-9, -6)], k, o, col)
+			"play":
+				_p([Vector2(-8, -12), Vector2(11, 0), Vector2(-8, 12)], k, o, col)
+				_p([Vector2(-4, -5), Vector2(4, 0), Vector2(-4, 5)], k, o, Color("#f6c433"))
+			"clip":
+				draw_rect(Rect2(o + Vector2(-9, -9) * k, Vector2(18, 21) * k), Color("#f4f6fb"))
+				draw_rect(Rect2(o + Vector2(-4, -12) * k, Vector2(8, 5) * k), Color("#c9402f"))
+				for ly in [-3.0, 2.0, 7.0]:
+					draw_rect(Rect2(o + Vector2(-6, ly) * k, Vector2(12, 2) * k), Color("#17307f"))
+			"dot":
+				draw_circle(o, 5.0 * k * 28.0 / 12.0, Color("#f6c433"))
+			"stripes":
+				var st := Color("#f6c433")
+				for i in range(2):
+					var sx: float = -10.0 + float(i) * 11.0
+					_p([Vector2(sx, 10), Vector2(sx + 6, 10), Vector2(sx + 14, -10), Vector2(sx + 8, -10)], k, o, st)
+			"watermark":
+				var wc := Color(1, 1, 1, 0.16)
+				draw_arc(o, 11.0 * k, 0.0, TAU, 24, wc, 3.0 * k)
+				draw_line(o - Vector2(11, 0) * k, o + Vector2(11, 0) * k, wc, 2.5 * k)
+				draw_circle(o, 3.5 * k, wc)
+
+
+# Fondo de Ajustes: Poke Balls tenues, nubes, montanas, pinos, hojas y el adorno de abajo.
+class SetArt extends Control:
+	var front := false   # true: solo el adorno de abajo, por encima del contenido
+	var lift := 4.0      # altura del adorno sobre el borde inferior
+	var corners := false   # rocas y hojas en las esquinas (portada)
+
+	func _init(on_top: bool = false) -> void:
+		front = on_top
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		resized.connect(queue_redraw)
+
+	func _ball(c: Vector2, r: float, col: Color) -> void:
+		draw_arc(c, r * 0.8, 0.0, TAU, 40, col, r * 0.4)
+		draw_line(c - Vector2(r, 0.0), c - Vector2(r * 0.34, 0.0), col, r * 0.18)
+		draw_line(c + Vector2(r * 0.34, 0.0), c + Vector2(r, 0.0), col, r * 0.18)
+		draw_circle(c, r * 0.16, col)
+
+	func _cloud(c: Vector2, k: float, col: Color) -> void:
+		draw_rect(Rect2(c + Vector2(-60, -8) * k, Vector2(120, 8) * k), col)
+		draw_rect(Rect2(c + Vector2(-38, -18) * k, Vector2(70, 10) * k), col)
+		draw_rect(Rect2(c + Vector2(-16, -28) * k, Vector2(30, 10) * k), col)
+
+	func _leaf(c: Vector2, ang: float, ln: float, col: Color) -> void:
+		var d: Vector2 = Vector2.from_angle(ang)
+		var s: Vector2 = d.orthogonal() * ln * 0.22
+		draw_colored_polygon(PackedVector2Array([c, c + d * ln * 0.45 + s, c + d * ln, c + d * ln * 0.45 - s]), col)
+
+	func _bush(c: Vector2, ln: float, flip: float) -> void:
+		for i in range(7):
+			var a: float = -PI * 0.5 + (float(i) - 3.0) * 0.36 * flip
+			_leaf(c, a, ln * (0.72 + 0.28 * sin(float(i) * 2.1)), Color("#2f9c3d") if i % 2 == 0 else Color("#58c648"))
+
+	func _draw() -> void:
+		var w: float = size.x
+		var h: float = size.y
+		if front:
+			if corners:
+				for sd in [0.0, 1.0]:
+					var cx: float = 40.0 if sd == 0.0 else w - 40.0
+					draw_colored_polygon(PackedVector2Array([Vector2(cx - 34.0, h + 8.0), Vector2(cx - 24.0, h - 24.0), Vector2(cx + 2.0, h - 36.0), Vector2(cx + 28.0, h - 22.0), Vector2(cx + 36.0, h + 8.0)]), Color("#6d7680"))
+					_bush(Vector2(cx + (44.0 if sd == 0.0 else -44.0), h + 8.0), 46.0, 1.0)
+			_ornament(w, h)
+			return
+		var base: float = h - 18.0
+		var band := Color(0.27, 0.4, 0.8, 0.32)
+		var x := 60.0
+		while x < w:
+			_ball(Vector2(x, 84.0), 13.0, Color(1, 1, 1, 0.035))
+			x += 130.0
+		_ball(Vector2(w - 170.0, h - 170.0), 96.0, Color(0.45, 0.6, 1.0, 0.13))
+		_cloud(Vector2(w * 0.3, h - 120.0), 1.0, band)
+		_cloud(Vector2(w * 0.62, h - 136.0), 1.1, band)
+		_cloud(Vector2(w * 0.45, h - 76.0), 0.7, band)
+		var far := PackedVector2Array([Vector2(0, base)])
+		for i in range(13):
+			var fx: float = w * float(i) / 12.0
+			far.append(Vector2(fx, base - (i % 2) * 54.0 - 16.0))
+		far.append(Vector2(w, base))
+		draw_colored_polygon(far, Color(0.1, 0.17, 0.5, 0.75))
+		var pine := Color(0.06, 0.12, 0.38, 0.92)
+		x = 8.0
+		var n := 0
+		while x < w:
+			var ph: float = 26.0 + float((n * 7) % 3) * 12.0
+			draw_colored_polygon(PackedVector2Array([Vector2(x - 12.0, base), Vector2(x, base - ph), Vector2(x + 12.0, base)]), pine)
+			x += 44.0
+			n += 1
+		_bush(Vector2(46.0, base), 62.0, 1.0)
+		_bush(Vector2(112.0, base), 42.0, -1.0)
+		_bush(Vector2(w - 46.0, base), 66.0, -1.0)
+		_bush(Vector2(w - 116.0, base), 44.0, 1.0)
+
+	# Adorno central de abajo
+	func _ornament(w: float, h: float) -> void:
+		var bc := Vector2(w * 0.5, h - lift)
+		for sd in [-1.0, 1.0]:
+			for j in range(3):
+				var px: float = bc.x + sd * (34.0 + float(j) * 26.0)
+				draw_colored_polygon(PackedVector2Array([Vector2(px, bc.y - 10.0), Vector2(px + sd * 16.0, bc.y - 10.0), Vector2(px + sd * 26.0, bc.y + 6.0), Vector2(px + sd * 10.0, bc.y + 6.0)]), Color("#f6c433"))
+		draw_circle(bc, 26.0, Color("#dfe9ff"))
+		draw_circle(bc, 22.0, Color("#1a1d29"))
+		draw_circle(bc, 20.0, Color("#f5f6f8"))
+		var top := PackedVector2Array()
+		for i in range(17):
+			top.append(bc + Vector2.from_angle(PI + PI * float(i) / 16.0) * 20.0)
+		draw_colored_polygon(top, Color("#e23b3b"))
+		draw_line(bc - Vector2(20.0, 0.0), bc + Vector2(20.0, 0.0), Color("#1a1d29"), 4.0)
+		draw_circle(bc, 7.0, Color("#1a1d29"))
+		draw_circle(bc, 4.0, Color("#f5f6f8"))
+
+
+static var _set_grabber: Texture2D = null
+
+
+# Tirador de los deslizadores: una Poke Ball.
+static func _grabber_tex() -> Texture2D:
+	if _set_grabber != null:
+		return _set_grabber
+	var n := 34
+	var img := Image.create(n, n, false, Image.FORMAT_RGBA8)
+	var c := Vector2(float(n) * 0.5 - 0.5, float(n) * 0.5 - 0.5)
+	for py in range(n):
+		for px in range(n):
+			var p := Vector2(px, py)
+			var d: float = p.distance_to(c)
+			var col := Color(0, 0, 0, 0)
+			if d <= 16.5:
+				col = Color("#e8eefc")
+			if d <= 14.5:
+				col = Color("#e23b3b") if p.y < c.y else Color("#f5f6f8")
+				if absf(p.y - c.y) <= 1.5:
+					col = Color("#1a1d29")
+			if d <= 6.0:
+				col = Color("#1a1d29")
+			if d <= 3.5:
+				col = Color("#f5f6f8")
+			img.set_pixel(px, py, col)
+	_set_grabber = ImageTexture.create_from_image(img)
+	return _set_grabber
+
+
+func _set_slider(sl: HSlider) -> void:
+	sl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sl.custom_minimum_size = Vector2(0, 40)
+	sl.focus_mode = Control.FOCUS_ALL
+	var track := _sb(Color("#0b1a55"), SET_LINE, 2, 7)
+	track.content_margin_top = 5
+	track.content_margin_bottom = 5
+	var fill := _sb(Color("#f6c433"), Color.TRANSPARENT, 0, 6)
+	fill.content_margin_top = 5
+	fill.content_margin_bottom = 5
+	sl.add_theme_stylebox_override("slider", track)
+	sl.add_theme_stylebox_override("grabber_area", fill)
+	sl.add_theme_stylebox_override("grabber_area_highlight", fill)
+	sl.add_theme_icon_override("grabber", _grabber_tex())
+	sl.add_theme_icon_override("grabber_highlight", _grabber_tex())
+
+
+func _set_pill(txt: String) -> Label:
+	var p := PanelContainer.new()
+	p.custom_minimum_size = Vector2(84, 0)
+	var sb := _sb(Color("#0f2268"), SET_LINE, 2, 8)
+	sb.content_margin_top = 4
+	sb.content_margin_bottom = 4
+	p.add_theme_stylebox_override("panel", sb)
+	var l := _label(txt, 20)
+	l.autowrap_mode = TextServer.AUTOWRAP_OFF
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	p.add_child(l)
+	return l
+
+
+# Fila con fondo oscuro de la pantalla de Ajustes.
+func _set_row_panel() -> PanelContainer:
+	var pc := PanelContainer.new()
+	var sb := _sb(Color(0.03, 0.06, 0.24, 0.62), Color.TRANSPARENT, 0, 10)
+	sb.content_margin_top = 6
+	sb.content_margin_bottom = 6
+	pc.add_theme_stylebox_override("panel", sb)
+	settings_box.add_child(pc)
+	return pc
+
+
+# Boton de Ajustes: "gold" (elegido o principal) o "red"; el azul sale del tema de la pantalla.
+func _set_btn(b: Button, kind: String) -> void:
+	var c := Color("#f6c433") if kind == "gold" else Color("#c92a44")
+	var edge := Color("#fff0a8") if kind == "gold" else Color("#ffd6dc")
+	var fc := Color("#2b1a00") if kind == "gold" else Color.WHITE
+	b.add_theme_stylebox_override("normal", _sb(c, edge, 3, 12))
+	b.add_theme_stylebox_override("hover", _sb(c.lightened(0.1), edge, 3, 12))
+	b.add_theme_stylebox_override("pressed", _sb(c.darkened(0.1), edge, 3, 12))
+	b.add_theme_stylebox_override("focus", _sb(c.lightened(0.1), Color.WHITE, 4, 12))
+	for k in ["font_color", "font_hover_color", "font_focus_color", "font_pressed_color"]:
+		b.add_theme_color_override(k, fc)
+
+
+# Icono a la izquierda del texto de un boton.
+func _btn_glyph(b: Button, kind: String, col: Color) -> void:
+	var g := SetGlyph.new(kind, 26.0, col)
+	g.set_anchors_preset(Control.PRESET_CENTER_LEFT)
+	g.offset_left = 14.0
+	g.offset_right = 40.0
+	g.offset_top = -13.0
+	g.offset_bottom = 13.0
+	b.add_child(g)
+	for st in ["normal", "hover", "pressed", "focus"]:
+		var sb = b.get_theme_stylebox(st)
+		if sb != null:
+			var s2: StyleBox = sb.duplicate()
+			s2.content_margin_left = 46.0
+			b.add_theme_stylebox_override(st, s2)
+
+
+func _set_theme() -> Theme:
+	var th := Theme.new()
+	th.set_stylebox("normal", "Button", _sb(Color("#1c3e94"), SET_LINE, 3, 12))
+	th.set_stylebox("hover", "Button", _sb(Color("#2a54bc"), Color("#b5cdfb"), 3, 12))
+	th.set_stylebox("pressed", "Button", _sb(Color("#142f75"), SET_LINE, 3, 12))
+	th.set_stylebox("focus", "Button", _sb(Color("#2a54bc"), Color.WHITE, 4, 12))
+	th.set_stylebox("disabled", "Button", _sb(Color("#1c2c5c"), Color("#47598c"), 2, 12))
+	th.set_color("font_color", "Button", Color.WHITE)
+	th.set_color("font_hover_color", "Button", Color.WHITE)
+	th.set_color("font_focus_color", "Button", Color.WHITE)
+	th.set_color("font_pressed_color", "Button", Color.WHITE)
+	th.set_stylebox("scroll", "VScrollBar", _sb(Color(0.03, 0.06, 0.24, 0.7), Color.TRANSPARENT, 0, 8))
+	th.set_stylebox("grabber", "VScrollBar", _sb(SET_LINE, Color.TRANSPARENT, 0, 8))
+	th.set_stylebox("grabber_highlight", "VScrollBar", _sb(Color("#b5cdfb"), Color.TRANSPARENT, 0, 8))
+	th.set_stylebox("grabber_pressed", "VScrollBar", _sb(Color("#f6c433"), Color.TRANSPARENT, 0, 8))
+	return th
 
 
 func _build_settings() -> void:
 	var s: Control = _screen("settings")
+	var ins: Vector4 = DSP.insets(get_tree())
+	s.add_theme_constant_override("margin_left", 10 + int(ins.x))
+	s.add_theme_constant_override("margin_right", 10 + int(ins.z))
+	s.add_theme_constant_override("margin_top", 8 + int(ins.y))
+	s.add_theme_constant_override("margin_bottom", 10 + int(ins.w))
 	var pc := PanelContainer.new()
+	pc.theme = _set_theme()
+	var fr := _sb(Color("#17307f"), SET_LINE, 4, 20)
+	fr.content_margin_left = 16
+	fr.content_margin_right = 16
+	fr.content_margin_top = 10
+	fr.content_margin_bottom = 22
+	pc.add_theme_stylebox_override("panel", fr)
 	s.add_child(pc)
-	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 10)
-	pc.add_child(v)
-	var hd := HBoxContainer.new()
-	v.add_child(hd)
-	var tt := _label("Ajustes", 38)
-	tt.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	tt.autowrap_mode = TextServer.AUTOWRAP_OFF
-	hd.add_child(tt)
-	hd.add_child(_btn_close("Cerrar", func(): _leave(), Vector2(130, 44)))
-	set_tabs_row = HFlowContainer.new()
-	set_tabs_row.add_theme_constant_override("h_separation", 10)
-	set_tabs_row.add_theme_constant_override("v_separation", 8)
-	v.add_child(set_tabs_row)
-	var ssc := ScrollContainer.new()
-	ssc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	ssc.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	v.add_child(ssc)
-	settings_box = VBoxContainer.new()
-	settings_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	settings_box.add_theme_constant_override("separation", 8)
-	ssc.add_child(settings_box)
-
-
-# Pantalla de novedades, como la pestana "What's new" del original: una tarjeta por version con etiquetas de color.
-func _build_news() -> void:
-	var s: Control = _screen("news")
-	var pc := PanelContainer.new()
-	s.add_child(pc)
-	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 10)
-	pc.add_child(v)
-	var hd := HBoxContainer.new()
-	v.add_child(hd)
-	var tt := _label("Novedades", 38)
-	tt.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	tt.autowrap_mode = TextServer.AUTOWRAP_OFF
-	hd.add_child(tt)
-	hd.add_child(_btn_close("Cerrar", func(): _leave(), Vector2(130, 44)))
-	news_scroll = ScrollContainer.new()
-	news_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	news_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	v.add_child(news_scroll)
-	news_box = VBoxContainer.new()
-	news_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	news_box.add_theme_constant_override("separation", 10)
-	news_scroll.add_child(news_box)
-
-# Pantalla "Apoyar el proyecto": donacion voluntaria, sin ventajas en el juego.
-func _build_support() -> void:
-	var s: Control = _screen("support")
-	var pc := PanelContainer.new()
-	s.add_child(pc)
+	pc.add_child(SetArt.new())
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 12)
 	pc.add_child(v)
 	var hd := HBoxContainer.new()
 	v.add_child(hd)
-	var tt := _label("Apoyar el proyecto", 38)
-	tt.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var rib := PanelContainer.new()
+	var rs := _sb(Color("#2a56c4"), Color("#b5cdfb"), 3, 22)
+	rs.content_margin_top = 2
+	rs.content_margin_bottom = 2
+	rs.content_margin_left = 10
+	rs.content_margin_right = 16
+	rib.add_theme_stylebox_override("panel", rs)
+	hd.add_child(rib)
+	var rh := HBoxContainer.new()
+	rh.add_theme_constant_override("separation", 12)
+	rib.add_child(rh)
+	rh.add_child(IC.rect("gear", 42))
+	var tt := _label("Ajustes", 36)
 	tt.autowrap_mode = TextServer.AUTOWRAP_OFF
-	hd.add_child(tt)
-	hd.add_child(_btn_close("Cerrar", func(): _leave(), Vector2(130, 44)))
+	rh.add_child(tt)
+	var rb := IC.rect("ball", 24)
+	rb.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	rh.add_child(rb)
+	var hsp := Control.new()
+	hsp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hd.add_child(hsp)
+	var cl := _btn_close("Cerrar", func(): _leave(), Vector2(160, 48))
+	_set_btn(cl, "red")
+	_btn_glyph(cl, "x", Color.WHITE)
+	hd.add_child(cl)
+	set_tabs_row = HBoxContainer.new()
+	set_tabs_row.add_theme_constant_override("separation", 10)
+	v.add_child(set_tabs_row)
+	var body := PanelContainer.new()
+	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	var bs := _sb(Color(0.08, 0.15, 0.47, 0.42), SET_LINE, 3, 16)
+	bs.content_margin_right = 6
+	body.add_theme_stylebox_override("panel", bs)
+	v.add_child(body)
+	var ssc := ScrollContainer.new()
+	ssc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	body.add_child(ssc)
+	var bm := MarginContainer.new()
+	bm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bm.add_theme_constant_override("margin_right", 26)   # la barra de desplazamiento no tapa las filas
+	ssc.add_child(bm)
+	settings_box = VBoxContainer.new()
+	settings_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	settings_box.add_theme_constant_override("separation", 8)
+	bm.add_child(settings_box)
+	pc.add_child(SetArt.new(true))
+
+
+# Pantalla de novedades: lista de versiones a la izquierda y el detalle de la elegida a la derecha.
+func _nsb(bg: Color, border: Color, bw: int = 3, rad: int = 10) -> StyleBoxFlat:
+	var sb := _sb(bg, border, bw, rad)
+	sb.corner_detail = 2   # esquinas escalonadas, como pixel art
+	return sb
+
+
+func _build_news() -> void:
+	var s: Control = _screen("news")
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 8)
+	s.add_child(v)
+	var hd := HBoxContainer.new()
+	hd.add_theme_constant_override("separation", 10)
+	v.add_child(hd)
+	var ban := PanelContainer.new()
+	ban.add_theme_stylebox_override("panel", _nsb(Color("#b52a35"), Color("#ffd23f"), 3, 12))
+	hd.add_child(ban)
+	var bh := HBoxContainer.new()
+	bh.add_theme_constant_override("separation", 10)
+	ban.add_child(bh)
+	bh.add_child(IC.rect("ball", 42))
+	var tt := _label("Novedades", 38, C_GOLD)
+	tt.autowrap_mode = TextServer.AUTOWRAP_OFF
+	bh.add_child(tt)
+	var sp := PanelContainer.new()
+	sp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sp.add_theme_stylebox_override("panel", _nsb(Color("#101a30"), Color("#3f6db0")))
+	hd.add_child(sp)
+	var st := _label("Consulta las últimas actualizaciones, cambios y contenido nuevo.", 19)
+	st.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	sp.add_child(st)
+	var body := HBoxContainer.new()
+	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	body.add_theme_constant_override("separation", 10)
+	v.add_child(body)
+	var left := VBoxContainer.new()
+	left.custom_minimum_size.x = 240
+	left.add_theme_constant_override("separation", 8)
+	body.add_child(left)
+	var lp := PanelContainer.new()
+	lp.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	lp.add_theme_stylebox_override("panel", _nsb(Color("#101a30"), Color("#3f6db0")))
+	left.add_child(lp)
+	var lsc := ScrollContainer.new()
+	lsc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	lp.add_child(lsc)
+	news_list = VBoxContainer.new()
+	news_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	news_list.add_theme_constant_override("separation", 6)
+	lsc.add_child(news_list)
+	left.add_child(_btn_close("Cerrar", func(): _leave(), Vector2(0, 52)))
+	var rp := PanelContainer.new()
+	rp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	rp.add_theme_stylebox_override("panel", _nsb(Color("#101a30"), Color("#3f6db0")))
+	body.add_child(rp)
+	news_scroll = ScrollContainer.new()
+	news_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	news_scroll.focus_mode = Control.FOCUS_ALL
+	rp.add_child(news_scroll)
+	var nm := MarginContainer.new()
+	nm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	nm.add_theme_constant_override("margin_right", 36)   # la barra de desplazamiento no tapa las tarjetas
+	news_scroll.add_child(nm)
+	news_box = VBoxContainer.new()
+	news_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	news_box.add_theme_constant_override("separation", 10)
+	nm.add_child(news_box)
+
+
+# Pantalla "Apoyar el proyecto": donacion voluntaria, sin ventajas en el juego. Fondo: la fogata de noche.
+func _support_section(b: VBoxContainer, title: String, icon: String, text: String, col: Color) -> void:
+	var hd := HBoxContainer.new()
+	b.add_child(hd)
+	var tab := PanelContainer.new()
+	tab.add_theme_stylebox_override("panel", _nsb(Color("#1f4a90"), Color("#3f6db0"), 2, 8))
+	hd.add_child(tab)
+	var th := HBoxContainer.new()
+	th.add_theme_constant_override("separation", 8)
+	tab.add_child(th)
+	th.add_child(IC.rect(icon, 26))
+	var tl := _label(title, 21, C_GOLD)
+	tl.autowrap_mode = TextServer.AUTOWRAP_OFF
+	th.add_child(tl)
+	b.add_child(_label(text, 18, col))
+
+
+func _build_support() -> void:
+	var s: Control = _screen("support")
+	var pc := PanelContainer.new()
+	pc.add_theme_stylebox_override("panel", _nsb(Color("#0e1a33"), Color("#9cc8ff"), 3, 12))
+	s.add_child(pc)
+	var holder := Control.new()
+	holder.clip_contents = true
+	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pc.add_child(holder)
+	var art := TextureRect.new()
+	art.texture = load("res://assets/ui/support_art.png")
+	art.set_anchors_preset(Control.PRESET_RIGHT_WIDE)
+	art.offset_left = -606.0
+	art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	art.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	holder.add_child(art)
+	var body := HBoxContainer.new()
+	body.add_theme_constant_override("separation", 10)
+	pc.add_child(body)
+	var v := VBoxContainer.new()
+	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	v.add_theme_constant_override("separation", 8)
+	body.add_child(v)
+	var right := VBoxContainer.new()
+	right.custom_minimum_size.x = 400
+	body.add_child(right)
+	var cr := HBoxContainer.new()
+	cr.alignment = BoxContainer.ALIGNMENT_END
+	right.add_child(cr)
+	cr.add_child(_btn_close("Cerrar", func(): _leave(), Vector2(130, 44)))
+	var ban := PanelContainer.new()
+	ban.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	ban.add_theme_stylebox_override("panel", _nsb(Color("#6b4423"), Color("#3a2410"), 3, 10))
+	v.add_child(ban)
+	var bh := HBoxContainer.new()
+	bh.add_theme_constant_override("separation", 10)
+	ban.add_child(bh)
+	bh.add_child(IC.rect("ball", 40))
+	var tt := _label("Apoyar el proyecto", 34, C_GOLD)
+	tt.autowrap_mode = TextServer.AUTOWRAP_OFF
+	bh.add_child(tt)
 	var sc := ScrollContainer.new()
 	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	sc.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	v.add_child(sc)
+	var sm := MarginContainer.new()
+	sm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sm.add_theme_constant_override("margin_right", 8)
+	sc.add_child(sm)
 	var b := VBoxContainer.new()
 	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	b.add_theme_constant_override("separation", 12)
-	sc.add_child(b)
-	b.add_child(_label("Pokémon Survivors es y seguirá siendo gratis, sin anuncios ni compras. Si quieres que haga posible tener modo multijugador o jugar en línea, puedes hacer una donación voluntaria: todo el dinero va a los gastos del proyecto, nada más.", 27))
-	b.add_child(_label("Donar no da ninguna ventaja en el juego.", 23, Color("#c8d6ee")))
-	b.add_child(_label("Para qué servirían los servidores", 33, C_GOLD))
-	b.add_child(_label("Los servidores ayudarían mucho a subir todo esto a una nube para que los jugadores puedan guardar sus partidas y jugar en línea, y permitirían desarrollar modos multijugador.", 27))
-	b.add_child(_label("Si apoyan el proyecto, desarrollaré todo eso. Ahora mismo no puedo hacerlo por falta de fondos.", 27, C_GOLD))
-	var hb := HFlowContainer.new()
-	hb.add_theme_constant_override("h_separation", 10)
-	hb.alignment = FlowContainer.ALIGNMENT_CENTER
-	v.add_child(hb)
-	var db := _btn("Donar en Ko-fi", func(): OS.shell_open(SUPPORT_URL), Vector2(0, 54))
-	db.icon = IC.tex("heart", IC.scale_for("heart", 26))
+	b.add_theme_constant_override("separation", 8)
+	sm.add_child(b)
+	b.add_child(_label("Pokémon Survivors es y seguirá siendo gratis, sin anuncios ni compras. Si quieres que haga posible tener modo multijugador o jugar en línea, puedes hacer una donación voluntaria: todo el dinero va a los gastos del proyecto, nada más.", 19))
+	var nop := PanelContainer.new()
+	nop.add_theme_stylebox_override("panel", _nsb(Color("#16233f"), Color("#9cc8ff"), 2, 8))
+	b.add_child(nop)
+	var nr := HBoxContainer.new()
+	nr.add_theme_constant_override("separation", 10)
+	nop.add_child(nr)
+	nr.add_child(IC.rect("heart", 26))
+	var nl := _label("Donar no da ninguna ventaja en el juego.", 18, Color("#dfe8ff"))
+	nl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	nr.add_child(nl)
+	_support_section(b, "Para qué servirían los servidores", "m_coop", "Los servidores ayudarían mucho a subir todo esto a una nube para que los jugadores puedan guardar sus partidas y jugar en línea, y permitirían desarrollar modos multijugador.", Color.WHITE)
+	_support_section(b, "Planes a futuro", "contract", "Si apoyan el proyecto, desarrollaré todo eso. Ahora mismo no puedo hacerlo por falta de fondos.", C_GOLD)
+	var db := _btn("Donar en Ko-fi", func(): OS.shell_open(SUPPORT_URL), Vector2(420, 64))
+	db.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	db.icon = IC.tex("heart", IC.scale_for("heart", 34))
+	db.add_theme_font_size_override("font_size", 28)
 	for st in ["normal", "hover", "pressed", "focus"]:
-		var yc := Color("#f4b93a") if st != "hover" else Color("#ffd066")
-		db.add_theme_stylebox_override(st, _sb(yc, Color("#fff1b8") if st != "focus" else Color.WHITE, 3 if st == "focus" else 2, 12))
+		var yc := Color("#e0334f") if st != "hover" else Color("#ff4f6a")
+		db.add_theme_stylebox_override(st, _nsb(yc, Color("#ffd6dc") if st != "focus" else Color.WHITE, 4 if st == "focus" else 3, 14))
 	for fc in ["font_color", "font_hover_color", "font_focus_color", "font_pressed_color"]:
-		db.add_theme_color_override(fc, Color("#3a2200"))
-	hb.add_child(db)
+		db.add_theme_color_override(fc, Color.WHITE)
+	v.add_child(db)
 	support_focus = db
 
 
@@ -6679,114 +7774,245 @@ func _refresh_support() -> void:
 	focus_first = support_focus
 
 
-func _news_tag(text: String, col: Color) -> Control:
-	var wrap := HBoxContainer.new()
-	var pc := PanelContainer.new()
-	var sb := _sb(col, col.darkened(0.25), 2, 8)
-	sb.content_margin_left = 12
-	sb.content_margin_right = 12
-	sb.content_margin_top = 3
-	sb.content_margin_bottom = 3
-	pc.add_theme_stylebox_override("panel", sb)
-	var l := _label(text, 18, Color("#10243f"))
-	l.autowrap_mode = TextServer.AUTOWRAP_OFF
-	pc.add_child(l)
-	wrap.add_child(pc)
-	return wrap
+# Mando y teclado: arriba/abajo cambia de version; a la derecha entras al detalle y ahi arriba/abajo lo desplaza.
+func _news_nav(event: InputEvent) -> bool:
+	var dn: bool = event.is_action_pressed("ui_down", true)
+	var up: bool = event.is_action_pressed("ui_up", true)
+	var fo: Control = get_viewport().gui_get_focus_owner()
+	if fo == news_scroll:
+		if dn or up:
+			news_scroll.scroll_vertical += 130 if dn else -130
+			return true
+		if event.is_action_pressed("ui_left"):
+			news_btns[news_sel].grab_focus()
+			return true
+		return false
+	if not news_btns.has(fo):
+		return false
+	if event.is_action_pressed("ui_right"):
+		news_scroll.grab_focus()
+		return true
+	if dn or up:
+		var ni: int = clampi(news_sel + (1 if dn else -1), 0, news_btns.size() - 1)
+		_news_select(ni)
+		news_btns[ni].grab_focus()
+		return true
+	return false
 
 
 func _refresh_news() -> void:
+	for c in news_list.get_children():
+		news_list.remove_child(c)
+		c.queue_free()
+	news_btns = []
+	for i in range(PN.ENTRIES.size()):
+		var b := Button.new()
+		b.custom_minimum_size = Vector2(0, 54)
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		b.pressed.connect(_news_select.bind(i))
+		news_list.add_child(b)
+		news_btns.append(b)
+		var row := HBoxContainer.new()
+		row.set_anchors_preset(Control.PRESET_FULL_RECT)
+		row.offset_left = 10
+		row.offset_right = -8
+		row.add_theme_constant_override("separation", 8)
+		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		b.add_child(row)
+		var ic := IC.rect("ball", 30)
+		ic.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(ic)
+		var vt := _label("v" + String(PN.ENTRIES[i]["ver"]), 24)
+		vt.autowrap_mode = TextServer.AUTOWRAP_OFF
+		vt.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		vt.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		vt.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(vt)
+		if i == 0:
+			var nw := PanelContainer.new()
+			nw.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			nw.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			nw.add_theme_stylebox_override("panel", _nsb(Color("#d12a3c"), Color("#ff9aa2"), 2, 6))
+			var nl := _label("¡NUEVO!", 14)
+			nl.autowrap_mode = TextServer.AUTOWRAP_OFF
+			nl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			nw.add_child(nl)
+			row.add_child(nw)
+	_news_select(0)
+	focus_first = news_btns[0]
+
+
+func _news_select(idx: int) -> void:
+	news_sel = idx
+	for i in range(news_btns.size()):
+		var on: bool = i == idx
+		var b: Button = news_btns[i]
+		b.add_theme_stylebox_override("normal", _nsb(Color("#d98a12") if on else Color("#16233f"), Color("#ffe07a") if on else Color("#3f6db0")))
+		b.add_theme_stylebox_override("hover", _nsb(Color("#e8a020") if on else Color("#22345c"), Color("#ffe07a")))
+		b.add_theme_stylebox_override("pressed", _nsb(Color("#b8740c"), Color("#ffe07a")))
+		b.add_theme_stylebox_override("focus", _nsb(Color("#d98a12") if on else Color("#22345c"), Color.WHITE, 4))
 	for c in news_box.get_children():
 		news_box.remove_child(c)
 		c.queue_free()
-	var first_entry := true
-	for e in PN.ENTRIES:
-		if not first_entry:
-			news_box.add_child(HSeparator.new())
-		first_entry = false
-		var t := _label(L.t(String(e["title"])), 30, C_GOLD)
-		t.add_theme_constant_override("outline_size", 0)
-		news_box.add_child(t)
-		news_box.add_child(_label("%s  ·  v%s" % [PN.fmt_date(String(e["date"]), L.lang()), String(e["ver"])], 20, Color("#aebbd6")))
-		for sec in [["new", "Nuevo", Color("#5ddc8a")], ["changes", "Cambios", Color("#4db3ff")], ["fixes", "Arreglos", Color("#ffb347")]]:
-			var lines: Array = e.get(String(sec[0]), [])
-			if lines.is_empty():
-				continue
-			news_box.add_child(_news_tag(L.t(String(sec[1])), sec[2]))
-			for ln in lines:
-				var brow := HBoxContainer.new()
-				brow.add_theme_constant_override("separation", 10)
-				var dot := _label("•", 22)
-				dot.autowrap_mode = TextServer.AUTOWRAP_OFF
-				dot.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-				brow.add_child(dot)
-				var bl := _label(L.t(String(ln)), 22)
-				bl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-				brow.add_child(bl)
-				news_box.add_child(brow)
+	var e: Dictionary = PN.ENTRIES[idx]
+	news_box.add_child(_news_hero(e))
+	for sec in [["new", "Nuevo", Color("#c9404e"), "star"], ["changes", "Cambios", Color("#2f9a5a"), "up"], ["fixes", "Arreglos", Color("#2f7fd0"), "gear"]]:
+		var lines: Array = e.get(String(sec[0]), [])
+		if not lines.is_empty():
+			news_box.add_child(_news_section(String(sec[1]), sec[2], String(sec[3]), lines))
 	news_scroll.scroll_vertical = 0
-	for b in news_box.get_parent().get_parent().find_children("*", "Button", true, false):
-		focus_first = b
-		break
-	var cb: Control = null
-	for b2 in news_scroll.get_parent().get_child(0).get_children():
-		if b2 is Button:
-			cb = b2
-	if cb != null:
-		focus_first = cb
+	_news_fit(idx)
+
+
+# El texto con saltos de linea solo sabe su altura tras colocarse: se ajusta y asi las tarjetas no lo cortan.
+func _news_fit(idx: int) -> void:
+	for pass_i in range(2):
+		await get_tree().process_frame
+		if news_sel != idx:
+			return
+		for l in news_box.find_children("*", "Label", true, false):
+			var lb: Label = l
+			if lb.autowrap_mode != TextServer.AUTOWRAP_OFF and lb.get_parent() is HBoxContainer:
+				lb.custom_minimum_size.y = float(lb.get_line_count()) * float(lb.get_line_height() + lb.get_theme_constant("line_spacing"))
+
+
+func _news_hero(e: Dictionary) -> Control:
+	var hero := Control.new()
+	hero.custom_minimum_size = Vector2(0, 150)
+	hero.clip_contents = true
+	var art := TextureRect.new()
+	art.texture = load("res://assets/ui/news_hero.png")
+	art.set_anchors_preset(Control.PRESET_FULL_RECT)
+	art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	art.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hero.add_child(art)
+	var vt := Label.new()
+	vt.text = "Pokémon Survivors V" + String(e["ver"])
+	vt.position = Vector2(20, 8)
+	vt.add_theme_font_size_override("font_size", 40)
+	vt.add_theme_color_override("font_color", C_GOLD)
+	vt.add_theme_constant_override("outline_size", 10)
+	vt.add_theme_color_override("font_outline_color", Color("#3a1a08"))
+	hero.add_child(vt)
+	var info := VBoxContainer.new()
+	info.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	info.offset_left = 20
+	info.offset_right = -270
+	info.offset_top = -74
+	info.offset_bottom = -4
+	info.alignment = BoxContainer.ALIGNMENT_END
+	hero.add_child(info)
+	var tl := _label(L.t(String(e["title"])), 18)
+	tl.add_theme_constant_override("outline_size", 6)
+	tl.add_theme_color_override("font_outline_color", Color("#10243f"))
+	info.add_child(tl)
+	var dl := _label(PN.fmt_date(String(e["date"]), L.lang()), 16, Color("#fff2d0"))
+	dl.add_theme_constant_override("outline_size", 5)
+	dl.add_theme_color_override("font_outline_color", Color("#10243f"))
+	info.add_child(dl)
+	for i in range(3):
+		var pv := Preview.new()
+		# de pie sobre la hierba del banner, en el mismo sitio que en el arte
+		var fx: float = [0.78, 0.88, 0.945][i]
+		var fy: float = [0.0, 0.0, -16.0][i]   # Squirtle, un poco mas arriba, sobre su loma
+		pv.anchor_left = fx
+		pv.anchor_right = fx
+		pv.anchor_top = 1.0
+		pv.anchor_bottom = 1.0
+		pv.offset_left = -45.0
+		pv.offset_right = 45.0
+		pv.offset_top = -102.0 + fy
+		pv.offset_bottom = 8.0 + fy
+		hero.add_child(pv)
+		pv.setup([4, 1, 7][i], false, 2.4)
+		pv.walk = true
+		pv.row = 5   # de espaldas, mirando en diagonal hacia las montanas de la izquierda
+	return hero
+
+
+func _news_section(title: String, col: Color, icon: String, lines: Array) -> Control:
+	var pc := PanelContainer.new()
+	pc.add_theme_stylebox_override("panel", _nsb(col.darkened(0.72), col))
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 6)
+	pc.add_child(v)
+	var hd := HBoxContainer.new()
+	v.add_child(hd)
+	var tab := PanelContainer.new()
+	tab.add_theme_stylebox_override("panel", _nsb(col, col.lightened(0.3), 2, 8))
+	hd.add_child(tab)
+	var th := HBoxContainer.new()
+	th.add_theme_constant_override("separation", 8)
+	tab.add_child(th)
+	th.add_child(IC.rect(icon, 26))
+	var tl := _label(title, 24, Color.WHITE)
+	tl.autowrap_mode = TextServer.AUTOWRAP_OFF
+	th.add_child(tl)
+	for ln in lines:
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 10)
+		var dot := IC.rect("ball", 18)
+		dot.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+		row.add_child(dot)
+		var bl := _label(L.t(String(ln)), 20)
+		bl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(bl)
+		v.add_child(row)
+	return pc
 
 
 func _slider_row(label: String, key: String) -> void:
 	var row := HBoxContainer.new()
-	settings_box.add_child(row)
-	var sic := IC.rect("sound", 28)
-	sic.custom_minimum_size.x = 40
-	row.add_child(sic)
+	row.add_theme_constant_override("separation", 12)
+	_set_row_panel().add_child(row)
+	row.add_child(SetGlyph.new({"master": "speaker", "music": "music", "sfx": "spark"}.get(key, "speaker"), 32.0))
 	var l := _label(label, 22)
-	l.custom_minimum_size = Vector2(200, 0)
+	l.custom_minimum_size = Vector2(230, 0)
+	l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(l)
 	var sl := HSlider.new()
 	sl.min_value = 0
 	sl.max_value = 100
 	sl.step = 5
 	sl.value = float(SV.d["settings"][key])
-	sl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	sl.custom_minimum_size = Vector2(0, 40)
-	sl.focus_mode = Control.FOCUS_ALL
+	_set_slider(sl)
+	row.add_child(sl)
+	var pl := _set_pill("%d%%" % int(sl.value))
+	row.add_child(pl.get_parent())
 	sl.value_changed.connect(func(v: float):
 		SV.d["settings"][key] = int(v)
+		pl.text = "%d%%" % int(v)
 		SV.save()
 		if Aud.inst != null:
 			Aud.inst.apply()
 		if key == "sfx":
 			Aud.sfx("coin"))
-	row.add_child(sl)
 
 
 func _view_row() -> void:
 	var box := VBoxContainer.new()
-	settings_box.add_child(box)
+	_set_row_panel().add_child(box)
 	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
 	box.add_child(row)
-	var sic := IC.rect("phone", 28)
-	sic.custom_minimum_size.x = 40
-	row.add_child(sic)
+	row.add_child(SetGlyph.new("monitor", 32.0))
 	var l := _label("Tamaño de pantalla", 22)
-	l.custom_minimum_size = Vector2(200, 0)
+	l.custom_minimum_size = Vector2(230, 0)
+	l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(l)
 	var sl := HSlider.new()
 	sl.min_value = DSP.MIN_PCT
 	sl.max_value = DSP.MAX_PCT
 	sl.step = 5
 	sl.value = float(DSP.pct())
-	sl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	sl.custom_minimum_size = Vector2(0, 40)
-	sl.focus_mode = Control.FOCUS_ALL
+	sl.scrollable = false
+	_set_slider(sl)
 	row.add_child(sl)
-	var pl := _label("%d%%" % DSP.pct(), 22, C_GOLD)
-	pl.custom_minimum_size = Vector2(80, 0)
-	pl.autowrap_mode = TextServer.AUTOWRAP_OFF
-	row.add_child(pl)
+	var pl := _set_pill("%d%%" % DSP.pct())
+	row.add_child(pl.get_parent())
 	var rs := _btn("Restablecer", func(): pass, Vector2(150, 40))
 	row.add_child(rs)
 	var info := _label("", 16, Color("#c8d6ee"))
@@ -6803,16 +8029,31 @@ func _view_row() -> void:
 
 
 func _sec(title: String) -> void:
-	var l := _label(title, 28, C_GOLD)
+	var pc := PanelContainer.new()
+	pc.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	var sb := _sb(Color("#2a56c4"), SET_LINE, 3, 6)
+	sb.corner_radius_top_left = 16
+	sb.corner_radius_bottom_right = 22
+	sb.content_margin_top = 4
+	sb.content_margin_bottom = 4
+	sb.content_margin_right = 34
+	pc.add_theme_stylebox_override("panel", sb)
+	settings_box.add_child(pc)
+	var h := HBoxContainer.new()
+	h.add_theme_constant_override("separation", 10)
+	pc.add_child(h)
+	h.add_child(SetGlyph.new(String(SET_SEC_ICON.get(title, "spark")), 30.0))
+	var l := _label(title, 26)
+	l.autowrap_mode = TextServer.AUTOWRAP_OFF
 	l.add_theme_constant_override("outline_size", 0)
-	settings_box.add_child(l)
+	h.add_child(l)
 
 
 # Fila: titulo + descripcion a la izquierda, control a la derecha.
 func _srow(title: String, desc: String, ctrl: Control) -> void:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 12)
-	settings_box.add_child(row)
+	_set_row_panel().add_child(row)
 	var tv := VBoxContainer.new()
 	tv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	tv.add_theme_constant_override("separation", 0)
@@ -6820,9 +8061,8 @@ func _srow(title: String, desc: String, ctrl: Control) -> void:
 	tv.add_child(_label(title, 22))
 	if desc != "":
 		tv.add_child(_label(desc, 16, Color("#c8d6ee")))
+	ctrl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(ctrl)
-	var sep := HSeparator.new()
-	settings_box.add_child(sep)
 
 
 # Selector de opciones: la elegida lleva borde dorado.
@@ -6832,9 +8072,7 @@ func _seg(opts: Array, cur_i: int, cb: Callable, translate: bool = true) -> HBox
 	for i in range(opts.size()):
 		var b := _btn(L.t(String(opts[i])) if translate else String(opts[i]), func(): cb.call(i), Vector2(0, 44))
 		if i == cur_i:
-			for st in ["normal", "hover", "pressed"]:
-				b.add_theme_stylebox_override(st, _sb(C_BTN_H, C_GOLD, 3, 22))
-			b.add_theme_color_override("font_color", C_GOLD)
+			_set_btn(b, "gold")
 		h.add_child(b)
 	return h
 
@@ -6842,7 +8080,7 @@ func _seg(opts: Array, cur_i: int, cb: Callable, translate: bool = true) -> HBox
 func _yesno(on: bool, cb: Callable) -> Button:
 	var b := _btn(L.t("Sí") if on else L.t("No"), func(): cb.call(not on), Vector2(90, 46))
 	if on:
-		_gold_btn(b, true)
+		_set_btn(b, "gold")
 	return b
 
 
@@ -6863,12 +8101,34 @@ func _refresh_settings() -> void:
 	_clear(set_tabs_row)
 	var first_tab: Button = null
 	for i in range(SET_TABS.size()):
-		var tb := _btn(L.t(SET_TABS[i]), func(): set_tab = i; last_act = ""; _refresh_settings(); _gf(tab_sel), Vector2(0, 46))
-		if i == set_tab:
-			for st in ["normal", "hover", "pressed"]:
-				tb.add_theme_stylebox_override(st, _sb(Color("#3b5aa8"), C_GOLD, 3, 14))
+		var tb := _btn("", func(): set_tab = i; last_act = ""; _refresh_settings(); _gf(tab_sel), Vector2(0, 54))
+		tb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var on: bool = i == set_tab
+		var fc: Color = Color("#2b1a00") if on else Color.WHITE
+		if on:
+			_set_btn(tb, "gold")
 			first_tab = tb
 			tab_sel = tb
+		var trow := HBoxContainer.new()
+		trow.set_anchors_preset(Control.PRESET_FULL_RECT)
+		trow.alignment = BoxContainer.ALIGNMENT_CENTER
+		trow.add_theme_constant_override("separation", 10)
+		trow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		tb.add_child(trow)
+		trow.add_child(SetGlyph.new(String(SET_TAB_ICON[i]), 30.0, fc))
+		var tl := _label(L.t(SET_TABS[i]), 22, fc)
+		tl.autowrap_mode = TextServer.AUTOWRAP_OFF
+		tl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		tl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		trow.add_child(tl)
+		tb.custom_minimum_size.x = tl.get_minimum_size().x + 70.0
+		if on:
+			var ptr := SetGlyph.new("pointer", 1.0)
+			ptr.anchor_left = 0.5
+			ptr.anchor_right = 0.5
+			ptr.anchor_top = 1.0
+			ptr.anchor_bottom = 1.0
+			tb.add_child(ptr)
 		set_tabs_row.add_child(tb)
 	tab_row = set_tabs_row
 	_clear(settings_box)
@@ -6898,8 +8158,9 @@ func _set_sound() -> void:
 		if Aud.inst != null:
 			Aud.inst.apply()
 		_refresh_settings(), Vector2(220, 50))
-	if not muted:
-		_gold_btn(mb, true)
+	_set_btn(mb, "gold")
+	_btn_glyph(mb, "speaker" if muted else "mute", Color("#2b1a00"))
+	mb.custom_minimum_size.x = 280
 	mb.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	settings_box.add_child(mb)
 
@@ -6925,9 +8186,7 @@ func _set_graphics() -> void:
 		lb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		lb.add_theme_font_size_override("font_size", 20)
 		if code == cur_lang:
-			for st in ["normal", "hover", "pressed"]:
-				lb.add_theme_stylebox_override(st, _sb(C_BTN_H, C_GOLD, 3, 22))
-			lb.add_theme_color_override("font_color", C_GOLD)
+			_set_btn(lb, "gold")
 		lg.add_child(lb)
 	settings_box.add_child(lg)
 	_sec("Calidad")
@@ -6935,12 +8194,17 @@ func _set_graphics() -> void:
 		SV.d["settings"]["quality"] = i
 		SV.save()
 		_refresh_settings()))
+	_srow("Rendimiento", "Si el juego va a tirones (sobre todo con movimientos fusión): Ahorro y Mínimo quitan efectos, estelas y números de daño sueltos y simplifican los disparos. No cambia el daño ni la dificultad.", _seg(["Normal", "Ahorro", "Mínimo"], clampi(int(SV.d["settings"].get("perf", 0)), 0, 2), func(i: int):
+		SV.d["settings"]["perf"] = i
+		SV.save()
+		_refresh_settings()))
 	_srow("Opacidad de los efectos", "Qué tan transparentes se ven los ataques de tus movimientos, para ver mejor a los enemigos. No afecta a los avisos de peligro.", _seg(["100%", "75%", "50%", "30%"], clampi(int(SV.d["settings"].get("fx_op", 1)), 0, 3), func(i: int):
 		SV.d["settings"]["fx_op"] = i
 		SV.save()
 		_refresh_settings()))
 	_sec("Pantalla")
-	_view_row()
+	if not DSP.is_desktop():
+		_view_row()
 	if DSP.is_desktop():
 		_srow("Modo de ventana", "Ventana o pantalla completa (solo en PC).", _seg(["Ventana", "Pantalla completa"], DSP.win_mode(), func(i: int):
 			DSP.set_window(i, DSP.win_res())
@@ -6956,7 +8220,11 @@ func _set_graphics() -> void:
 		TXS.scale_tree(self)
 		_refresh_settings()))
 	_srow("Números de daño", "Los números que salen al golpear o ser golpeado.", _toggle_set("dmg_numbers"))
-	_srow("Menos sacudidas y destellos", "La cámara tiembla menos y los destellos son más suaves.", _toggle_set("shake", true))
+	_srow("Temblor de pantalla", "Cuánto tiembla la cámara. Reducido y Apagado también suavizan los destellos.", _seg(["Normal", "Reducido", "Apagado"], SV.shake_lv(), func(i: int):
+		SV.d["settings"]["shake_lv"] = i
+		SV.d["settings"]["shake"] = i == 0
+		SV.save()
+		_refresh_settings()))
 	_srow("Vibración", "Vibra el móvil cuando te golpean.", _toggle_set("vibration"))
 	_srow("Mostrar FPS", "Cuadros por segundo, en la esquina.", _toggle_set("fps"))
 	_srow("Caja de estadísticas", "Muestra tus estadísticas (daño, velocidad…) arriba a la izquierda.", _toggle_set("stats_box"))
@@ -6990,7 +8258,7 @@ func _set_controls() -> void:
 			last_act = act
 			_refresh_listen(), Vector2(190, 46))
 		if listening == act:
-			_gold_btn(cb, true)
+			_set_btn(cb, "gold")
 		else:
 			cb.icon = PADI.tex(PAD.btn(act))
 			cb.expand_icon = true
@@ -7067,24 +8335,83 @@ func _danger(b: Button) -> void:
 	b.add_theme_stylebox_override("focus", _sb(Color("#a92a3b"), Color.WHITE, 5, 12))
 
 
+# v6.0: About con el logo sobre el paisaje, tarjeta legal y creditos con siluetas de fondo.
 func _set_about() -> void:
-	var t := _label("PokéSurvivor", 52, C_GOLD)
-	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	settings_box.add_child(t)
-	var by := _label("Port de Android por JayElDragon", 30)
-	by.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	settings_box.add_child(by)
-	var ver := _label(L.t("Versión") + " " + UPD.APP_VERSION + " · Android", 20, Color("#c8d6ee"))
-	ver.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	settings_box.add_child(ver)
-	settings_box.add_child(_label("Juego de fans gratis y sin ánimo de lucro: sin anuncios ni compras. Pokémon y sus personajes pertenecen a Nintendo, Creatures y GAME FREAK; este proyecto no está afiliado con ellos.", 20, Color("#c8d6ee")))
-	_sec("Créditos")
+	var am := MarginContainer.new()
+	am.add_theme_constant_override("margin_right", 36)   # la barra de desplazamiento no tapa las tarjetas
+	settings_box.add_child(am)
+	var ab := VBoxContainer.new()
+	ab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	ab.add_theme_constant_override("separation", 8)
+	am.add_child(ab)
+	var hero := TextureRect.new()
+	hero.texture = load("res://assets/ui/about_hero.png")
+	hero.custom_minimum_size = Vector2(0, 200)
+	hero.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	hero.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	hero.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	hero.clip_contents = true
+	ab.add_child(hero)
+	var hr := HBoxContainer.new()
+	hr.alignment = BoxContainer.ALIGNMENT_CENTER
+	hr.add_theme_constant_override("separation", 14)
+	ab.add_child(hr)
+	var by := _label("Port de Android por JayElDragon", 24)
+	by.autowrap_mode = TextServer.AUTOWRAP_OFF
+	hr.add_child(by)
+	var pill := PanelContainer.new()
+	pill.add_theme_stylebox_override("panel", _nsb(Color("#101a30"), Color("#9cc8ff"), 2, 10))
+	var ver := _label(L.t("Versión") + " " + UPD.APP_VERSION + " · Android", 18)
+	ver.autowrap_mode = TextServer.AUTOWRAP_OFF
+	pill.add_child(ver)
+	hr.add_child(pill)
+	var lp := PanelContainer.new()
+	lp.add_theme_stylebox_override("panel", _nsb(Color("#101a30"), Color("#3f6db0")))
+	lp.add_child(_label("Juego de fans gratis y sin ánimo de lucro: sin anuncios ni compras. Pokémon y sus personajes pertenecen a Nintendo, Creatures y GAME FREAK; este proyecto no está afiliado con ellos.", 18, Color("#dfe8ff")))
+	ab.add_child(lp)
+	var cp := PanelContainer.new()
+	cp.add_theme_stylebox_override("panel", _nsb(Color("#101a30"), Color("#3f6db0")))
+	ab.add_child(cp)
+	var holder := Control.new()
+	holder.clip_contents = true
+	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cp.add_child(holder)
+	var art := TextureRect.new()
+	art.texture = load("res://assets/ui/about_credits.png")
+	art.set_anchors_preset(Control.PRESET_RIGHT_WIDE)
+	art.offset_left = -360.0
+	art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	art.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	holder.add_child(art)
+	var cv := VBoxContainer.new()
+	cv.add_theme_constant_override("separation", 6)
+	cp.add_child(cv)
+	var ch := HBoxContainer.new()
+	cv.add_child(ch)
+	var tab := PanelContainer.new()
+	tab.add_theme_stylebox_override("panel", _nsb(Color("#2f7fd0"), Color("#9cc8ff"), 2, 8))
+	ch.add_child(tab)
+	var th := HBoxContainer.new()
+	th.add_theme_constant_override("separation", 8)
+	tab.add_child(th)
+	th.add_child(IC.rect("ball", 26))
+	var tl := _label("Créditos", 24, C_GOLD)
+	tl.autowrap_mode = TextServer.AUTOWRAP_OFF
+	th.add_child(tl)
 	for line in ["• Juego original (web): JPTER78.", "• Port de Android: JayElDragon.", "• Sprites: PMD SpriteCollab y sus artistas (CC BY-NC 4.0).", "• Datos Pokémon: PokéAPI.", "• Fuente: Pixelify Sans (OFL)."]:
-		settings_box.add_child(_label(line, 20))
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 10)
+		row.add_child(IC.rect("ball", 18))
+		var ll := _label(L.t(line).trim_prefix("• "), 18)
+		ll.autowrap_mode = TextServer.AUTOWRAP_OFF
+		row.add_child(ll)
+		cv.add_child(row)
 	var hb := HFlowContainer.new()
 	hb.add_theme_constant_override("h_separation", 10)
 	hb.alignment = FlowContainer.ALIGNMENT_CENTER
-	settings_box.add_child(hb)
+	ab.add_child(hb)
 	var dxb := _btn("Pokédex", func(): _show("dex"), Vector2(0, 50))
 	hb.add_child(dxb)
 	hb.add_child(_btn("Mi repositorio en GitHub", func(): OS.shell_open(REPO_URL), Vector2(0, 50)))

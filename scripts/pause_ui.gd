@@ -18,6 +18,7 @@ signal open_settings
 signal summary_requested
 signal fov_changed(pct: int)
 signal stick_fixed_changed(on: bool)
+signal perf_changed(lv: int)
 
 const GOLD := Color("#ffd23f")
 var th := Theme.new()
@@ -135,6 +136,7 @@ func build() -> void:
 	v.add_child(_fov_row())
 	v.add_child(_stick_row())
 	v.add_child(_aim_row())
+	v.add_child(_perf_row())
 	var mrow := HBoxContainer.new()
 	mrow.alignment = BoxContainer.ALIGNMENT_CENTER
 	v.add_child(mrow)
@@ -661,6 +663,14 @@ func _slider_row(label: String, key: String) -> HBoxContainer:
 
 
 # Campo de vision: acerca/aleja la camara (100-200 %). Se guarda y se aplica al instante.
+var fov_sl: HSlider = null
+
+
+func sync_fov() -> void:
+	if fov_sl != null:
+		fov_sl.value = float(clampi(int(SV.d["settings"].get("fov", 165)), 100, 200))
+
+
 func _fov_row() -> HBoxContainer:
 	var row := HBoxContainer.new()
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -677,6 +687,8 @@ func _fov_row() -> HBoxContainer:
 	sl.max_value = 200
 	sl.step = 5
 	sl.value = float(clampi(int(SV.d["settings"].get("fov", 165)), 100, 200))
+	sl.scrollable = false   # v5.8: la rueda del raton no cambia la vision sin querer
+	fov_sl = sl
 	sl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	sl.custom_minimum_size = Vector2(300, 40)
 	sl.focus_mode = Control.FOCUS_ALL
@@ -729,6 +741,36 @@ func _stick_row() -> HBoxContainer:
 	var sp := Control.new()
 	sp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(sp)
+	return row
+
+
+var perf_btns: Array = []
+
+
+# Rendimiento: menos efectos (no cambia el dano). Se aplica al instante.
+func _perf_row() -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 10)
+	var l := _label("Rendimiento", 24)
+	l.custom_minimum_size = Vector2(190, 0)
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	row.add_child(l)
+	perf_btns.clear()
+	var cur: int = clampi(int(SV.d["settings"].get("perf", 0)), 0, 2)
+	var names: Array = ["Normal", "Ahorro", "Mínimo"]
+	for i in range(3):
+		var b := _btn(String(names[i]), i == cur, func(): pass)
+		b.custom_minimum_size = Vector2(130, 48)
+		b.add_theme_font_size_override("font_size", 22)
+		b.pressed.connect(func():
+			SV.d["settings"]["perf"] = i
+			SV.save()
+			for k in range(perf_btns.size()):
+				_style_toggle(perf_btns[k], k == i)
+			perf_changed.emit(i))
+		perf_btns.append(b)
+		row.add_child(b)
 	return row
 
 

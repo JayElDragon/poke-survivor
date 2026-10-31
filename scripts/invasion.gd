@@ -106,7 +106,7 @@ func update(delta: float) -> void:
 			if float(cur["t"]) <= 0.0:
 				cur["state"] = "go"
 				cur["t"] = DURATION
-				_big("You are being invaded!!", "Survive until the timer runs out")
+				_big(m.L.t("¡Te están invadiendo!"), m.L.t("Sobrevive hasta que se acabe el tiempo"))
 				if cur["kind"] == "alpha":
 					m.alpha.spawn()
 				log.append(["start", cur["kind"]])

@@ -143,8 +143,8 @@ static func apply() -> void:
 # ---------------------------------------------------------------
 const STICK_ON := 0.6       # a partir de aqui el stick cuenta como empujado
 const STICK_OFF := 0.35     # por debajo de aqui se considera suelto (evita rebotes)
-const STICK_DELAY := 0.42   # espera antes de empezar a repetir
-const STICK_REPEAT := 0.16  # segundos entre saltos mientras se mantiene
+const STICK_DELAY := 0.5    # espera antes de empezar a repetir
+const STICK_REPEAT := 0.24  # segundos entre saltos mientras se mantiene (antes 0,16: se sentia "turbo")
 static var vertical_only := false   # el stick ignora el eje X (lista de modos)
 static var _sdir := Vector2i.ZERO
 static var _snext := 0.0

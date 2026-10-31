@@ -8,6 +8,8 @@ const ARENA_R := 24.0
 const BOSS_EVERY := 5.0
 const TOUCH := 0.4
 const SCALE := 1.5
+const SPD_SOFT := 130.0
+const SPD_OVER := 0.25
 const T_TITLE := 1.3
 const T_FLASH := 4.7
 const T_PORT := 5.1
@@ -482,7 +484,7 @@ func fight() -> void:
 	m._say(L.t("¡Arceus puede ser derrotado! Aguanta y acaba con él"), 3.4)
 	won = false
 	win_t = 0.0
-	A.max_hp = roundf(base * 30.0)
+	A.max_hp = 5000000.0   # 5 millones fijos (pedido del dueño)
 	A.hp = A.max_hp
 	A.def["scripted"] = true
 	A.set_meta("jd_arceus", true)
@@ -567,8 +569,8 @@ func arceus_tick(dt: float) -> void:
 	var tg: Vector2 = m.player.position
 	var dv: Vector2 = tg - A.position
 	var dist: float = dv.length()
-	var k: float = minf(1.22, 0.74 + arena_t * 0.013)
-	var spd: float = maxf(70.0, m._spd() * k)
+	var k: float = minf(1.22, 0.74 + arena_t * 0.013) + maxf(0.0, arena_t - 300.0) * 0.0015
+	var spd: float = maxf(70.0, cap_spd(m._spd()) * k)
 	var dn: Vector2 = dv / maxf(dist, 0.001)
 	A.position += dn * spd * dt
 	A.face_angle(dn.angle())
@@ -636,6 +638,16 @@ func cast_tick(dt: float) -> void:
 		cd = maxf(1.4, 3.2 - arena_t * 0.025)
 
 
+# Tope suave de velocidad del jugador durante la Sentencia (anti-huida sin fin).
+static func cap_spd(s: float) -> float:
+	return s if s <= SPD_SOFT else SPD_SOFT + (s - SPD_SOFT) * SPD_OVER
+
+
+# Daño del toque: 40% al inicio; sube del min 7 al 10 de Sentencia hasta 100%.
+func touch_pct() -> float:
+	return minf(1.0, TOUCH + maxf(0.0, arena_t - 420.0) / 180.0 * (1.0 - TOUCH))
+
+
 func touch() -> void:
 	var pl = m.player
 	if pl.dead or touch_cd > 0.0:
@@ -645,7 +657,7 @@ func touch() -> void:
 		return
 	touch_cd = 0.9
 	pl.invuln = 0.0
-	m._hurt_player(pl.max_hp * TOUCH, "", true)
+	m._hurt_player(pl.max_hp * touch_pct(), "", true)
 	m.shake = 9.0
 	m._ring(pl.position, 6.0, 70.0, GOLD, 0.4)
 	A.play("Attack", 1.4)
@@ -687,7 +699,7 @@ func spawn_boss() -> void:
 	var k: float = pow(2.0, float(boss_n))
 	var ranged: bool = m._has_t(mon["types"], ["psychic", "electric", "ghost", "fairy", "fire", "water", "ice", "dragon"])
 	var def := {"dex": dex, "name": String(mon["name"]), "hp": roundf(base * k),
-		"spd": roundf(clampf(48.0 + (float(mon["spd"]) - 78.0) * 0.6, 48.0, 105.0)),
+		"spd": roundf(maxf(clampf(48.0 + (float(mon["spd"]) - 78.0) * 0.6, 48.0, 105.0), cap_spd(m._spd()) * 0.8)),
 		"dmg": roundf((36.0 + t / 20.0) * k), "xp": roundf(500.0 + t * 1.2),
 		"behavior": "ranged" if ranged else "charger",
 		"shotDmg": roundf((18.0 + t / 40.0) * k), "shotCd": 0.9, "range": 300.0}
