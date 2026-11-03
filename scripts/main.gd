@@ -473,6 +473,15 @@ var tickets := 0
 var tickets10 := 0
 var gold_gcoins_run := 0
 var gcoins_run := 0   # Gachapon Coins de la partida (las suelta Poltchageist)
+# v6.2: modo Halloween (se activa en el menu principal)
+const HW_GENGAR_AT := 1500.0   # minuto 25: antes de la Sentencia de Arceus del minuto 30
+const HW_CANDY_P := 0.07
+const HW_GHOST_W := 4.0
+var hw := false
+var hw_candy_run := 0
+var hw_gengar_done := false
+# v6.2: Caramelo Raro y subidas de nivel sin nada que elegir dan una mejora al azar
+var rc_bonus := {"atk": 0.0, "spd": 0.0, "cd": 0.0}
 # --- grietas y arenas legendarias ---
 const ARENA_POS := Vector2(60000.0, 60000.0)
 const RIFT_START := 75.0
@@ -667,9 +676,20 @@ func _ready() -> void:
 	sec.m = self
 	sec.poi = poi
 	jd.m = self
+	hw = SV.hw_on() and not ["tower", "chal"].has(mode)
+	Prop.hw = hw
 	dn = DNC.new()
 	dn.m = self
 	dn.setup()
+	if hw:
+		var deco := HWDecor.new()
+		deco.m = self
+		gfx.add_child(deco)
+		gfx.move_child(deco, 0)
+	if bool(SV.d.get("hw_hat_on", false)) and bool(SV.d.get("hw_hat", false)):
+		var hat := HWHat.new()
+		hat.p = player
+		player.add_child(hat)
 	wx = WeatherFx.new()
 	ui.add_child(wx)
 	hud = Hud.new()
@@ -1089,7 +1109,7 @@ func _finish_run() -> void:
 		for md_id in mods:
 			st2["mb_" + String(md_id)] = maxi(int(st2.get("mb_" + String(md_id), 0)), rmin)
 	SV.finish_run({"judge": js, "time": run_time, "kills": kills, "level": player.level, "bosses": run_bosses,
-		"chests": run_chests, "coins": coins, "tickets": tickets, "tickets10": tickets10, "gcoins": gcoins_run, "gold_gcoins": gold_gcoins_run, "dex": SV.run_dex,
+		"chests": run_chests, "coins": coins, "tickets": tickets, "tickets10": tickets10, "gcoins": gcoins_run, "gold_gcoins": gold_gcoins_run, "hw_candy": hw_candy_run, "dex": SV.run_dex,
 		"dead": player.dead and not timeup, "moves": mv_list, "items": item_list, "mul": mul, "extra": extra,
 		"other_dmg": int(run_dmg.get("_other", 0.0)), "other_kills": int(run_kills_by.get("_other", 0)),
 		"ally_dmg": int(ally_dmg), "ally_kills": ally_kills})
@@ -1711,14 +1731,14 @@ func _atk() -> float:
 		k *= 1.4
 	if _has_item("lifeorb"):
 		k *= 1.3   # antes, con las dos a la vez (Doble equipaje) la Vidasfera no sumaba daño pero seguía quitando vida
-	return base_atk * pow(1.10, float(_lv("atk"))) * (1.0 + _buff_mul("atk")) * k * (1.5 if _pw("fury") else 1.0) * (1.5 if wp_t > 0.0 else 1.0) * _rk("atk") * (1.0 + 0.003 * float(reap_kills)) * (1.0 + _abn("dmg") + _moxie() + (_abn("defiant") if defiant_t > 0.0 else 0.0)) * (DYN.DMG_K if _dyn_on() else 1.0)
+	return (1.0 + float(rc_bonus["atk"])) * base_atk * pow(1.10, float(_lv("atk"))) * (1.0 + _buff_mul("atk")) * k * (1.5 if _pw("fury") else 1.0) * (1.5 if wp_t > 0.0 else 1.0) * _rk("atk") * (1.0 + 0.003 * float(reap_kills)) * (1.0 + _abn("dmg") + _moxie() + (_abn("defiant") if defiant_t > 0.0 else 0.0)) * (DYN.DMG_K if _dyn_on() else 1.0)
 
 
 func _spd() -> float:
 	if mode == "chal" and _ch_rs("no_move"):
 		return 0.0
 	var k: float = (1.35 if _has_item("choicescarf") else 1.0) * (1.1 if _has_item("ti_flying") else 1.0)
-	return base_spd * pow(1.07, float(_lv("spd"))) * (1.0 + _buff_mul("spd")) * k * (1.4 if _pw("haste") else 1.0) * (0.8 if _has_mod("slow") else 1.0) * _rk("spd") * (1.0 + _abn("spd") + _ab_wspd()) * (DYN.STAT_K if _dyn_on() else 1.0) * (kec.spd_mul() if kec != null else 1.0)
+	return (1.0 + float(rc_bonus["spd"])) * base_spd * pow(1.07, float(_lv("spd"))) * (1.0 + _buff_mul("spd")) * k * (1.4 if _pw("haste") else 1.0) * (0.8 if _has_mod("slow") else 1.0) * _rk("spd") * (1.0 + _abn("spd") + _ab_wspd()) * (DYN.STAT_K if _dyn_on() else 1.0) * (kec.spd_mul() if kec != null else 1.0)
 
 
 func _cd_mul() -> float:
@@ -1727,7 +1747,7 @@ func _cd_mul() -> float:
 
 func _cd_mul_raw() -> float:
 	var k: float = 0.8 if _has_item("quickclaw") else 1.0
-	return pow(0.92, float(_lv("cd"))) * k * float(perks["cd"]) * (0.65 if _pw("frenzy") else 1.0) * _rk("cd") * (1.0 - _abn("cd")) / (DYN.STAT_K if _dyn_on() else 1.0) * (kec.cd_mul() if kec != null else 1.0)
+	return (1.0 - float(rc_bonus["cd"])) * pow(0.92, float(_lv("cd"))) * k * float(perks["cd"]) * (0.65 if _pw("frenzy") else 1.0) * _rk("cd") * (1.0 - _abn("cd")) / (DYN.STAT_K if _dyn_on() else 1.0) * (kec.cd_mul() if kec != null else 1.0)
 
 
 func _reduction() -> float:
@@ -4753,6 +4773,8 @@ func _bag_at(t: float) -> Array:
 				wd = roundi(float(w) * BIOME_W_MUL)
 			if dn != null:
 				wd = roundi(float(wd) * dn.weight_mul(int(d["dex"])))
+			if hw and (_dex_by[int(d["dex"])]["types"] as Array).has("ghost"):
+				wd = roundi(float(wd) * HW_GHOST_W)   # en Halloween salen muchos mas Fantasma
 			for i in range(wd):
 				bag.append(d)
 		if key != "":
@@ -4935,6 +4957,32 @@ func _spawn_one(angle: float = -999.0, near: bool = false) -> Enemy:
 	return e
 
 
+# v6.2: Gengar gigante del modo Halloween.
+func _hw_spawn_gengar() -> void:
+	hw_gengar_done = true
+	var def := {"at": run_time, "dex": 94, "name": "Gengar", "hp": roundf(26000.0 * 1.35), "spd": 58.0, "dmg": roundf(70.0 * 1.2),
+		"xp": 2400.0, "behavior": "chase", "shotDmg": 42.0, "shotCd": 1.0, "range": 280.0}
+	var e = _spawn_boss(def)
+	e.set_meta("hw_gengar", true)
+	e.scale = Vector2(1.8, 1.8)
+	e.radius *= 1.8
+	e.body_h *= 1.8
+	_say(L.t("¡Un Gengar gigante surge de las sombras!"), 4.0)
+	shake = 16.0
+
+
+func _hw_kill(e) -> void:
+	if e.has_meta("hw_gengar"):
+		for i in range(25):
+			_spawn_orb(e.position + Vector2(randf_range(-40.0, 40.0), randf_range(-30.0, 30.0)), "hw_candy", 1.0)
+		_say(L.t("¡Gengar gigante derrotado! +%d caramelos") % 25, 3.6)
+	elif e.boss:
+		for i in range(6):
+			_spawn_orb(e.position + Vector2(randf_range(-24.0, 24.0), randf_range(-18.0, 18.0)), "hw_candy", 1.0)
+	elif randf() < HW_CANDY_P:
+		_spawn_orb(e.position, "hw_candy", 1.0)
+
+
 func _spawn_boss(b: Dictionary, t_v: float = -1.0):
 	var t: float = run_time if t_v < 0.0 else t_v
 	var sc := {"hp": (1.0 + t / 600.0) * _adapt_k(), "dmg": (1.0 + t / 600.0) * pow(_adapt_k(), 0.7), "spd": 1.0}
@@ -4977,6 +5025,8 @@ func _update_spawner(delta: float) -> void:
 	if boss_idx < boss_run.size() and t >= float(boss_run[boss_idx]["at"]) and (mode != "normal" or (boss_idx > 0 and arena == null and not dir_finale)):
 		_spawn_boss(boss_run[boss_idx])
 		boss_idx += 1
+	if hw and mode == "normal" and not hw_gengar_done and t >= HW_GENGAR_AT and arena == null and not _boss_alive():
+		_hw_spawn_gengar()
 	if t >= 1200.0 and not late_warned and _late_x(t) > 0.0 and arena == null:
 		late_warned = true
 		_say(L.t("¡Minuto 20! Los Pokémon se vuelven mucho más peligrosos…"), 4.0)
@@ -6531,6 +6581,8 @@ func _damage_enemy(e, amount: float, col: Color = Color.WHITE, dir: Vector2 = Ve
 	Aud.sfx("hit")
 	if e.hurt_by(d):
 		kills += 1
+		if hw:
+			_hw_kill(e)
 		run_kills_by[src_k] = int(run_kills_by.get(src_k, 0)) + 1
 		if tw_risk.has("l_reap"):
 			reap_kills += 1
@@ -7801,6 +7853,10 @@ func _collect(kind: String, value: float) -> void:
 		gcoins_run += int(value)
 		Aud.sfx("shinyGet")
 		add_text(player.position + Vector2(0.0, -player.body_h - 4.0), L.t("+%d Gachapon Coin") % int(value), Color("#ff8ad8"), 20)
+	elif kind == "hw_candy":
+		hw_candy_run += int(value)
+		Aud.sfx("coin")
+		add_text(player.position + Vector2(0.0, -player.body_h - 4.0), L.t("+%d caramelo") % int(value), Color("#ff9a3d"), 18)
 	elif kind == "ticket":
 		tickets += int(value)
 		Aud.sfx("shinyGet")
@@ -8361,9 +8417,46 @@ func _fuse_hint(pair: Array) -> void:
 		get_tree().create_timer(2.8).timeout.connect(func(): _say(why, 3.4))
 
 
+# v6.2: nada util que elegir (todo al maximo): mejora al azar sin mostrar cartas.
+func _picks_useful(picks: Array) -> bool:
+	for c in picks:
+		var cat: String = String(c["cat"])
+		if cat == "evo" or cat == "up" or (cat == "stat" and String(c["id"]) != "heal"):
+			return true
+	return false
+
+
+func _rc_random_bonus() -> void:
+	var opts := ["hp", "atk", "spd", "cd"]
+	var pick: String = String(opts[randi() % opts.size()])
+	var txt := ""
+	match pick:
+		"hp":
+			player.max_hp += 15.0
+			player.hp = minf(player.max_hp, player.hp + 15.0)
+			txt = L.t("+15 PS máximos")
+		"atk":
+			rc_bonus["atk"] = float(rc_bonus["atk"]) + 0.04
+			txt = L.t("+4% de daño")
+		"spd":
+			rc_bonus["spd"] = float(rc_bonus["spd"]) + 0.03
+			txt = L.t("+3% de velocidad")
+		"cd":
+			rc_bonus["cd"] = minf(0.4, float(rc_bonus["cd"]) + 0.03)
+			txt = L.t("-3% de recarga")
+	Aud.sfx("levelup")
+	_ring(player.position, 8.0, 120.0, Color("#4f9cf0"), 0.6)
+	add_text(player.position + Vector2(0.0, -player.body_h - 22.0), L.t("Mejora al azar: %s") % txt, Color("#7fe0ff"), 20)
+
+
 func _open_cards() -> void:
 	var picks: Array = _offer()
 	if picks.is_empty():
+		pending_levels = 0
+		return
+	if not _picks_useful(picks) and not (mode == "chal" and _ch_rs("no_upgrade")):
+		for i in range(maxi(1, pending_levels)):
+			_rc_random_bonus()
 		pending_levels = 0
 		return
 	choosing = true
@@ -9915,6 +10008,7 @@ class Pool extends Node2D:
 
 class Prop extends Node2D:
 	static var tw: Node2D
+	static var hw := false   # v6.2: en Halloween las rocas son lapidas y los cofres, calabazas
 	var kind := "tree"
 	var r := 15.0
 	var solid := false
@@ -9979,6 +10073,9 @@ class Prop extends Node2D:
 			draw_set_transform(Vector2.ZERO, 0.0, Vector2(1.0, 0.42))
 			draw_circle(Vector2.ZERO, r * 1.35, Color(0, 0, 0, 0.28))
 			draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+		if kind == "rock" and hw:
+			HWDecor.grave(self, v)
+			return
 		if kind == "tree" or kind == "rock":
 			var key: String = ("tree%d" % mini(2, int(v * 3.0))) if kind == "tree" else ("rock%d" % (1 if v > 0.8 else 0))
 			var tx: Texture2D = tw.prop_tex(key) if tw != null else null
@@ -10004,7 +10101,7 @@ class Prop extends Node2D:
 				var tnm: String = "ch%d" % POI.paid_tier if sub == "paid" else ("trapv" if sub == "trapv" else "trapd")
 				if POI.draw_tex(self, tnm, POI.SC, 0.0):
 					return
-			var okc: bool = _spr("chest_open" if used else "chest_closed")
+			var okc: bool = HWDecor.pumpkin_chest(self, used, t) if hw else _spr("chest_open" if used else "chest_closed")
 			if big:
 				draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 			if okc:
@@ -10536,6 +10633,9 @@ class Orb extends Node2D:
 			elif kind == "item":
 				icn = "star"
 				glow = Color("#ff8ad8")
+			elif kind == "hw_candy":
+				icn = "hw_candy"
+				glow = Color("#ff8a2a")
 			elif kind == "ball":
 				icn = "ball"
 				glow = Color("#ff6b6b")
@@ -12499,3 +12599,126 @@ class Stick extends Node2D:
 			return
 		draw_arc(_origin, radius, 0.0, TAU, 48, Color(1, 1, 1, 0.35), 3.0)
 		draw_circle(_pos, 28.0, Color(1, 1, 1, 0.45))
+
+
+# v6.2: calabazas, tumbas y huesos del modo Halloween alrededor de la camara (sin colision).
+# Tambien dibuja las lapidas (rocas) y los cofres calabaza que usa Prop en Halloween.
+class HWDecor extends Node2D:
+	const CELL := 240.0
+	const BONE_CELL := 110.0
+	const PX := 3.0
+	const PUMP := ["......gg......", ".....gg.......", "..oOOOoOOOOo..", ".oOOOOoOOOOOo.", "oOOYYOoOYYOOOo", "oOOYYOoOYYOOOo", "oOOOOOoOOOOOOo", "oOYOYYYYYYOYOo", "oOOYYYYYYYYOOo", ".oOOYOYYOYOOo.", "..oOOOoOOOOo..", "...oooooooo..."]
+	const STONE := ["..kkkkkk..", ".kSSSSSSk.", "kSSSddSSSk", "kSSddddSSk", "kSSSddSSSk", "kSSSddSSSk", "kSSSSSSSSk", "kSSSSSSSSk", "kkkkkkkkkk"]
+	const GRAVE := ["...kkkkkk...", "..kSSSSSSk..", ".kSSSSSSSSk.", "kSSSSddSSSSk", "kSSSddddSSSk", "kSSSSddSSSSk", "kSSSSddSSSSk", "kSSSSSSSSSSk", "kSSmSSSSmSSk", "kSSSSSSSSSSk", "kkkkkkkkkkkk", ".gggggggggg."]
+	const CHEST := ["........gg........", ".......gg.........", "....kkkkkkkkkk....", "..kkOOOOoOOOOOkk..", ".kOOOOOOoOOOOOOOk.", "kOOYYYOOoOOYYYOOOk", "kOOOYOOOoOOOYOOOOk", "kOOOOOOOoOOOOOOOOk", "kOOYOYYYYYYYYOYOOk", "kOOOYYYYYYYYYYOOOk", ".kOOOYOYYOYOYOOOk.", "..kOOOOOoOOOOOOk..", "...kkkkkkkkkkkk..."]
+	const BONE := ["kk......kk", "kwk....kwk", ".kwwwwwwk.", "kwk....kwk", "kk......kk"]
+	const SKULL := [".kkkk.", "kwwwwk", "kkwwkk", "kwwwwk", ".kwwk.", ".k..k."]
+	var m = null
+	var src = null   # en el menu: el MenuWorld (usa su cam y su tamano de vista)
+	var t := 0.0
+
+	func _process(delta: float) -> void:
+		t += delta
+		queue_redraw()
+
+	static func hsh(x: int, y: int, k: int) -> float:
+		var v: int = (x * 73856093) ^ (y * 19349663) ^ (k * 83492791)
+		v = (v ^ (v >> 13)) * 1274126177
+		return float((v ^ (v >> 16)) & 0xFFFF) / 65535.0
+
+	static func rows(ci: CanvasItem, rw: Array, cols: Dictionary, px: float) -> void:
+		var w: int = String(rw[0]).length()
+		for y in range(rw.size()):
+			var r: String = rw[y]
+			for x in range(r.length()):
+				if r[x] != ".":
+					ci.draw_rect(Rect2((float(x) - float(w) * 0.5) * px, float(y - rw.size()) * px, px, px), cols[r[x]])
+
+	# Lapida en lugar de roca (dos tonos segun la variante).
+	static func grave(ci: CanvasItem, v: float) -> void:
+		var base := Color("#7a7e8c") if v < 0.5 else Color("#8a8476")
+		rows(ci, GRAVE, {"k": Color("#2a2c36"), "S": base, "d": base.darkened(0.4), "m": Color("#4f7a3a"), "g": Color("#3f6a2c")}, 3.0)
+
+	# Cofre calabaza: brilla cerrado; abierto se ve apagado y sin tapa.
+	static func pumpkin_chest(ci: CanvasItem, used: bool, t: float) -> bool:
+		var fl: float = 0.75 + 0.25 * sin(t * 6.0)
+		var cols := {"k": Color("#3a1404"), "O": Color("#e86a14"), "o": Color("#9a3a08"), "g": Color("#4f8a2a"), "Y": Color(1.0, 0.86, 0.3) if not used else Color("#5a2206")}
+		if not used:
+			ci.draw_circle(Vector2(0, -20), 34.0, Color(1.0, 0.6, 0.15, 0.16 * fl))
+			rows(ci, CHEST, cols, 2.6)
+		else:
+			rows(ci, CHEST.slice(3), cols, 2.6)
+		return true
+
+	func _b(x: float, y: float, w: float, h: float, c: Color) -> void:
+		draw_rect(Rect2(x * PX, y * PX, w * PX, h * PX), c)
+
+	func _draw() -> void:
+		var c := Vector2.ZERO
+		var half := Vector2.ZERO
+		if m != null and m.player != null:
+			c = m.player.position
+			half = m.get_viewport_rect().size * 0.5 / maxf(0.3, m.cam_zoom)
+		elif src != null:
+			c = src.cam
+			half = src.vs * 0.5
+		else:
+			return
+		half += Vector2(CELL, CELL)
+		for gy in range(floori((c.y - half.y) / CELL), floori((c.y + half.y) / CELL) + 1):
+			for gx in range(floori((c.x - half.x) / CELL), floori((c.x + half.x) / CELL) + 1):
+				var r: float = hsh(gx, gy, 1)
+				if r > 0.3:
+					continue
+				draw_set_transform(Vector2((float(gx) + 0.15 + 0.7 * hsh(gx, gy, 2)) * CELL, (float(gy) + 0.15 + 0.7 * hsh(gx, gy, 3)) * CELL), 0.0, Vector2.ONE)
+				if r < 0.08:
+					_stone()
+				else:
+					_pumpkin(hsh(gx, gy, 4))
+		# huesos y calaveras por todas partes
+		for gy in range(floori((c.y - half.y) / BONE_CELL), floori((c.y + half.y) / BONE_CELL) + 1):
+			for gx in range(floori((c.x - half.x) / BONE_CELL), floori((c.x + half.x) / BONE_CELL) + 1):
+				var r2: float = hsh(gx, gy, 9)
+				if r2 > 0.22:
+					continue
+				var bp := Vector2((float(gx) + 0.1 + 0.8 * hsh(gx, gy, 10)) * BONE_CELL, (float(gy) + 0.1 + 0.8 * hsh(gx, gy, 11)) * BONE_CELL)
+				draw_set_transform(bp, (hsh(gx, gy, 12) - 0.5) * 2.4 if r2 > 0.05 else 0.0, Vector2.ONE)
+				rows(self, SKULL if r2 < 0.05 else BONE, {"k": Color("#4a4438"), "w": Color("#e8e2d0")}, 2.0)
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+	func _pumpkin(seed_v: float) -> void:
+		var fl: float = 0.7 + 0.3 * sin(t * 7.0 + seed_v * 20.0)
+		draw_circle(Vector2(0, -16), 40.0, Color(1.0, 0.6, 0.15, 0.13 * fl))
+		_b(-7, 0, 14, 1, Color(0, 0, 0, 0.3))
+		rows(self, PUMP, {"O": Color("#e86a14"), "o": Color("#8a3206"), "g": Color("#4f8a2a"), "Y": Color(1.0, 0.86, 0.3).lerp(Color("#e86a14"), 1.0 - fl)}, PX)
+
+	func _stone() -> void:
+		_b(-5, 0, 10, 1, Color(0, 0, 0, 0.3))
+		rows(self, STONE, {"k": Color("#2a2c36"), "S": Color("#7a7e8c"), "d": Color("#4a4d5a")}, PX)
+
+
+# v6.2: sombrero de bruja encima del Pokemon del jugador.
+class HWHat extends Node2D:
+	const PX := 3.0
+	var p = null
+
+	func _process(_delta: float) -> void:
+		if p != null:
+			position = Vector2(0.0, -float(p.body_h) * 0.62)   # apoyado en la cabeza
+		queue_redraw()
+
+	func _b(x: float, y: float, w: float, h: float, c: Color) -> void:
+		draw_rect(Rect2(x * PX, y * PX, w * PX, h * PX), c)
+
+	func _draw() -> void:
+		var k := Color("#1a1028")
+		_b(-8, -1, 16, 2, k)
+		_b(-7, -1, 14, 1, Color("#3a2458"))
+		_b(-4, -5, 8, 4, Color("#3a2458"))
+		_b(-4, -3, 8, 1, Color("#ff8a2a"))
+		_b(-1, -3, 2, 1, Color("#ffe14a"))
+		_b(-3, -8, 6, 3, Color("#3a2458"))
+		_b(-1, -11, 4, 3, Color("#3a2458"))
+		_b(2, -12, 3, 2, Color("#3a2458"))
+		_b(4, -11, 1, 1, Color("#3a2458"))
+

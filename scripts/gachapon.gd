@@ -40,6 +40,16 @@ static func locked_ids() -> Array:
 	return out
 
 
+# v6.2: en Halloween la maquina calabaza solo da movimientos Veneno y Fantasma.
+const HW_TYPES := ["poison", "ghost"]
+
+
+static func hw_pool(ids: Array) -> Array:
+	if not SV.hw_on():
+		return ids
+	return ids.filter(func(id): return HW_TYPES.has(String(def_of(String(id)).get("type", ""))))
+
+
 static func type_color(t: String) -> Color:
 	return Color.html(String(MD.TYPE_COLOR.get(t, "#b0a99f")))
 
@@ -49,7 +59,7 @@ static func spend(gold: bool) -> Array:
 	var key := "gold_coins" if gold else "gcoins"
 	if int(SV.d.get(key, 0)) <= 0:
 		return []
-	var locked := locked_ids()
+	var locked := hw_pool(locked_ids())
 	if locked.is_empty():
 		return []
 	var got: Array = []
@@ -184,6 +194,17 @@ class MachineArt extends Control:
 	const BW := 400.0
 	const BH := 520.0
 	const CAPS := [Color("#e0434f"), Color("#4b9bff"), Color("#ffd33d"), Color("#5fcb6a"), Color("#ff9ed8"), Color("#ff7b3d")]
+	const HCAPS := [Color("#8a4ad0"), Color("#5fcb6a"), Color("#ff8a2a"), Color("#3a2458"), Color("#c86bdc")]
+	var pumpkin := false
+
+	# v6.2: maquina calabaza de Halloween (solo cambia colores y dibujo de la tapa)
+	func set_pumpkin(on: bool) -> void:
+		if pumpkin == on:
+			return
+		pumpkin = on
+		for i in seed_caps.size():
+			seed_caps[i]["c"] = (HCAPS if on else CAPS)[i % (HCAPS if on else CAPS).size()]
+		queue_redraw()
 	var t: float = -1.0           # <0: en reposo
 	var gold: bool = false
 	var discs: Array = []         # [{col}] discos que salen
@@ -335,12 +356,12 @@ class MachineArt extends Control:
 		var off := Vector2((size.x - BW * sc) * 0.5, (size.y - BH * sc) * 0.5)
 		draw_set_transform(off + Vector2(sin(idle_t * 50.0) * bump * 2.0, -bump * 2.0) * sc, 0.0, Vector2(sc, sc))
 		var line := Color("#1a1a2e")
-		var white := Color("#f4f6fb")
+		var white := Color("#f4f6fb") if not pumpkin else Color("#3a2458")
 		var shade := Color("#c9d2e6")
-		var grey := Color("#a3a9b8")
-		var red := Color("#e8262d")
-		var dred := Color("#a8141c")
-		var lred := Color("#ff6b5e")
+		var grey := Color("#a3a9b8") if not pumpkin else Color("#4a3a5e")
+		var red := Color("#e8262d") if not pumpkin else Color("#e86a14")
+		var dred := Color("#a8141c") if not pumpkin else Color("#8a3206")
+		var lred := Color("#ff6b5e") if not pumpkin else Color("#ffa040")
 		var GC := Vector2(200, 205)
 		# sombra y patas
 		draw_ellipse_shadow(Vector2(200, 508), 150.0, 10.0)
@@ -362,7 +383,7 @@ class MachineArt extends Control:
 		var shake: float = 0.0
 		if t >= 0.0 and t > 0.95 and t < 2.5:
 			shake = sin(t * 55.0) * 3.0
-		draw_colored_polygon(_ell(GC, 130.0, 86.0, 0.0, TAU, 48), Color(0.68, 0.84, 1.0, 0.55))
+		draw_colored_polygon(_ell(GC, 130.0, 86.0, 0.0, TAU, 48), Color(0.68, 0.84, 1.0, 0.55) if not pumpkin else Color(0.35, 0.18, 0.5, 0.55))
 		for i in seed_caps.size():
 			var cp: Dictionary = seed_caps[i]
 			var p: Vector2 = GC + (cp["p"] as Vector2) + (cp["o"] as Vector2) + Vector2(shake * (1.0 if i % 2 == 0 else -1.0), absf(shake) * 0.4)
@@ -381,15 +402,28 @@ class MachineArt extends Control:
 		cap.append(cap[0])
 		draw_polyline(cap, line, 3.0)
 		draw_polyline(_ell(Vector2(200, 112), 94.0, 68.0, 3.7, 4.7, 10), lred, 6.0)
-		draw_circle(Vector2(200, 36), 11.0, Color("#ffae3d"))
-		draw_circle(Vector2(200, 36), 11.0, line, false, 2.0)
-		_rr(Rect2(86, 110, 228, 12), 4, red, line)
-		draw_circle(Vector2(136, 98), 24.0, line)
-		draw_circle(Vector2(136, 98), 20.0, red)
-		draw_circle(Vector2(136, 98), 20.0, line, false, 2.0)
-		draw_rect(Rect2(116, 96, 40, 4), line)
-		draw_circle(Vector2(136, 98), 7.0, white)
-		draw_circle(Vector2(136, 98), 7.0, line, false, 2.0)
+		if pumpkin:
+			# tapa de calabaza: gajos, rabo y cara tallada que brilla
+			for gx in [150.0, 250.0]:
+				draw_polyline(_ell(Vector2(200, 112), absf(gx - 200.0) + 8.0, 80.0, PI * 1.15, PI * 1.85, 10), dred, 3.0)
+			draw_line(Vector2(200, 112), Vector2(200, 34), dred, 3.0)
+			_rr(Rect2(192, 14, 16, 22), 4, Color("#4f8a2a"), line)
+			draw_line(Vector2(208, 22), Vector2(226, 12), Color("#4f8a2a"), 5.0)
+			var glow := Color(1.0, 0.86, 0.3, 0.75 + 0.25 * sin(idle_t * 6.0))
+			draw_colored_polygon(PackedVector2Array([Vector2(150, 86), Vector2(176, 86), Vector2(163, 62)]), glow)
+			draw_colored_polygon(PackedVector2Array([Vector2(224, 86), Vector2(250, 86), Vector2(237, 62)]), glow)
+			draw_colored_polygon(PackedVector2Array([Vector2(150, 96), Vector2(250, 96), Vector2(238, 106), Vector2(214, 100), Vector2(200, 108), Vector2(186, 100), Vector2(162, 106)]), glow)
+			_rr(Rect2(86, 110, 228, 12), 4, red, line)
+		else:
+			draw_circle(Vector2(200, 36), 11.0, Color("#ffae3d"))
+			draw_circle(Vector2(200, 36), 11.0, line, false, 2.0)
+			_rr(Rect2(86, 110, 228, 12), 4, red, line)
+			draw_circle(Vector2(136, 98), 24.0, line)
+			draw_circle(Vector2(136, 98), 20.0, red)
+			draw_circle(Vector2(136, 98), 20.0, line, false, 2.0)
+			draw_rect(Rect2(116, 96, 40, 4), line)
+			draw_circle(Vector2(136, 98), 7.0, white)
+			draw_circle(Vector2(136, 98), 7.0, line, false, 2.0)
 		# panel gris con ranura y mando giratorio
 		_rr(Rect2(118, 330, 164, 96), 12, grey, line)
 		draw_rect(Rect2(122, 334, 156, 4), Color("#cfd3de"))

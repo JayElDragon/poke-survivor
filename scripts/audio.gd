@@ -132,6 +132,11 @@ func play_sfx(name: String, pitch: float = 1.0) -> void:
 	pl.play()
 
 
+# v6.2: pistas WAV con bucle exacto en el import (sin costura ni fundido). La de Halloween es el
+# inicio de "Haunted House", cortado en un compas que encaja con el principio. Suena de golpe, sin fade-in.
+const NO_FADE_IN := ["halloween"]
+
+
 func play_music(name: String) -> void:
 	if name == cur_name:
 		return
@@ -145,13 +150,23 @@ func play_music(name: String) -> void:
 	if old.playing:
 		tw.tween_property(old, "volume_db", -60.0, 0.7)
 		tw.tween_callback(old.stop).set_delay(0.75)
+	if not old.playing and (name == "" or NO_FADE_IN.has(name)):
+		tw.kill()   # nada que fundir: un Tween vacio da error
 	if name == "":
 		return
-	var st := _get_stream("res://audio/mus_%s.ogg" % name, true)
+	var path := "res://audio/mus_%s.ogg" % name
+	if not ResourceLoader.exists(path) and ResourceLoader.exists("res://audio/mus_%s.wav" % name):
+		path = "res://audio/mus_%s.wav" % name
+	var st := _get_stream(path, true)
 	if st == null:
 		return
 	var m: float = _vol("music") * 0.75
+	var full: float = linear_to_db(maxf(m, 0.0001)) if m > 0.0 else -80.0
 	nw.stream = st
+	if NO_FADE_IN.has(name):
+		nw.volume_db = full
+		nw.play()
+		return
 	nw.volume_db = -60.0
 	nw.play()
-	tw.tween_property(nw, "volume_db", linear_to_db(maxf(m, 0.0001)) if m > 0.0 else -80.0, 0.8)
+	tw.tween_property(nw, "volume_db", full, 0.8)

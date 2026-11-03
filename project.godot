@@ -15,7 +15,7 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 [application]
 
 config/name="Pokémon Survivors"
-config/version="6.1"
+config/version="6.2"
 run/main_scene="res://scenes/menu.tscn"
 config/features=PackedStringArray("4.7", "Mobile")
 config/icon="res://icon.png"

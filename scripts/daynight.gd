@@ -20,6 +20,8 @@ var last_phase := ""
 
 
 func phase_at(t: float) -> String:
+	if m != null and bool(m.hw):
+		return "night"   # v6.2: en Halloween siempre es de noche
 	var c: float = fposmod(t, CYCLE)
 	if c < P_DAY:
 		return "day"
@@ -39,6 +41,8 @@ func is_night() -> bool:
 
 
 func color_at(t: float) -> Color:
+	if m != null and bool(m.hw):
+		return Color(0.07, 0.04, 0.24, 0.52)   # noche cerrada de Halloween desde el primer segundo
 	var c: float = fposmod(t, CYCLE)
 	var keys: Array = [[0.0, "day"], [P_DAY - 20.0, "day"], [P_DAY + 20.0, "dusk"], [P_DUSK - 10.0, "dusk"], [P_DUSK + 25.0, "night"], [P_NIGHT - 10.0, "night"], [P_NIGHT + 20.0, "dawn"], [CYCLE - 20.0, "dawn"], [CYCLE, "day"]]
 	for i in range(keys.size() - 1):

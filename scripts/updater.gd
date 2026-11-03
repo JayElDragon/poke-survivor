@@ -10,7 +10,7 @@ const L = preload("res://scripts/lang.gd")
 const PAD = preload("res://scripts/pad.gd")
 
 const REPO := "JayElDragon/poke-survivor"
-const FALLBACK_VERSION := "6.1"
+const FALLBACK_VERSION := "6.2"
 static var APP_VERSION: String = _current()
 
 

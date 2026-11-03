@@ -9,6 +9,26 @@ const UPD = preload("res://scripts/updater.gd")
 
 const ENTRIES := [
 	{
+		"ver": "6.2",
+		"date": "2026-11-03",
+		"title": "Poke Survivors 6.2: evento de Halloween",
+		"new": [
+			"Nuevo modo Halloween: actívalo en el menú principal con el selector «Versión del juego».",
+			"En Halloween siempre es de noche, hay calabazas y tumbas por el mapa y salen muchos más Pokémon de tipo Fantasma.",
+			"En Halloween, las rocas son lápidas, los cofres son calabazas, hay huesos por todo el mapa y el menú de noche se llena de Pokémon Fantasma.",
+			"Caramelos de Halloween: los sueltan los Pokémon y los jefes. Úsalos en el banner Fantasma del gacha o para el sombrero de bruja.",
+			"Gengar gigante: aparece en el minuto 25 de una partida normal en modo Halloween.",
+			"En Halloween el logo se pone sombrero de bruja, telarañas, murciélagos y calabazas, y la música del menú hace un bucle limpio sin cortes ni fundidos.",
+			"En Halloween, la máquina TM Gachapon se convierte en una calabaza que solo da movimientos Veneno y Fantasma.",
+		],
+		"changes": [
+			"Si ya no quedan mejoras que elegir, el Caramelo Raro y las subidas de nivel dan una mejora al azar sin abrir la pantalla de cartas.",
+		],
+		"fixes": [
+			"Arreglado: los códigos de guardado copiados desde notas, correo o chats ya no salen como «no válidos»; también se puede pegar el contenido de save.json.",
+		],
+	},
+	{
 		"ver": "6.1",
 		"date": "2026-10-31",
 		"title": "Poke Survivors 6.1: nueva tienda de Kecleon, más vínculos y gacha más justo",

@@ -89,6 +89,13 @@ var dex_page_lbl: Label
 var dex_detail: VBoxContainer
 var dex_prev: Preview
 var gacha_region := 1
+var hw_top: Button = null
+var menu_world = null
+var hw_logo: Control = null
+var tag_lbl: Label = null
+var tag_base := ""
+var tag_hw := ""
+const HW_TAGS := ["¡Feliz Halloween! Cuidado con lo que se esconde en la hierba.", "Gengar está detrás de ti... no, ahora a la izquierda.", "Truco o trato: los caramelos no se comen solos.", "Los Gastly no dan miedo, solo dan un poco de gas.", "Esta noche no amanece. Literalmente.", "Las calabazas tienen ojos. Y hambre.", "Un Duskull te está contando. Ya va por diez.", "No mires debajo de las lápidas... ¿o sí?", "Mimikyu solo quiere un abrazo. Probablemente.", "Sobrevive hasta el amanecer. Spoiler: no llega."]
 var gacha_box: VBoxContainer
 var gacha_result: Control
 var gp_machine
@@ -411,6 +418,43 @@ class MenuWorld extends Node2D:
 	var pool: Array = []
 	var amb: Ambient = null
 	var cur_chunk := Vector2i(99999, 99999)
+	var hw_deco: Node2D = null
+
+	# v6.2: decoracion de Halloween en el fondo del menu (lapidas, cofres calabaza, huesos)
+	# Los mismos 20 Pokemon que pasean por el menu del juego original; en Halloween, todos los de tipo Fantasma.
+	var pool_hw := false
+
+	func _build_pool(on: bool) -> void:
+		var SVl = load("res://scripts/save_data.gd")
+		pool = []
+		pool_hw = on
+		if on:
+			for p in SVl.dex_list:
+				if (p["types"] as Array).has("ghost") and SVl.smeta.has(str(int(p["dex"]))):
+					pool.append(p)
+			return
+		for d in CAST:
+			for p in SVl.dex_list:
+				if int(p["dex"]) == d and SVl.smeta.has(str(d)):
+					pool.append(p)
+					break
+
+	func set_hw(on: bool) -> void:
+		MAINS.Prop.hw = on
+		if tw != null and on != pool_hw:
+			_build_pool(on)
+			for mm in mons:
+				if is_instance_valid(mm):
+					mm.queue_free()
+			mons.clear()
+			for i in range(CAST.size()):
+				_spawn_mon(true)
+		if hw_deco != null:
+			hw_deco.visible = on
+		if props != null:
+			for p in props.get_children():
+				if p is CanvasItem:
+					(p as CanvasItem).queue_redraw()
 	var gen_q: Array = []
 	var biome_i := 0
 
@@ -456,12 +500,7 @@ class MenuWorld extends Node2D:
 	func start() -> void:
 		var SVl = load("res://scripts/save_data.gd")
 		SVl.ensure()
-		# Los mismos 20 Pokemon que pasean por el menu del juego original
-		for d in CAST:
-			for p in SVl.dex_list:
-				if int(p["dex"]) == d and SVl.smeta.has(str(d)):
-					pool.append(p)
-					break
+		_build_pool(SVl.hw_on())
 		cam = Vector2(randf_range(-3000.0, 3000.0), randf_range(-3000.0, 3000.0))
 		var sd: int = randi() % 100000
 		tw = TW.new()
@@ -476,10 +515,15 @@ class MenuWorld extends Node2D:
 		gen.world_seed = sd
 		gen.menu_mode = true
 		MAINS.Prop.tw = tw
+		hw_deco = MAINS.HWDecor.new()
+		hw_deco.src = self
+		add_child(hw_deco)
+		move_child(hw_deco, tw.get_index() + 1)
+		set_hw(SVl.hw_on())
 		vs = get_viewport_rect().size
 		_update_chunks(true)
 		tw.flush_bake()
-		for i in range(pool.size()):
+		for i in range(CAST.size()):   # 20 a la vez; en Halloween se turnan entre todos los Fantasma
 			_spawn_mon(true)
 		amb = Ambient.new()
 		get_parent().add_child(amb)
@@ -789,7 +833,7 @@ func _ready() -> void:
 	if not is_overlay:
 		DSP.apply_window()
 		Aud.setup(self)
-		Aud.music("village")
+		Aud.music("halloween" if SV.hw_on() else "village")
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	_build_theme()
 	RenderingServer.set_default_clear_color(Color("#16233a"))
@@ -799,6 +843,7 @@ func _ready() -> void:
 		world.z_index = -4000   # el fondo siempre queda detras de toda la interfaz
 		add_child(world)
 		world.start()
+		menu_world = world
 		var upd := UPD.new()
 		add_child(upd)
 		upd.found.connect(func(info: Dictionary):
@@ -893,6 +938,15 @@ func _ready() -> void:
 	top.add_child(_gap(8))
 	set_top = _icon_btn("gear", func(): if cur != "settings": _show("settings"))
 	top.add_child(set_top)
+	top.add_child(_gap(8))
+	# v6.2: cambia la version del juego (Poke Ball = base, calabaza = Halloween)
+	hw_top = _icon_btn("ball", func():
+		SV.d["settings"]["hw_mode"] = not SV.hw_on()
+		SV.save()
+		Aud.sfx("confirm")
+		toast(L.t("Modo Halloween") if SV.hw_on() else L.t("Juego base"))
+		_refresh_hw_box())
+	top.add_child(hw_top)
 	var sp := Control.new()   # todo queda a la izquierda; el menu principal ocupa la derecha
 	sp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top.add_child(sp)
@@ -1256,7 +1310,9 @@ func _show(name: String) -> void:
 		screens[k].visible = k == name
 	back_btn.visible = name != "main" and name != "test"
 	credit_box.visible = name == "main"
-	shade.color.a = 0.30 if name == "main" else 0.62
+	if hw_top != null:
+		hw_top.visible = name == "main" and not is_overlay
+	shade.color.a = (0.48 if SV.hw_on() else 0.30) if name == "main" else 0.62   # en Halloween el menu tambien es de noche
 	for pn in [coin_pill, tix_pill, name_pill, news_top, support_top, mute_top, set_top]:
 		pn.visible = name != "test"
 	if is_overlay:
@@ -1916,14 +1972,20 @@ func _build_main() -> void:
 	logo.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR   # es arte suave, no pixel art
 	logo.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	left.add_child(logo)
+	hw_logo = HWLogo.new()
+	hw_logo.visible = SV.hw_on()
+	logo.add_child(hw_logo)
 	# S58.5: frase aleatoria y amable (se elige una sola vez al construir el menu)
 	var tags: Array = ["¡Ahora con más hierba que cortar!", "Cuidado: Meowth podría robarte el almuerzo.", "Hoy es un buen día para evolucionar.", "Recomendado por 9 de cada 10 Pikachu.", "¡Sobrevive un minuto más!", "No alimentes a los Snorlax salvajes.", "Kecleon acepta monedas, no cumplidos.", "Las Poké Balls no incluyen puntería.", "Un Charmander nunca duerme: solo parpadea.", "Cada Pokémon es un poco brillante por dentro."]
-	var tg := _label(L.t(String(tags[randi() % tags.size()])), 18, Color.WHITE)
+	tag_base = String(tags[randi() % tags.size()])
+	tag_hw = String(HW_TAGS[randi() % HW_TAGS.size()])
+	var tg := _label(L.t(tag_hw if SV.hw_on() else tag_base), 18, Color("#ffc27a") if SV.hw_on() else Color.WHITE)
 	tg.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	tg.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	tg.add_theme_color_override("font_outline_color", Color("#0b1a55"))
+	tg.add_theme_color_override("font_outline_color", Color("#2a0f3d") if SV.hw_on() else Color("#0b1a55"))
 	tg.add_theme_constant_override("outline_size", 6)
 	left.add_child(tg)
+	tag_lbl = tg
 	var card := PanelContainer.new()
 	var cds := _sb(Color("#0f1f60"), Color("#f6c433"), 4, 18)
 	cds.content_margin_top = 4
@@ -2022,6 +2084,166 @@ func _build_main() -> void:
 
 
 # Fondo del Pokemon en la portada: Poke Ball tenue y plataforma iluminada.
+# v6.2: adornos de Halloween sobre el logo, en pixel art con bloques del tamano de los pixeles
+# del logo y el mismo contorno azul marino. Coordenadas en pixeles de logo.png (1442x806).
+class HWLogo extends Control:
+	const TS := Vector2(1442, 806)
+	const PX := 10.0
+	const PAL := {
+		"k": Color("#0d1650"), "P": Color("#5b2a9c"), "p": Color("#3a1868"), "h": Color("#8a55d6"),
+		"O": Color("#e2620e"), "o": Color("#b84e0c"), "Y": Color("#ffe84a"), "G": Color("#4f9a2a"),
+		"R": Color("#ff3b3b"), "W": Color("#e8eeff"),
+	}
+	const HAT := [
+		"..............kkk.......",
+		"............kkPPPk......",
+		"...........kPPPkk.......",
+		"..........kPPPk.........",
+		".........khPPPk.........",
+		"........khPPPPk.........",
+		"........khPPPPPk........",
+		".......khPPPPPPk........",
+		".......khPPPPPPPk.......",
+		"......kOOOOYYYYOOk......",
+		"......kOOOOYkkYOOk......",
+		"......kOOOOYYYYOOk......",
+		"..kkkkpPPPPPPPPPPpkkkk..",
+		".kpPPPPPPPPPPPPPPPPPPpk.",
+		"kpPPPPPPPPPPPPPPPPPPPPpk",
+		".kkppppppppppppppppppkk.",
+		"...kkkkkkkkkkkkkkkkkk...",
+	]
+	const PUMP := [
+		"........kk.......",
+		".......kGk.......",
+		"...kkkkkGkkkkk...",
+		"..kOOOoOOOoOOOk..",
+		".kOhOOoOOOoOOOOk.",
+		"kOhOOOoOOOoOOOOOk",
+		"kOhOOYOOOOOOYOOOk",
+		"kOhOYYYOOOOOYYYOk",
+		"kOOOOOOOOOOOOOOOk",
+		"kOOOOOOOOOOOOOOOk",
+		"kOOYOOOOOOOOOYOOk",
+		"kOOYYYYYYYYYYYOOk",
+		".kOOYYOYYYOYYOOk.",
+		".kOOOOOOOOOOOOOk.",
+		"..kkOOOOOOOOOkk..",
+		"....kkkkkkkkk....",
+	]
+	const SPUMP := [
+		"....kGk....",
+		".kkkkGkkkk.",
+		"kOOoOOOoOOk",
+		"kOOYOOOYOOk",
+		"kOYYYOYYYOk",
+		"kOOOOOOOOOk",
+		"kOYOOOOOYOk",
+		"kOOYYYYYOOk",
+		".kOOoOoOOk.",
+		"..kkkkkkk..",
+	]
+	const BAT_A := [
+		"kk...........kk",
+		"kkk..k...k..kkk",
+		".kkk.kkkkk.kkk.",
+		"..kkkkYkYkkkk..",
+		"...kkkkkkkkk...",
+		".....kk.kk.....",
+	]
+	const BAT_B := [
+		".....k...k.....",
+		".....kkkkk.....",
+		"...kkkYkYkkk...",
+		".kkkkkkkkkkkkk.",
+		"kkk..kkkkk..kkk",
+		"kk.....k.....kk",
+	]
+	const SPI := [
+		"k.kkk.k",
+		".kkkkk.",
+		"kkRkRkk",
+		".kkkkk.",
+		"k.....k",
+	]
+	var t := 0.0
+	var web: Array = []   # celdas de la telarana (esquina arriba-derecha), se calcula una vez
+
+	func _ready() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var n := 18
+		for y in n:
+			for x in n:
+				var v := Vector2(x + 0.5, y + 0.5)
+				var d: float = v.length()
+				if d > n:
+					continue
+				var a: float = atan2(v.y, v.x)
+				var on := false
+				for ra in [0.0, PI / 6.0, PI / 3.0, PI / 2.0]:
+					if absf(a - ra) * d < 0.6:
+						on = true
+				for rr in [5.5, 11.0, 16.5]:
+					var sag: float = rr * (1.0 - 0.13 * sin(fmod(a, PI / 6.0) * 6.0))
+					if absf(d - sag) < 0.5:
+						on = true
+				if on:
+					web.append(Vector2(x, y))
+
+	func _process(d: float) -> void:
+		if not visible:
+			return
+		t += d
+		queue_redraw()
+
+	func _spr(rows: Array, at: Vector2, px: float = PX, flip := false, glow := false) -> void:
+		at = (at / px).round() * px
+		var w: int = String(rows[0]).length()
+		for y in rows.size():
+			var r: String = rows[y]
+			for x in w:
+				var ch: String = r[w - 1 - x] if flip else r[x]
+				if ch == ".":
+					continue
+				var c: Color = PAL[ch]
+				if ch == "Y" and glow:
+					c = c.lerp(Color("#fff3b0"), 0.3 + 0.3 * sin(t * 5.0))   # la vela parpadea
+				draw_rect(Rect2(at + Vector2(x, y) * px, Vector2(px + 0.6, px + 0.6)), c)
+
+	# telarana en una esquina: sx/sy = hacia donde crece (-1 izquierda / arriba)
+	func _web(corner: Vector2, sx: float, sy: float, px: float) -> void:
+		for cell in web:
+			var p: Vector2 = corner + Vector2(cell.x * sx, cell.y * sy) * px
+			if sx < 0.0:
+				p.x -= px
+			if sy < 0.0:
+				p.y -= px
+			draw_rect(Rect2(p, Vector2(px + 0.6, px + 0.6)), Color(PAL["W"], 0.82))
+
+	func _draw() -> void:
+		var ps: Vector2 = (get_parent() as Control).size   # el ancla vertical no siempre se aplica dentro del VBox
+		var k: float = minf(ps.x / TS.x, ps.y / TS.y)
+		var off: Vector2 = (ps - TS * k) * 0.5
+		draw_set_transform(off, 0.0, Vector2(k, k))
+		# telarana en la esquina arriba-derecha de la N
+		_web(Vector2(1330, 92), -1.0, 1.0, 12.0)
+		# arañita colgando de la telarana de la N
+		var sy: float = 300.0 + roundf(sin(t * 1.4) * 3.0) * 8.0
+		draw_rect(Rect2(1190, 200, 4, sy - 200), Color(PAL["W"], 0.85))
+		_spr(SPI, Vector2(1164, sy), 8.0)
+		# calabazas en lugar de las Poke Balls
+		_spr(PUMP, Vector2(959, 526) - Vector2(17, 16) * 11.0 * 0.5, 11.0, false, true)
+		_spr(SPUMP, Vector2(268, 722) - Vector2(11, 10) * 12.5 * 0.5, 12.5, false, true)
+		_spr(SPUMP, Vector2(1162, 722) - Vector2(11, 10) * 12.5 * 0.5, 12.5, false, true)
+		# murcielagos aleteando
+		var fr: bool = fmod(t * 5.0, 1.0) < 0.5
+		_spr(BAT_A if fr else BAT_B, Vector2(560 + sin(t * 0.7) * 40.0, 20 + cos(t * 1.1) * 10.0), 8.0)
+		_spr(BAT_B if fr else BAT_A, Vector2(1120 + sin(t * 0.6 + 2.0) * 36.0, 30 + cos(t * 0.9) * 12.0), 7.0, true)
+		# sombrero de bruja encima de la P
+		_spr(HAT, Vector2(156, -64), 12.0)
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
 class MainStage extends Control:
 	func _init() -> void:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -3165,8 +3387,58 @@ func _refresh_main() -> void:
 		sl.autowrap_mode = TextServer.AUTOWRAP_OFF
 		sl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		sr.add_child(sl)
+	_refresh_hw_box()
 	var lb = main_btns.get(last_pick, null)
 	focus_first = lb if lb != null and is_instance_valid(lb) else main_play_btn
+
+
+# v6.2: elige la version del juego (base o Halloween) y, en Halloween, el sombrero de bruja.
+const HW_HAT_COST := 50
+
+
+func _refresh_hw_box() -> void:
+	if hw_top == null:
+		return
+	var on: bool = SV.hw_on()
+	var ic: String = "hw_pumpkin" if on else "ball"
+	if menu_world != null and is_instance_valid(menu_world):
+		menu_world.set_hw(on)
+	if hw_logo != null and is_instance_valid(hw_logo):
+		hw_logo.visible = on
+	if tag_lbl != null and is_instance_valid(tag_lbl):
+		tag_lbl.text = L.t(tag_hw if on else tag_base)
+		tag_lbl.add_theme_color_override("font_color", Color("#ffc27a") if on else Color.WHITE)
+		tag_lbl.add_theme_color_override("font_outline_color", Color("#2a0f3d") if on else Color("#0b1a55"))
+	if not is_overlay:
+		Aud.music("halloween" if on else "village")
+	if shade != null:
+		shade.color = Color(0.07, 0.03, 0.2, 0.48 if cur == "main" else shade.color.a) if on else Color(0, 0.05, 0.1, 0.30 if cur == "main" else shade.color.a)
+	hw_top.icon = IC.tex(ic, IC.scale_for(ic, 26))
+	hw_top.tooltip_text = L.t("Modo Halloween: noche eterna, calabazas, más Pokémon Fantasma, caramelos y un Gengar gigante en el minuto 25.") if on else L.t("Juego base")
+	hw_top.add_theme_stylebox_override("normal", _sb(Color("#5a2208"), Color("#ff8a2a"), 3, 14) if on else _sb(Color("#0f2268"), Color("#b5cdfb"), 3, 14))
+
+
+# Sombrero de bruja: se compra y se pone o quita desde el banner de Halloween.
+func _hw_hat_btn() -> Button:
+	var owned: bool = bool(SV.d.get("hw_hat", false))
+	var txt: String = L.t("Comprar sombrero (%d caramelos)") % HW_HAT_COST
+	if owned:
+		txt = L.t("Sombrero: puesto") if bool(SV.d.get("hw_hat_on", false)) else L.t("Sombrero: quitado")
+	var hb := _btn(txt, func():
+		if not bool(SV.d.get("hw_hat", false)):
+			if int(SV.d.get("hw_candy", 0)) < HW_HAT_COST:
+				toast(L.t("No tienes caramelos suficientes: consíguelos en el modo Halloween"))
+				return
+			SV.d["hw_candy"] = int(SV.d.get("hw_candy", 0)) - HW_HAT_COST
+			SV.d["hw_hat"] = true
+			SV.d["hw_hat_on"] = true
+			toast(L.t("¡Sombrero de bruja conseguido!"))
+		else:
+			SV.d["hw_hat_on"] = not bool(SV.d.get("hw_hat_on", false))
+		SV.save()
+		_refresh_gacha(), Vector2(0, 40))
+	hb.add_theme_font_size_override("font_size", 16)
+	return hb
 
 
 # Pantalla de fin de partida como la del original: titulo, cuadricula de datos,
@@ -4918,10 +5190,14 @@ var gp_pending: Array = []
 func _refresh_gachapon() -> void:
 	_clear(gp_info)
 	gacha_result.visible = false
-	var hd := _label("Máquina TM Gachapon", 36, C_GOLD)
+	var hwm: bool = SV.hw_on()
+	gp_machine.art.set_pumpkin(hwm)
+	var hd := _label("Máquina Calabaza" if hwm else "Máquina TM Gachapon", 36, Color("#ffb347") if hwm else C_GOLD)
 	hd.autowrap_mode = TextServer.AUTOWRAP_OFF
 	gp_info.add_child(hd)
 	gp_info.add_child(_label("Inserta una Gachapon Coin y gira la palanca: te sale una cápsula con un movimiento nuevo. La moneda dorada da 2 movimientos.", 21, Color("#c8d6ee")))
+	if hwm:
+		gp_info.add_child(_label("Modo Halloween: la máquina calabaza solo da movimientos de tipo Veneno y Fantasma.", 20, Color("#ffd9a0")))
 	var bal := HBoxContainer.new()
 	bal.add_theme_constant_override("separation", 22)
 	bal.add_child(_coin_row(int(SV.d.get("gcoins", 0)), false, 34.0))
@@ -4945,15 +5221,24 @@ func _refresh_gachapon() -> void:
 	gp_info.add_child(gp_msg)
 	if gp_btn1.disabled and gp_btn2.disabled:
 		gp_msg.text = L.t("No tienes monedas. Consigue Gachapon Coins superando retos.")
-	elif GP.locked_ids().is_empty():
-		gp_msg.text = L.t("¡Ya desbloqueaste todos los movimientos de la máquina!")
+	elif GP.hw_pool(GP.locked_ids()).is_empty():
+		gp_msg.text = L.t("¡Ya tienes todos los movimientos Veneno y Fantasma de la máquina!") if hwm else L.t("¡Ya desbloqueaste todos los movimientos de la máquina!")
+		gp_btn1.disabled = true
+		gp_btn2.disabled = true
 	var tot: int = GP.DATA.MOVES.size()
-	gp_info.add_child(_label(L.t("Movimientos desbloqueados: %d / %d") % [GP.unlocked().size(), tot], 24, C_GOLD))
+	var have: int = GP.unlocked().size()
+	if hwm:
+		var hw_ids: Array = GP.DATA.MOVES.filter(func(m): return GP.HW_TYPES.has(String(m["type"]))).map(func(m): return String(m["id"]))
+		tot = hw_ids.size()
+		have = hw_ids.filter(func(id): return GP.is_unlocked(String(id))).size()
+	gp_info.add_child(_label(L.t("Movimientos desbloqueados: %d / %d") % [have, tot], 24, C_GOLD))
 	gp_collection = HFlowContainer.new()
 	gp_collection.add_theme_constant_override("h_separation", 8)
 	gp_collection.add_theme_constant_override("v_separation", 8)
 	gp_info.add_child(gp_collection)
 	for m in GP.DATA.MOVES:
+		if hwm and not GP.HW_TYPES.has(String(m["type"])):
+			continue
 		var d = GP.Disc.new(GP.type_color(String(m["type"])), 46.0)
 		d.locked = not GP.is_unlocked(String(m["id"]))
 		d.tooltip_text = "" if d.locked else String(m["name"])
@@ -5052,8 +5337,19 @@ func _refresh_gacha() -> void:
 	tabs.add_theme_constant_override("v_separation", 8)
 	gacha_box.add_child(tabs)
 	tab_row = tabs
-	for i in range(1, 10):
+	if gacha_region == 0 and not SV.hw_on():
+		gacha_region = 1
+	for i in range(0 if SV.hw_on() else 1, 10):
 		var r: int = i
+		if r == 0:
+			var hb0 := _btn(L.t("Halloween") + "\n" + L.t("Fantasma"), func(): gacha_region = 0; _refresh_gacha(); _gf(tab_sel), Vector2(112, 62))
+			hb0.add_theme_font_size_override("font_size", 20)
+			hb0.add_theme_stylebox_override("normal", _sb(Color("#d9620f") if gacha_region == 0 else Color("#4a2068"), C_GOLD if gacha_region == 0 else Color("#ff8a2a"), 3, 12))
+			if gacha_region == 0:
+				first = hb0
+				tab_sel = hb0
+			tabs.add_child(hb0)
+			continue
 		var tb := _btn(L.t(SV.REGIONS[r - 1]) + "\n" + L.t("Gen %d") % r, func(): gacha_region = r; _refresh_gacha(); _gf(tab_sel), Vector2(112, 62))
 		tb.add_theme_font_size_override("font_size", 20)
 		if r == gacha_region:
@@ -5070,6 +5366,9 @@ func _refresh_gacha() -> void:
 	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	left.add_theme_constant_override("separation", 12)
 	main.add_child(left)
+	if gacha_region == 0:
+		_hw_gacha(main, left, first)
+		return
 	var bd: Dictionary = BANNERS[gacha_region - 1]
 	var banner := Banner.new()
 	banner.c1 = Color.html(String(bd["c1"]))
@@ -5186,6 +5485,77 @@ func _refresh_gacha() -> void:
 	focus_first = first
 
 
+# v6.2: banner Fantasma de Halloween, se paga con caramelos.
+func _hw_gacha(main: HBoxContainer, left: VBoxContainer, first: Button) -> void:
+	var banner := Banner.new()
+	banner.c1 = Color("#3b1f5c")
+	banner.c2 = Color("#c0581a")
+	banner.custom_minimum_size = Vector2(0, 360)
+	banner.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	left.add_child(banner)
+	var cnt: Vector2i = _region_counts(0)
+	var tx := VBoxContainer.new()
+	tx.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	tx.offset_left = 22
+	tx.offset_top = 16
+	tx.offset_right = -22
+	tx.add_theme_constant_override("separation", 6)
+	banner.add_child(tx)
+	var ttl := _label("Banner Fantasma", 44, Color("#ffb347"))
+	ttl.autowrap_mode = TextServer.AUTOWRAP_OFF
+	tx.add_child(ttl)
+	tx.add_child(_label("Solo Pokémon de tipo Fantasma. Se paga con caramelos de Halloween.", 22))
+	tx.add_child(_label(L.t("Tienes %d de %d") % [cnt.x, cnt.y], 20, Color("#ffe0c0")))
+	banner.add_mon(92, 3.2, 0.0, 0.36)
+	banner.add_mon(94, 3.4, 0.34, 0.66)
+	banner.add_mon(93, 3.2, 0.64, 1.0)
+	var brow := HBoxContainer.new()
+	brow.add_theme_constant_override("separation", 12)
+	left.add_child(brow)
+	var b1 := _cost_btn(L.t("Tirada ×1"), str(SV.HW_PULL), "", "hw_candy", func(): _do_pull(1, "candy"), Vector2(0, 64), SV.can_pull(1, "candy"), false, true)
+	var b10 := _cost_btn(L.t("Tirada ×10"), str(SV.HW_PULL * 10), "", "hw_candy", func(): _do_pull(10, "candy"), Vector2(0, 64), SV.can_pull(10, "candy"), false, true)
+	for b in [b1, b10]:
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		brow.add_child(b)
+	var have := HBoxContainer.new()
+	have.add_theme_constant_override("separation", 8)
+	have.add_child(IC.rect("hw_candy", 24))
+	_nw(have, _label(L.t("Caramelos: %d") % int(SV.d.get("hw_candy", 0)), 20, Color("#ffd9a0")))
+	var gap := Control.new()
+	gap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	have.add_child(gap)
+	have.add_child(_hw_hat_btn())
+	left.add_child(have)
+	left.add_child(_label(L.t("Tiradas sin legendario en el banner Fantasma: %d / %d") % [int(SV.d["pity"].get("0", 0)), SV.PITY_5], 18, Color("#c8d6ee")))
+	var counts: Array = [0, 0, 0, 0, 0]
+	for p in SV.region_pool(0):
+		counts[clampi(int(p["rarity"]) - 1, 0, 4)] += 1
+	var op := PanelContainer.new()
+	op.custom_minimum_size = Vector2(330, 0)
+	op.add_theme_stylebox_override("panel", _card_sb())
+	main.add_child(op)
+	var ov := VBoxContainer.new()
+	ov.add_theme_constant_override("separation", 5)
+	op.add_child(ov)
+	ov.add_child(_label("Probabilidades", 26))
+	for j in range(4, -1, -1):
+		var rr := HBoxContainer.new()
+		rr.add_theme_constant_override("separation", 8)
+		rr.add_child(IC.rect(String(RARITY_BALL[j]), 24))
+		var rn := _label(SV.RARITY_NAME[j], 20, Color.html(String(RARITY_COL[j])))
+		rn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		rn.autowrap_mode = TextServer.AUTOWRAP_OFF
+		rr.add_child(rn)
+		var pc := _label("%s%% · %d" % [str(SV.PULL_RATES[j]), int(counts[j])], 20, Color("#dfe8ff"))
+		pc.autowrap_mode = TextServer.AUTOWRAP_OFF
+		rr.add_child(pc)
+		ov.add_child(rr)
+	ov.add_child(_label(L.t("· Cada tirada cuesta %d caramelos. Los caramelos se consiguen derrotando Pokémon en el modo Halloween.") % SV.HW_PULL, 16, Color("#ffd9a0")))
+	ov.add_child(_label(L.t("· A las %d tiradas sin legendario en un banner, la siguiente lo es.") % SV.PITY_5, 16, Color("#c8d6ee")))
+	ov.add_child(_label(L.t("· Los repetidos dan Pokémonedas. Los shiny no se repiten."), 16, Color("#c8d6ee")))
+	focus_first = first if first != null else b1
+
+
 func _nw(parent: Node, l: Label) -> void:
 	l.autowrap_mode = TextServer.AUTOWRAP_OFF
 	parent.add_child(l)
@@ -5193,7 +5563,7 @@ func _nw(parent: Node, l: Label) -> void:
 
 func _do_pull(n: int, use: String) -> void:
 	if not SV.can_pull(n, use):
-		toast(L.t("No tienes tickets suficientes: consíguelos jugando"))
+		toast(L.t("No tienes caramelos suficientes: consíguelos en el modo Halloween") if use == "candy" else L.t("No tienes tickets suficientes: consíguelos jugando"))
 		return
 	var results: Array = SV.pull(gacha_region, n, use)
 	SV.save()
@@ -8304,7 +8674,7 @@ func _set_account() -> void:
 			ib.text = L.t("¿Reemplazar tu progreso actual? Pulsa otra vez")
 			return
 		import_armed = false
-		var parsed = JSON.parse_string(Marshalls.base64_to_utf8(DisplayServer.clipboard_get().strip_edges()))
+		var parsed = SV.parse_save_code(DisplayServer.clipboard_get())
 		if parsed is Dictionary and parsed.has("owned") and parsed.has("coins"):
 			SV.d = SV._merge(SV.default_data(), parsed)
 			SV._migrate_upgrades()

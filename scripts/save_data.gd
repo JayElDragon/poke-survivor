@@ -452,8 +452,37 @@ static func claim_goal(g: Dictionary) -> bool:
 
 
 # ---- gacha ----
+# v6.2: el banner 0 es el de Halloween (solo Pokemon de tipo Fantasma, se paga con caramelos).
+const HW_PULL := 5
+
+
+# v6.2: lee un codigo de guardado aunque al copiarlo se hayan colado saltos de linea o espacios
+# (notas, correo, chats), y tambien el contenido de save.json pegado tal cual.
+static func parse_save_code(raw: String) -> Variant:
+	var t: String = raw.strip_edges()
+	if t.begins_with("\ufeff"):
+		t = t.substr(1)
+	if t.begins_with("{"):
+		return JSON.parse_string(t)
+	var re := RegEx.new()
+	re.compile("[^A-Za-z0-9+/=_-]")
+	var b: String = re.sub(t, "", true).replace("-", "+").replace("_", "/")
+	while b.length() % 4 != 0:
+		b += "="
+	return JSON.parse_string(Marshalls.base64_to_utf8(b))
+
+
+static func hw_on() -> bool:
+	return bool(d["settings"].get("hw_mode", false))
+
+
 static func region_pool(region: int) -> Array:
 	var out: Array = []
+	if region == 0:
+		for p in dex_list:
+			if (p["types"] as Array).has("ghost") and smeta.has(str(int(p["dex"]))):
+				out.append(p)
+		return out
 	for p in dex_list:
 		if int(p["gen"]) == region and smeta.has(str(int(p["dex"]))):
 			out.append(p)
@@ -461,6 +490,8 @@ static func region_pool(region: int) -> Array:
 
 
 static func can_pull(n: int, use: String) -> bool:
+	if use == "candy":
+		return int(d.get("hw_candy", 0)) >= n * HW_PULL
 	if n == 10 and use == "t10":
 		return int(d.get("tickets10", 0)) >= 1
 	return int(d["tickets"]) >= n
@@ -533,6 +564,8 @@ static func pull(region: int, n: int = 1, use: String = "t1") -> Array:
 	var purple: bool = n == 10 and use == "t10"
 	if purple:
 		d["tickets10"] = int(d["tickets10"]) - 1
+	elif use == "candy":
+		d["hw_candy"] = int(d.get("hw_candy", 0)) - n * HW_PULL
 	else:
 		d["tickets"] = int(d["tickets"]) - n
 	var key := str(region)
@@ -650,6 +683,7 @@ static func finish_run(r: Dictionary) -> Dictionary:
 	var tickets10: int = int(r.get("tickets10", 0))
 	d["tickets10"] = int(d.get("tickets10", 0)) + tickets10
 	d["gcoins"] = int(d.get("gcoins", 0)) + int(r.get("gcoins", 0))
+	d["hw_candy"] = int(d.get("hw_candy", 0)) + int(r.get("hw_candy", 0))
 	d["gold_coins"] = int(d.get("gold_coins", 0)) + int(r.get("gold_gcoins", 0))
 	_add_top({"time": int(r["time"]), "kills": int(r["kills"]), "level": int(r["level"]), "dex": int(r.get("dex", 25)), "judge": int(r.get("judge", {}).get("time", 0)) if r.get("judge", {}) is Dictionary else 0, "date": Time.get_date_string_from_system()})
 	last_run = {"judge": r.get("judge", {}), "time": int(r["time"]), "kills": int(r["kills"]), "level": int(r["level"]), "coins": coins, "tickets": tickets, "tickets10": tickets10, "gcoins": int(r.get("gcoins", 0)), "bosses": int(r["bosses"]), "dex": int(r.get("dex", 25)),
