@@ -305,6 +305,131 @@ class Wheel extends Node2D:
 
 
 # ---------------------------------------------------------------
+# ---------------------------------------------------------------
+# 7.0: Sala del Origen (del original). Plataforma de marmol y oro sobre un mar de nubes, columnas de luz y estrellas;
+# Aspas Doradas desde el minuto 5 de la Sentencia (y un segundo carril al reves desde el 7); y Arceus suma un ataque
+# nuevo cada 30 s: Velocidad Extrema, Premonicion, Gravedad, Hiperrayo y Sentencia de las Tablas.
+# ---------------------------------------------------------------
+const BLADES_AT := 300.0
+const BLADES2_AT := 420.0
+const BLADE_N := 6
+const BLADE_PCT := 0.35
+const EXTRA := ["extreme", "future", "gravity", "hyper", "tablets"]
+const EXTRA_EVERY := 30.0
+const TYPE_COLS := ["#ff6a1f", "#3d8bff", "#45b23c", "#ffd21a", "#62d2ea", "#e04a2e", "#a043d0", "#aa7c3c", "#93b2ff", "#ff4f9a", "#90b82a", "#8e7a5a", "#5c48aa", "#5a3cff", "#463840", "#8c9caf", "#ff8acb", "#c4bcb0"]
+var deco: Node2D = null
+var blade_a := 0.0
+var blade_cd := 0.0
+var extra_i := 0
+var blades_said := 0
+
+
+class HallDeco extends Node2D:
+	var jd = null
+	var t := 0.0
+	var R := 1000.0
+
+	func _process(d: float) -> void:
+		t += d
+		queue_redraw()
+
+	func _draw() -> void:
+		# mar de nubes alrededor de la plataforma
+		for i in range(26):
+			var a: float = TAU * float(i) / 26.0 + t * 0.02
+			var rr: float = R * (1.12 + 0.06 * sin(t * 0.5 + float(i)))
+			draw_circle(Vector2(cos(a), sin(a) * 0.85) * rr, R * 0.16, Color(1.0, 0.97, 0.92, 0.10))
+		# plataforma de marmol con anillos de oro
+		draw_circle(Vector2.ZERO, R, Color(0.96, 0.93, 0.86, 0.10))
+		for k in [1.0, 0.82, 0.62, 0.3]:
+			draw_arc(Vector2.ZERO, R * k, 0.0, TAU, 96, Color(1.0, 0.82, 0.37, 0.35), 3.0)
+		for i in range(12):
+			var a2: float = TAU * float(i) / 12.0
+			draw_line(Vector2.from_angle(a2) * R * 0.3, Vector2.from_angle(a2) * R * 0.62, Color(1.0, 0.85, 0.45, 0.16), 2.0)
+		# columnas de luz en el borde
+		for i in range(10):
+			var a3: float = TAU * float(i) / 10.0
+			var p: Vector2 = Vector2.from_angle(a3) * R * 0.95
+			var beat: float = 0.5 + 0.5 * sin(t * 2.0 + float(i))
+			draw_rect(Rect2(p + Vector2(-9.0, -260.0), Vector2(18.0, 260.0)), Color(1.0, 0.95, 0.75, 0.10 + 0.08 * beat))
+			draw_circle(p, 14.0, Color(1.0, 0.88, 0.5, 0.35))
+		# estrellas
+		for i in range(30):
+			var a4: float = float(i) * 2.39996
+			var sp: Vector2 = Vector2.from_angle(a4) * R * (0.2 + fposmod(float(i) * 0.37, 1.0) * 1.1)
+			var tw: float = 0.5 + 0.5 * sin(t * 3.0 + float(i) * 1.7)
+			draw_rect(Rect2(sp - Vector2(1.5, 1.5), Vector2(3.0, 3.0)), Color(1, 1, 1, 0.25 + 0.5 * tw))
+		# Aspas Doradas: ruedas que dan vueltas por su carril, con huecos para cruzar
+		if jd != null:
+			for lane in jd.blade_lanes():
+				var lr: float = float(lane[0])
+				var ang: float = float(lane[1])
+				draw_arc(Vector2.ZERO, lr, 0.0, TAU, 96, Color(1.0, 0.82, 0.3, 0.18), 30.0)
+				for b in range(BLADE_N):
+					var ba: float = ang + TAU * float(b) / float(BLADE_N)
+					var bp: Vector2 = Vector2.from_angle(ba) * lr
+					draw_circle(bp, 30.0, Color(0.55, 0.38, 0.05, 0.9))
+					draw_circle(bp, 25.0, Color(1.0, 0.82, 0.3))
+					for s in range(6):
+						var sa: float = t * 9.0 * float(lane[2]) + TAU * float(s) / 6.0
+						draw_line(bp, bp + Vector2.from_angle(sa) * 25.0, Color(1.0, 0.95, 0.7), 3.0)
+					draw_circle(bp, 7.0, Color(1, 1, 1))
+
+
+# Carriles activos: [radio, angulo, sentido]
+func blade_lanes() -> Array:
+	var out: Array = []
+	if phase != "fight" or won:
+		return out
+	var R: float = (ARENA_R - 4.0) * ARENA.TS
+	if arena_t >= BLADES_AT:
+		out.append([R, blade_a, 1.0])
+	if arena_t >= BLADES2_AT:
+		out.append([R * 0.62, -blade_a * 1.15 + 0.5, -1.0])
+	return out
+
+
+func blades_tick(dt: float) -> void:
+	blade_a += dt * 0.55
+	blade_cd -= dt
+	var lanes: Array = blade_lanes()
+	if lanes.size() > blades_said:
+		blades_said = lanes.size()
+		m._say(L.t("¡Las Aspas Doradas de Arceus giran por la Sala del Origen!") if blades_said == 1 else L.t("¡Un segundo carril de Aspas gira al revés!"), 3.0)
+		Aud.sfx("toll")
+	if blade_cd > 0.0 or m.player.dead:
+		return
+	var rel: Vector2 = m.player.position - center
+	for lane in lanes:
+		for b in range(BLADE_N):
+			var bp: Vector2 = Vector2.from_angle(float(lane[1]) + TAU * float(b) / float(BLADE_N)) * float(lane[0])
+			if bp.distance_to(rel) < 30.0 + m.player.radius * 0.6:
+				blade_cd = 1.0
+				m.player.invuln = 0.0
+				m._hurt_player(m.player.max_hp * BLADE_PCT, "", true)
+				m.player.position = center + rel.normalized() * (float(lane[0]) - 80.0)   # te echa del carril, hacia dentro
+				m.player_vel = Vector2.ZERO
+				m.shake = maxf(m.shake, 10.0)
+				m._ring(m.player.position, 6.0, 90.0, GOLD, 0.4)
+				return
+
+
+func _hall_on() -> void:
+	if deco != null and is_instance_valid(deco):
+		return
+	deco = HallDeco.new()
+	deco.jd = self
+	deco.R = (ARENA_R - 1.0) * ARENA.TS
+	deco.position = center
+	m.gfx.add_child(deco)
+
+
+func _hall_off() -> void:
+	if deco != null and is_instance_valid(deco):
+		deco.queue_free()
+	deco = null
+
+
 func reset() -> void:
 	phase = ""
 	done = false
@@ -490,6 +615,10 @@ func fight() -> void:
 	A.set_meta("jd_arceus", true)
 	m.enemies.append(A)
 	m.ainfo = {"phase": "jd", "back": m.player.position, "stash_e": m.ainfo.get("stash_e", []), "stash_o": m.ainfo.get("stash_o", []), "boss": A}
+	_hall_on()   # 7.0: Sala del Origen
+	blade_a = 0.0
+	blades_said = 0
+	extra_i = 0
 
 
 # --- cada fotograma ---------------------------------------------
@@ -547,6 +676,7 @@ func update(dt: float) -> void:
 	touch_cd -= dt
 	spin += dt
 	arceus_tick(dt)
+	blades_tick(dt)   # 7.0: Aspas Doradas
 	keep_inside()
 	boss_t -= dt
 	if boss_t <= 0.0:
@@ -578,6 +708,11 @@ func arceus_tick(dt: float) -> void:
 	cd -= dt
 	if cd <= 0.0:
 		var id: String = "nova" if (dist < 210.0 and randf() < 0.6) else ("cross" if last_cast == "rain" else "rain")
+		# 7.0: cada 30 s de Sentencia se suma un ataque nuevo; se alternan con los de siempre
+		var n_extra: int = mini(EXTRA.size(), int(arena_t / EXTRA_EVERY))
+		if n_extra > 0 and id != "nova" and randf() < 0.5:
+			id = String(EXTRA[extra_i % n_extra])
+			extra_i += 1
 		cast(id)
 
 
@@ -617,6 +752,54 @@ func cast(id: String) -> void:
 			hz_last.angle = a0 + float(i) * TAU / float(n2)
 		wind = 1.1
 		A.play("Charge", 0.9)
+	elif id == "extreme":
+		# Velocidad Extrema: linea avisada hacia ti y Arceus la recorre de golpe
+		var to: Vector2 = m.player.position
+		hz("beam", A.position, 0.0, 0.8, 0.3, Color("#fff6d0"))
+		hz_last.angle = (to - A.position).angle()
+		hz_last.width = 70.0
+		hz_last.length = A.position.distance_to(to) + 120.0
+		wind = 0.8
+		A.play("Charge", 1.4)
+		m._say(L.t("¡Velocidad Extrema!"), 1.0)
+		casting = {"id": id, "t": 0.0, "wind": wind, "done": false, "to": to}
+		m._ring(A.position, A.radius, A.radius * 3.0, GOLD, wind)
+		return
+	elif id == "future":
+		# Premonicion: tres marcas donde estas que estallan tarde
+		var pf: Vector2 = m.player.position
+		for i in range(3):
+			hz("zone", pf + Vector2.from_angle(randf() * TAU) * randf_range(0.0, 60.0), 60.0, 2.0 + 0.25 * float(i), 0.25, Color("#ff9ad8"), "pillar")
+		wind = 0.6
+		A.play("Shoot", 0.9)
+		m._say(L.t("¡Premonición!"), 1.0)
+	elif id == "gravity":
+		# Gravedad: te vuelves pesado unos segundos y caen pilares
+		m.trap_slow_t = maxf(m.trap_slow_t, 3.0)
+		m._ring(m.player.position, 160.0, 20.0, Color("#b9a6ff"), 0.8, 5.0)
+		var pg: Vector2 = m.player.position
+		for i in range(4):
+			hz("zone", pg + Vector2.from_angle(TAU * float(i) / 4.0) * 90.0, 50.0, 1.4, 0.25, Color("#b9a6ff"), "pillar")
+		wind = 0.9
+		A.play("Charge", 1.0)
+		m._say(L.t("¡Gravedad! Te mueves más despacio"), 1.4)
+	elif id == "hyper":
+		# Hiperrayo: rayo ancho hacia ti
+		hz("beam", A.position, 0.0, 1.3, 0.45, Color("#fff3b0"))
+		hz_last.angle = (m.player.position - A.position).angle()
+		hz_last.width = 120.0
+		wind = 1.3
+		A.play("Charge", 0.8)
+		m._say(L.t("¡Hiperrayo!"), 1.0)
+	elif id == "tablets":
+		# Sentencia de las Tablas: estallidos de todos los tipos por la sala
+		for i in range(14):
+			var tp: Vector2 = center + Vector2.from_angle(randf() * TAU) * randf_range(60.0, (ARENA_R - 4.0) * ARENA.TS)
+			hz("zone", tp, 56.0, 1.2 + 0.05 * float(i), 0.25, Color(String(TYPE_COLS[i % TYPE_COLS.size()])))
+		hz("zone", m.player.position, 56.0, 1.3, 0.25, GOLD, "pillar")
+		wind = 1.2
+		A.play("Shoot", 1.0)
+		m._say(L.t("¡Sentencia de las Tablas!"), 1.2)
 	else:
 		# Onda alrededor de el (si estas demasiado cerca).
 		hz("zone", A.position, 170.0, 0.85, 0.4, GOLD)
@@ -632,6 +815,10 @@ func cast_tick(dt: float) -> void:
 	A.face_angle(dv.angle())
 	if float(casting["t"]) >= float(casting["wind"]) and not bool(casting["done"]):
 		casting["done"] = true
+		if String(casting["id"]) == "extreme" and casting.has("to"):
+			A.position = casting["to"]   # Velocidad Extrema: aparece donde estabas
+			m._ring(A.position, A.radius, A.radius * 3.5, GOLD, 0.4, 5.0)
+			m.shake = maxf(m.shake, 8.0)
 		A.play("Attack" if String(casting["id"]) == "nova" else "Shoot", 1.2)
 	if float(casting["t"]) >= float(casting["wind"]) + 0.35:
 		casting = {}
@@ -758,6 +945,7 @@ func leave() -> void:
 	if A != null and is_instance_valid(A):
 		A.queue_free()
 	A = null
+	_hall_off()
 
 
 func boss_down() -> void:

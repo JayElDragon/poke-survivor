@@ -185,6 +185,106 @@ static func unlocked(stats: Dictionary) -> bool:
 	return int(stats.get("dens", 0)) >= 1
 
 
+# ---------------------------------------------------------------
+# 7.0: poderes de partida (del original). Comparten boton, duracion y recarga con el Dynamax; se elige uno en el menu.
+#  - mega: Megaevolucion (solo Pokemon con Mega). +40% de dano, +15% de velocidad, +25% de defensa, megaestallido al activarla.
+#  - tera: Teracristal (se desbloquea al llegar a la Sentencia de Arceus). Cuerpo de cristal y corona de su tipo: +50% de dano con los movimientos de su tipo, +20% de defensa.
+# (Gigamax no: el port no tiene sprites de formas y seria un Dynamax repetido.)
+# ---------------------------------------------------------------
+const MEGA_DEX := [3, 6, 9, 15, 18, 36, 65, 71, 80, 94, 115, 121, 127, 130, 142, 149, 150, 154, 160, 181, 208, 212, 214, 227, 229, 248,
+	254, 257, 260, 282, 302, 303, 306, 308, 310, 319, 323, 334, 354, 359, 362, 373, 376, 380, 381, 384, 428, 445, 448, 460, 475, 478,
+	500, 530, 531, 545, 560, 604, 609, 652, 655, 658, 668, 670, 687, 689, 691, 701, 718, 719, 780, 870]
+const POWER_NAMES := {"dyna": "Dynamax", "mega": "Megaevolución", "tera": "Teracristal"}
+const POWER_WORD := {"dyna": "DYNAMAX", "mega": "MEGA", "tera": "TERA"}
+const POWER_COL := {"dyna": "#ff3d6e", "mega": "#5fd0ff", "tera": "#7ff0e0"}
+const MEGA_RIFTS := 5   # grietas ganadas para desbloquear la Megaevolucion
+
+var kind := "dyna"
+
+
+static func power_ok(k: String, stats: Dictionary) -> bool:
+	match k:
+		"dyna":
+			return unlocked(stats)
+		"mega":
+			return int(stats.get("rifts", 0)) >= MEGA_RIFTS
+		"tera":   # llegar a la Sentencia de Arceus (o vencer a Eternatus)
+			return int(stats.get("arceusReached", 0)) >= 1 or int(stats.get("judgeTime", 0)) > 0 or int(stats.get("eternatusKills", 0)) >= 1
+	return false
+
+
+func k_dmg() -> float:
+	return DMG_K if kind == "dyna" else (1.4 if kind == "mega" else 1.0)
+
+
+func k_stat() -> float:
+	return STAT_K if kind == "dyna" else (1.15 if kind == "mega" else 1.0)
+
+
+func k_taken() -> float:
+	return TAKEN if kind == "dyna" else (0.25 if kind == "mega" else 0.2)
+
+
+# Aura de Megaevolucion: espiral de luz arcoiris y el simbolo (la piedra llave) flotando encima.
+class MegaAura extends Node2D:
+	var t := 0.0
+	var h := 40.0
+	var w := 24.0
+
+	func _init() -> void:
+		show_behind_parent = true
+
+	func _process(d: float) -> void:
+		t += d
+		queue_redraw()
+
+	func _draw() -> void:
+		var c := Vector2(0.0, -h * 0.5)
+		for i in range(18):
+			var ph: float = fposmod(t * 0.6 + float(i) / 18.0, 1.0)
+			var a: float = t * 2.4 + float(i) * 0.7
+			var p := Vector2(cos(a) * w * 1.2, c.y + h * 0.6 - ph * h * 1.4 + sin(a) * w * 0.3)
+			var col := Color.from_hsv(fposmod(float(i) / 18.0 + t * 0.2, 1.0), 0.55, 1.0, sin(ph * PI) * 0.75)
+			draw_circle(p, 3.0 + 3.0 * (1.0 - ph), col)
+		# simbolo de la Megaevolucion: esfera con la helice
+		var s := Vector2(0.0, -h - 26.0 + sin(t * 3.0) * 3.0)
+		draw_circle(s, 11.0, Color(0.1, 0.12, 0.2, 0.9))
+		draw_circle(s, 9.0, Color.from_hsv(fposmod(t * 0.3, 1.0), 0.45, 1.0))
+		draw_arc(s, 6.0, 0.4, PI * 1.3, 10, Color(1, 1, 1, 0.95), 2.0)
+		draw_arc(s, 6.0, PI + 0.4, PI * 2.3, 10, Color(0.1, 0.12, 0.2, 0.9), 2.0)
+
+
+# Teracristal: facetas de cristal sobre el cuerpo y una corona con el color de su tipo.
+class TeraCrown extends Node2D:
+	var t := 0.0
+	var h := 40.0
+	var w := 24.0
+	var col := Color("#7ff0e0")
+
+	func _process(d: float) -> void:
+		t += d
+		queue_redraw()
+
+	func _draw() -> void:
+		var c := Vector2(0.0, -h * 0.5)
+		# facetas que brillan por encima del cuerpo
+		for i in range(7):
+			var a: float = float(i) * 0.9 + t * 0.4
+			var p := c + Vector2(cos(a) * w * 0.7, sin(a * 1.3) * h * 0.35)
+			var sh: float = 0.5 + 0.5 * sin(t * 5.0 + float(i) * 1.7)
+			var s: float = 4.0 + 3.0 * sh
+			draw_colored_polygon(PackedVector2Array([p + Vector2(0, -s), p + Vector2(s * 0.6, 0), p + Vector2(0, s), p + Vector2(-s * 0.6, 0)]), Color(1, 1, 1, 0.25 + 0.35 * sh))
+		# corona: tres puntas de cristal con una gema del tipo
+		var top := Vector2(0.0, -h - 8.0 + sin(t * 2.5) * 2.0)
+		for k in [-1, 0, 1]:
+			var bx: float = float(k) * 10.0
+			var ht: float = 22.0 if k == 0 else 15.0
+			var pts := PackedVector2Array([top + Vector2(bx - 6.0, 0), top + Vector2(bx, -ht), top + Vector2(bx + 6.0, 0)])
+			draw_colored_polygon(pts, Color(col.r, col.g, col.b, 0.85))
+			draw_polyline(pts, Color(1, 1, 1, 0.9), 1.5)
+		draw_circle(top + Vector2(0, -4), 4.0, Color(1, 1, 1, 0.95))
+
+
 func start(main) -> void:
 	m = main
 	active = true
@@ -194,6 +294,9 @@ func start(main) -> void:
 	pulse = 0.6
 	since = 0.0
 	type = String(m.player.types[0])
+	if kind != "dyna":
+		_start_other()
+		return
 	bonus = roundf(m.player.max_hp * HP_BONUS)
 	m.player.max_hp += bonus
 	m.player.hp += bonus
@@ -217,6 +320,40 @@ func start(main) -> void:
 	m.pfx.ring(m.player.position, 10.0, 360.0, col, 0.7, 6.0)
 	m.pfx.ring(m.player.position, 10.0, 240.0, Color.WHITE, 0.5, 4.0)
 	m.pfx.burst(m.player.position, col, 28, 260.0)
+
+
+# Megaevolucion y Teracristal: sin crecer (como mucho un poco), con su aura propia.
+func _start_other() -> void:
+	bonus = 0.0
+	var col := Color(String(POWER_COL[kind]))
+	if kind == "mega":
+		aura_node = MegaAura.new()
+		var tw = m.create_tween()
+		tw.tween_property(m.player, "scale", Vector2(1.25, 1.25), 0.18).set_trans(Tween.TRANS_SINE)
+		tw.tween_property(m.player, "scale", Vector2(1.12, 1.12), 0.2).set_trans(Tween.TRANS_SINE)
+		# megaestallido: golpe de su tipo alrededor al megaevolucionar
+		var z = ZMS.new()
+		z.m = m
+		z.type = type
+		z.pal = type
+		z.c = m.player.position
+		z.dmg = (60.0 + 12.0 * float(m.player.level)) * m._atk()
+		z.boom(z.c, 360.0, 6.0)
+		z.hit(z.c, 360.0, 1.0, 260.0, "", 0, 0.0)
+	else:
+		aura_node = TeraCrown.new()
+		aura_node.col = Color.html(String(m.MD.TYPE_COLOR.get(type, "#7ff0e0"))).lerp(Color.WHITE, 0.25)
+		m.player.modulate = Color(0.75, 1.05, 1.15).lerp(aura_node.col, 0.25)   # cuerpo de cristal
+	aura_node.h = m.player.body_h
+	aura_node.w = m.player.radius * 1.8
+	m.player.add_child(aura_node)
+	m.player.invuln = maxf(m.player.invuln, 1.2)
+	m.player.flash = 1.0
+	m.shake = maxf(m.shake, 7.0)
+	Aud.sfx("legend")
+	m.pfx.ring(m.player.position, 10.0, 300.0, col, 0.7, 6.0)
+	m.pfx.ring(m.player.position, 10.0, 200.0, Color.WHITE, 0.5, 4.0)
+	m.pfx.burst(m.player.position + Vector2(0.0, -m.player.body_h * 0.5), col, 28, 240.0)
 
 
 # Destello y sonido de cada paso del crecimiento.
@@ -246,6 +383,8 @@ func stop() -> void:
 	var tw2 = m.create_tween()
 	tw2.tween_property(m.player, "scale", Vector2.ONE, 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	bonus = 0.0
+	if kind == "tera":
+		m.player.modulate = Color.WHITE   # se rompe el cristal
 	var col: Color = Color.html(String(m.MD.TYPE_COLOR.get(type, "#ff2a6d")))
 	m.pfx.ring(m.player.position, 10.0, 200.0, col, 0.5, 4.0)
 	m.pfx.burst(m.player.position, col, 14, 160.0)
@@ -262,7 +401,7 @@ func tick(delta: float) -> void:
 		aura = 0.18
 		m.pfx.burst(m.player.position + Vector2(randf_range(-26.0, 26.0), -20.0), col, 2, 70.0)
 	pulse -= delta
-	if pulse <= 0.0:
+	if pulse <= 0.0 and kind == "dyna":   # las ondas Max son solo del Dynamax
 		pulse = PULSE
 		n += 1
 		_pulse(n % 3 == 0, col)

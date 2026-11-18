@@ -9,6 +9,29 @@ const UPD = preload("res://scripts/updater.gd")
 
 const ENTRIES := [
 	{
+		"ver": "7.0",
+		"date": "2026-11-18",
+		"title": "Poke Survivors 7.0: la gran actualización",
+		"new": [
+			"Evolución en plena partida: a los niveles 20 y 40 eliges evolucionar (cambian aspecto, tipos y stats) o mantener su aspecto con la fuerza de su evolución. Los que no evolucionan se hacen más fuertes.",
+			"Nuevas dificultades en la Partida normal: Difícil (×1,5 monedas y tickets; se desbloquea al llegar a la Sentencia de Arceus) y Pesadilla (×2; se desbloquea venciendo a Eternatus en Difícil). En ellas no hay dificultad adaptativa.",
+			"Nuevo evento: Munchlax hambriento. Quiere 3 bayas de una clase: sacude los arbustos, llévaselas y te deja un objeto y un Caramelo Exp. Cuidado con los Combee.",
+			"Eternatus pelea en tres fases: charcos de Tóxico y Cañón Dinamax, núcleos unidos por una barrera de láseres que lo protegen, el Remolino Infinito que te arrastra y, al final, el Rayo Eternamax. El cielo se tiñe de rojo.",
+			"Maestría de cada Pokémon: suma puntos por los Pokémon derrotados y los minutos que juegas con él (y por jefes, grietas, Arceus y Eternatus). Al nivel 5 ganas el título «Experto en…», una corona en la Colección y el aura de maestro en la partida. Se ve en la ficha de cada Pokémon.",
+			"Huevos: salen del gacha (cada 10 tiradas ×10), de las grietas y de las misiones semanales. Se incuban en la Mochila (en el Perfil) con los minutos que juegas y pueden salir shiny.",
+			"Vestidor, en la ficha de cada Pokémon de la Colección: elige su versión normal o shiny y su estela (lo que deja al moverse). 18 estelas que se compran una vez con monedas y valen para todos tus Pokémon.",
+			"La Sentencia de Arceus ahora es en la Sala del Origen: plataforma de mármol y oro sobre un mar de nubes, con columnas de luz y estrellas. Desde el minuto 5 las Aspas Doradas dan vueltas por un carril (y otro al revés desde el 7), y Arceus suma un ataque nuevo cada 30 s: Velocidad Extrema, Premonición, Gravedad, Hiperrayo y Sentencia de las Tablas.",
+			"Los jefes que no ves se marcan con una flecha roja en el borde de la pantalla, con su distancia.",
+			"Nuevos poderes de partida: Megaevolución (solo Pokémon con Mega; se desbloquea ganando 5 grietas) y Teracristal (se desbloquea al llegar a la Sentencia de Arceus). Se eligen en el menú de modos y usan el botón MAX.",
+			"Cartas nuevas: Cazador (más daño a jefes y legendarios), Esquiva (probabilidad de esquivar golpes) y Poder rápido (menos recarga del Dynamax y del movimiento Z).",
+			"Cartas raras nuevas: Sabiduría (+15% de experiencia, una vez por partida) y Cuarto objeto (un hueco de objeto más si ya llevas tres).",
+			"Nueva carta Quitamovimientos: con todos los huecos llenos, olvida un movimiento y aprende otro de tu Pokémon en su hueco, o déjalo libre.",
+		],
+		"changes": [
+			"Al subir de nivel eliges entre 4 cartas en vez de 3.",
+		],
+	},
+	{
 		"ver": "6.2",
 		"date": "2026-11-03",
 		"title": "Poke Survivors 6.2: evento de Halloween",

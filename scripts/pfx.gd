@@ -70,7 +70,7 @@ func spark(pos: Vector2, color: Color, dir: Vector2, n: int = 4) -> void:
 
 
 func sp(shape: String, pal: String, pos: Vector2, o: Dictionary = {}) -> void:
-	if sprs.size() >= cap_sprites or randf() < skip * 0.9:
+	if sprs.size() >= cap_sprites or (randf() < skip * 0.9 and not bool(o.get("force", false))):   # force: estelas del Vestidor (ya llevan su propio ritmo)
 		return
 	sprs.append({"shape": shape, "pal": pal, "p": pos, "v": o.get("v", Vector2.ZERO), "t": 0.0, "life": float(o.get("life", 0.4)),
 		"scale": float(o.get("scale", 1.0)), "ang": float(o.get("angle", 0.0)), "spin": float(o.get("spin", 0.0)),

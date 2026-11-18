@@ -295,6 +295,10 @@ static func titles() -> Array:
 	for a in list():
 		if String(a["title"]) != "" and ach.has(String(a["id"])):
 			out.append(String(a["title"]))
+	# 7.0: titulo «Experto en X» por cada Pokemon con la maestria al maximo
+	for k in (SV.d.get("mastery", {}) as Dictionary):
+		if SV.is_master(int(k)) and SV.dex_by.has(int(k)):
+			out.append(L_t("Experto en %s") % L_t(String(SV.dex_by[int(k)]["name"])))
 	return out
 
 
@@ -574,6 +578,8 @@ static func claim(m: Dictionary, weekly: bool) -> bool:
 		return false
 	m["claimed"] = true
 	grant(def_of(String(m["id"]))["reward"])
+	if weekly:
+		SV.add_egg("mission")   # 7.0: las misiones semanales tambien dan un huevo (si cabe en la Mochila)
 	var s: Dictionary = SV.d["stats"]
 	s["missionsDone"] = int(s.get("missionsDone", 0)) + 1
 	SV.save()

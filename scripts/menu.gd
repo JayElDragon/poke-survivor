@@ -2322,6 +2322,11 @@ const MOD_INFO := {
 	"rich": ["Fiebre del oro", "Las monedas valen el doble, pero los enemigos tienen un 30% más de vida."],
 	"plague": ["Plaga", "Aparecen 2,5 veces más enemigos, pero con un 35% menos de vida."],
 }
+const DIFF_INFO := [
+	"Normal: la partida de siempre.",
+	"Difícil: enemigos con +50% de vida y +30% de daño. ×1,5 monedas y tickets.",
+	"Pesadilla: enemigos con +120% de vida y +70% de daño, y más enemigos a la vez. ×2 monedas y tickets.",
+]
 # id, nombre, icono, grupo, reglas
 const MODE_LIST := [
 	["normal", "Partida normal", "flag", "Clásicos", ["Sobrevive mientras llegan enemigos sin parar.", "Sube de nivel y elige movimientos y objetos.", "Vence a los jefes que aparecen cada pocos minutos.", "Al terminar ganas Pokémonedas y, a veces, tickets.", "Dura 60 minutos: Arceus llega en el minuto 30 y Eternatus en el 60."]],
@@ -3006,6 +3011,24 @@ func _modes_select_impl(id: String) -> void:
 	var info := {"hero": hero, "tag": L.t("Vista previa")}
 	var pm := "normal"
 	match id:
+		"normal":
+			# 7.0: dificultad (Normal, Dificil, Pesadilla); vencer a Eternatus desbloquea la siguiente
+			var unl: int = SV.diff_unlocked()
+			var cur: int = mini(clampi(int(SV.d.get("difficulty", 0)), 0, 2), unl)
+			var sg: HBoxContainer = _seg(SV.DIFF_NAMES, cur, func(i: int):
+				SV.d["difficulty"] = i
+				SV.save()
+				_modes_select(id))
+			for i in range(sg.get_child_count()):
+				var b: Button = sg.get_child(i)
+				b.focus_mode = Control.FOCUS_ALL
+				if i > unl:
+					b.disabled = true
+					b.text = L.t("%s (bloqueada)") % L.t(String(SV.DIFF_NAMES[i]))
+			mp_opts.add_child(sg)
+			mp_stat.text = L.t(String(DIFF_INFO[cur]))
+			if unl < 2:
+				mp_stat.text += "\n" + L.t("Difícil: llega a la Sentencia de Arceus. Pesadilla: vence a Eternatus en Difícil.")
 		"daily":
 			var ds: int = SV.daily_seed()
 			var dd: Dictionary = SV.d.get("daily", {})
@@ -3160,6 +3183,35 @@ func _modes_select_impl(id: String) -> void:
 					mp_prev.info["on"] = SV.run_mods)
 				mg.add_child(cb)
 			pm = "mods"
+	# 7.0: poder de la partida (comparten boton y recarga): Dynamax, Megaevolucion o Teracristal
+	if id != "tower" and id != "mods" and not id.begins_with("chal_") and DYN.unlocked(SV.d["stats"]):
+		var kinds := ["dyna", "mega", "tera"]
+		var st: Dictionary = SV.d["stats"]
+		var curk: String = String(SV.d.get("power", "dyna"))
+		var names: Array = kinds.map(func(k): return L.t(String(DYN.POWER_NAMES[k])))
+		var pw: HBoxContainer = _seg(names, maxi(0, kinds.find(curk)), func(i: int):
+			SV.d["power"] = String(kinds[i])
+			SV.save()
+			_modes_select(id), false)
+		for i in range(pw.get_child_count()):
+			var pb: Button = pw.get_child(i)
+			pb.focus_mode = Control.FOCUS_ALL
+			if not DYN.power_ok(String(kinds[i]), st):
+				pb.disabled = true
+				pb.text = L.t("%s (bloqueada)") % String(names[i])
+		mp_opts.add_child(_label(L.t("Poder de la partida (botón MAX):"), 16))
+		mp_opts.add_child(pw)
+		var pinfo := {
+			"dyna": "Dynamax: tu Pokémon se hace gigante y lanza ondas Max.",
+			"mega": "Megaevolución: +40% de daño, +15% de velocidad y +25% de defensa. Solo Pokémon con Megaevolución (si no, usa el Dynamax).",
+			"tera": "Teracristal: cuerpo de cristal y +50% de daño con los movimientos de su tipo.",
+		}
+		var ptxt: String = L.t(String(pinfo.get(curk, pinfo["dyna"])))
+		if not DYN.power_ok("mega", st):
+			ptxt += "\n" + L.t("Megaevolución: gana %d peleas en grietas para desbloquearla.") % DYN.MEGA_RIFTS
+		if not DYN.power_ok("tera", st):
+			ptxt += "\n" + L.t("Teracristal: llega a la Sentencia de Arceus para desbloquearlo.")
+		mp_stat.text = (mp_stat.text + "\n" if mp_stat.text != "" else "") + ptxt
 	if id != "daily" and id != "party":
 		mp_play.disabled = mp_play.disabled and id == "team"
 	else:
@@ -3355,7 +3407,7 @@ func _refresh_main() -> void:
 	if not SV.owns(dex) and SV.owned_count() > 0:
 		dex = int(SV.d["owned"].keys()[0])
 		SV.d["selected"] = dex
-	var shn: bool = bool(SV.d["shiny_on"]) and SV.owns(dex) and bool(SV.d["owned"][str(dex)]["shiny"])
+	var shn: bool = SV.show_shiny(dex)
 	if is_instance_valid(main_prev):
 		main_prev.queue_free()
 	main_prev = Preview.new()
@@ -3521,6 +3573,20 @@ func _show_run_summary() -> void:
 		var bl := _label(L.t("Recogidas %d · Tiempo +%d · Derrotados +%d") % _bd_nums(String(r["breakdown"])), 13, Color("#9fb4dc"))
 		bl.autowrap_mode = TextServer.AUTOWRAP_OFF
 		cv.add_child(bl)
+	# 7.0: lineas extra (maestria, huevos encontrados) y huevos que han nacido con esta partida
+	for nt in (r.get("notes", []) as Array):
+		var nl := _label(String(nt), 15, C_GOLD)
+		nl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		cv.add_child(nl)
+	for b in (r.get("eggs", []) as Array):
+		var bn: String = L.t(String(SV.dex_by[int(b["dex"])]["name"]))
+		var et: String = L.t("¡Ha nacido %s de un huevo!") % bn
+		if bool(b["shiny"]):
+			et += " " + L.t("¡Es shiny!")
+		if int(b["refund"]) > 0:
+			et += " " + L.t("(repetido: +%d monedas)") % int(b["refund"])
+		var el := _icon_label("star", et, 15, Color("#7dffb0"), 22.0)
+		cv.add_child(el)
 	var mid := HBoxContainer.new()
 	mid.add_theme_constant_override("separation", 8)
 	cc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -4185,7 +4251,7 @@ func _dex_card(p: Dictionary, owned: bool) -> Button:
 	tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var shn: bool = owned and bool(SV.d["owned"][str(dx)].get("shiny", false)) and bool(SV.d["shiny_on"])
+	var shn: bool = owned and SV.show_shiny(dx)
 	tr.texture = _icon_tex(dx, shn)
 	if not show:
 		tr.modulate = Color(0, 0, 0, 0.85)
@@ -4355,7 +4421,7 @@ func _dex_detail() -> void:
 	pv.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	dex_pv_box.add_child(pv)
 	var shiny_owned: bool = owned and bool(SV.d["owned"][str(dx)].get("shiny", false))
-	pv.setup(dx, shiny_owned and bool(SV.d["shiny_on"]), 6.0, not owned)
+	pv.setup(dx, shiny_owned and SV.show_shiny(dx), 6.0, not owned)
 	var ball := IC.rect("ball", 52)
 	ball.position = Vector2(8, 8)
 	ball.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -4394,6 +4460,8 @@ func _dex_detail() -> void:
 	nm.autowrap_mode = TextServer.AUTOWRAP_OFF
 	dex_namebar.add_child(nm)
 	if owned:
+		if SV.is_master(dx):
+			dex_namebar.add_child(IC.rect("crown", 30))   # 7.0: maestro
 		dex_namebar.add_child(IC.rect("star" if dx == int(SV.d["selected"]) else "starDim", 30))
 		dex_name_heart = _heart_btn(dx, 26.0)
 		dex_hearts[-dx] = dex_name_heart
@@ -4429,6 +4497,33 @@ func _dex_detail() -> void:
 	var ad := _label(L.t(String(abd["desc"])), 16, Color("#dbe6ff"))
 	ad.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	av.add_child(ad)
+	# 7.0: maestria de este Pokemon
+	var ms: Dictionary = SV.mastery(dx)
+	var mlv: int = SV.mastery_level(int(ms["pts"]))
+	var mpan := _dpanel()
+	var mvb := VBoxContainer.new()
+	mvb.add_theme_constant_override("separation", 4)
+	mpan.add_child(mvb)
+	dex_detail.add_child(mpan)
+	var mtitle: String = L.t("Maestría · Nivel %d / %d") % [mlv, SV.MASTERY_MAX]
+	if mlv >= SV.MASTERY_MAX:
+		mtitle = L.t("Maestría · ¡Experto en %s!") % L.t(String(p["name"]))
+	mvb.add_child(_icon_label("crown", mtitle, 20, C_GOLD, 28.0))
+	var nxt: int = int(SV.MASTERY_LV[mini(mlv + 1, SV.MASTERY_MAX)])
+	var prv: int = int(SV.MASTERY_LV[mlv])
+	var mfr: float = 1.0 if mlv >= SV.MASTERY_MAX else clampf(float(int(ms["pts"]) - prv) / float(maxi(1, nxt - prv)), 0.0, 1.0)
+	mvb.add_child(_stat_bar(L.t("Puntos"), str(int(ms["pts"])) + ("" if mlv >= SV.MASTERY_MAX else " / %d" % nxt), mfr, C_GOLD, "star"))
+	var mt: int = int(ms["time"])
+	var mb: int = int(ms["best"])
+	var mtxt := _label(L.t("Partidas %d · Tiempo %d:%02d h · Derrotados %d\nJefes %d · Grietas %d · Llegadas a Arceus %d · Eternatus %d\nMejor tiempo %d:%02d") % [
+		int(ms["runs"]), mt / 3600, (mt / 60) % 60, int(ms["kills"]), int(ms["bosses"]), int(ms["rifts"]), int(ms["arceus"]), int(ms["eter"]), mb / 60, mb % 60], 15, Color("#dbe6ff"))
+	mtxt.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	mvb.add_child(mtxt)
+	if mlv < SV.MASTERY_MAX:
+		var mh := _label(L.t("Suma puntos derrotando Pokémon y jugando minutos con él. Al nivel %d: título, corona y aura de maestro.") % SV.MASTERY_MAX, 14, Color("#8a96b0"))
+		mh.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		mvb.add_child(mh)
+	dex_detail.add_child(_dress_panel(dx))
 	# movimiento inicial
 	var mv: String = SV.start_move_of(dx)
 	var mp := _dpanel()
@@ -5569,6 +5664,8 @@ func _do_pull(n: int, use: String) -> void:
 	SV.save()
 	_update_top()
 	_play_slots(results)
+	if SV.last_egg:
+		toast(L.t("¡Huevo de regalo por 10 tiradas ×10! Está en tu Mochila (Perfil)."))
 
 
 # Tragaperras animada (como el original); al terminar muestra la lista de premios.
@@ -6890,6 +6987,144 @@ func _pp(title: String, ty: String = "", bgtex: String = "") -> VBoxContainer:
 	return v
 
 
+# 7.0: Vestidor de un Pokemon (ficha de la Coleccion): version normal o shiny y su estela.
+func _dress_panel(dx: int) -> Control:
+	var pan := _dpanel()
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 6)
+	pan.add_child(v)
+	v.add_child(_icon_label("star", L.t("Vestidor"), 20, C_GOLD, 26.0))
+	var dr: Dictionary = SV.dress(dx)
+	if SV.owns(dx) and bool(SV.d["owned"][str(dx)].get("shiny", false)):
+		var cur_s: int = int(dr.get("shiny", -1))
+		var sg: HBoxContainer = _seg(["Automático", "Normal", "Shiny"], cur_s + 1, func(i: int):
+			SV.set_dress(dx, "shiny", i - 1)
+			SV.save()
+			Aud.sfx("confirm")
+			_dex_detail())
+		v.add_child(sg)
+		var sh := _label(L.t("Automático sigue el interruptor shiny de la Colección."), 13, Color("#8a96b0"))
+		sh.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		v.add_child(sh)
+	var cur_t: String = String(dr.get("trail", ""))
+	var tl: String = L.t("Estela: %s") % (L.t(String(SV.TRAILS[cur_t][0])) if SV.TRAILS.has(cur_t) else L.t("ninguna"))
+	v.add_child(_label(tl, 17, Color("#dbe6ff")))
+	var fl := HFlowContainer.new()
+	fl.add_theme_constant_override("h_separation", 6)
+	fl.add_theme_constant_override("v_separation", 6)
+	v.add_child(fl)
+	var none := _btn(L.t("Sin estela"), func():
+		SV.set_dress(dx, "trail", "")
+		SV.save()
+		_dex_detail(), Vector2(0, 40))
+	if cur_t == "":
+		_set_btn(none, "gold")
+	fl.add_child(none)
+	for id in SV.TRAILS:
+		var td: Array = SV.TRAILS[id]
+		var tid: String = String(id)
+		var have: bool = SV.has_trail(tid)
+		var txt: String = L.t(String(td[0])) if have else "%s · %d" % [L.t(String(td[0])), int(td[3])]
+		var b := _btn(txt, func():
+			if SV.has_trail(tid):
+				SV.set_dress(dx, "trail", tid)
+				SV.save()
+				Aud.sfx("confirm")
+			elif SV.buy_trail(tid):
+				SV.set_dress(dx, "trail", tid)
+				SV.save()
+				Aud.sfx("coin")
+				toast(L.t("¡Estela comprada! Vale para todos tus Pokémon."))
+				_update_top()
+			else:
+				toast(L.t("No tienes monedas suficientes"))
+			_dex_detail(), Vector2(0, 40))
+		if tid == cur_t:
+			_set_btn(b, "gold")
+		elif not have:
+			b.modulate = Color(0.8, 0.85, 1.0, 0.85)
+		fl.add_child(b)
+	var hint := _label(L.t("Las estelas se compran una vez y valen para todos tus Pokémon; cada uno lleva la suya."), 13, Color("#8a96b0"))
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(hint)
+	return pan
+
+
+# 7.0: Mochila de huevos (Perfil). Cada huevo se incuba con los minutos que juegas.
+class EggIcon extends Control:
+	var col := Color("#f4f0e0")
+	var spot := Color("#7dd06a")
+	var t := randf() * 10.0
+
+	func _ready() -> void:
+		custom_minimum_size = Vector2(44, 52)
+
+	func _process(d: float) -> void:
+		t += d
+		queue_redraw()
+
+	func _draw() -> void:
+		var c := Vector2(22, 28)
+		var wob: float = sin(t * 2.0) * 0.06
+		draw_set_transform(c, wob, Vector2.ONE)
+		var pts := PackedVector2Array()
+		for i in range(24):
+			var a: float = TAU * float(i) / 24.0
+			pts.append(Vector2(cos(a) * 15.0, sin(a) * (20.0 if sin(a) < 0.0 else 17.0)))
+		draw_colored_polygon(pts, Color("#1a1a2a"))
+		var pts2 := PackedVector2Array()
+		for p in pts:
+			pts2.append(p * 0.88)
+		draw_colored_polygon(pts2, col)
+		draw_circle(Vector2(-5, -6), 4.0, spot)
+		draw_circle(Vector2(6, 3), 3.0, spot)
+		draw_circle(Vector2(-3, 9), 2.5, spot)
+		draw_circle(Vector2(-6, -11), 2.0, Color(1, 1, 1, 0.8))
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+func _eggs_panel() -> Control:
+	var pan := _dpanel()
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 6)
+	pan.add_child(v)
+	var eg: Array = SV.eggs()
+	v.add_child(_label(L.t("Mochila de huevos · %d / %d") % [eg.size(), SV.EGG_MAX], 20, C_GOLD))
+	if eg.is_empty():
+		var hl := _label(L.t("Consigue huevos en el gacha (cada 10 tiradas ×10), en las grietas y en las misiones semanales. Se incuban jugando partidas."), 15, Color("#9fb4dc"))
+		hl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		v.add_child(hl)
+		return pan
+	var row := HFlowContainer.new()
+	row.add_theme_constant_override("h_separation", 14)
+	row.add_theme_constant_override("v_separation", 8)
+	v.add_child(row)
+	for e in eg:
+		var box := VBoxContainer.new()
+		box.add_theme_constant_override("separation", 2)
+		var ic := EggIcon.new()
+		var tys: Array = SV.dex_by[int(e["dex"])]["types"]
+		ic.spot = Color.html(String(MD.TYPE_COLOR.get(String(tys[0]), "#7dd06a")))   # las manchas dan una pista del tipo
+		ic.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		box.add_child(ic)
+		var fr: float = clampf(float(e["prog"]) / maxf(1.0, float(e["need"])), 0.0, 1.0)
+		var bar := ProgressBar.new()
+		bar.custom_minimum_size = Vector2(90, 10)
+		bar.show_percentage = false
+		bar.max_value = 1.0
+		bar.value = fr
+		box.add_child(bar)
+		var left: int = maxi(0, int(e["need"]) - int(e["prog"]))
+		var ml := _label(L.t("%d min") % ceili(float(left) / 60.0), 13, Color("#dbe6ff"))
+		ml.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		box.add_child(ml)
+		row.add_child(box)
+	var hint := _label(L.t("Se incuban con los minutos que juegas. ¡Pueden salir shiny!"), 14, Color("#8a96b0"))
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(hint)
+	return pan
+
+
 func _goals_profile() -> Button:
 	var tc: Dictionary = SV.d.get("tc", {"g": 0, "outfit": 0, "hat": 0, "bag": 0})
 	var CVT = load("res://scripts/cave_int.gd")
@@ -6932,6 +7167,7 @@ func _goals_profile() -> Button:
 		_update_top())
 	top.add_child(ob)
 	top.add_child(_btn("Ver mi tarjeta de entrenador", _show_card, Vector2(0, 40)))
+	prof_box.add_child(_eggs_panel())
 	var root := HBoxContainer.new()
 	root.add_theme_constant_override("separation", 10)
 	root.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -7132,7 +7368,7 @@ func _goals_profile() -> Button:
 	pv2.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	rbox.add_child(pv2)
 	_place(pv2, Rect2(73, 50, 250, 165), 391, 352)
-	pv2.setup(sd, bool(SV.d.get("shiny_on", false)), 3.4)
+	pv2.setup(sd, SV.show_shiny(sd), 3.4)
 	var nm := _lnw(_name_of(sd) if SV.dex_by.has(sd) else "?", 26)
 	nm.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	nm.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -7388,7 +7624,7 @@ func _show_card() -> void:
 	var main_pv := Preview.new()
 	main_pv.custom_minimum_size = Vector2(180, 150)
 	pr.add_child(main_pv)
-	main_pv.setup(sd, bool(SV.d.get("shiny_on", false)), 4.0)
+	main_pv.setup(sd, SV.show_shiny(sd), 4.0)
 	var favs: Array = SV.d.get("favs", [0, 0, 0])
 	for i in range(3):
 		var dex: int = int(favs[i]) if i < favs.size() else 0

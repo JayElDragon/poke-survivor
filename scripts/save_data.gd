@@ -21,6 +21,178 @@ static var party_dex := 25
 static var run_type := "fire"      # modo Supervivencia por tipo
 static var team_dex: Array = []    # modo Equipo (2-3 Pokemon)
 const MOD_IDS := ["fast", "horde", "tank", "hard", "frail", "nohealing", "slow", "brainy", "glass", "rich", "plague"]
+# 7.0: dificultades de la Partida normal (d["difficulty"] = elegida, d["diff_unlock"] = la mas alta desbloqueada)
+const DIFF_NAMES := ["Normal", "Difícil", "Pesadilla"]
+
+
+# 7.0: Vestidor (del original, adaptado): por Pokemon eliges version normal o shiny y una estela, lo que deja al moverse.
+# Las estelas se compran una vez con monedas y valen para todos tus Pokemon. (Sin skins ni formas: el port no tiene esos sprites.)
+# id: [nombre, forma de particula (vfx), paleta, precio]
+const TRAILS := {
+	"leaf": ["Hojas", "leaf", "grass", 400], "flake": ["Copos de nieve", "flake", "ice", 400], "star": ["Estrellas", "star", "electric", 500],
+	"heart": ["Corazones", "heart", "fairy", 500], "note": ["Notas musicales", "note", "psychic", 600], "bubble": ["Burbujas", "bubble", "water", 400],
+	"fire": ["Llamas", "fire", "fire", 600], "coin": ["Monedas", "coin", "electric", 900], "feather": ["Plumas", "feather", "flying", 500],
+	"seed": ["Semillas", "seed", "grass", 300], "swirl": ["Remolinos", "swirl", "dragon", 700], "shadow": ["Sombras", "shadow", "ghost", 700],
+	"lava": ["Lava", "lava", "fire", 800], "grain": ["Arena", "grain", "ground", 300], "plus": ["Destellos", "plus", "normal", 400],
+	"blob": ["Babas tóxicas", "blob", "poison", 500], "mist": ["Niebla mágica", "mistorb", "fairy", 800], "rune": ["Runas", "rune", "dragon", 1000],
+}
+
+
+static func dress(dex: int) -> Dictionary:
+	return (d.get("dress", {}) as Dictionary).get(str(dex), {"trail": "", "shiny": -1})
+
+
+static func set_dress(dex: int, key: String, val) -> void:
+	var all: Dictionary = d.get("dress", {})
+	var dr: Dictionary = dress(dex).duplicate()
+	dr[key] = val
+	all[str(dex)] = dr
+	d["dress"] = all
+
+
+static func has_trail(id: String) -> bool:
+	return (d.get("trails", {}) as Dictionary).has(id)
+
+
+static func buy_trail(id: String) -> bool:
+	if has_trail(id) or not TRAILS.has(id) or int(d["coins"]) < int(TRAILS[id][3]):
+		return false
+	d["coins"] = int(d["coins"]) - int(TRAILS[id][3])
+	var tr: Dictionary = d.get("trails", {})
+	tr[id] = true
+	d["trails"] = tr
+	return true
+
+
+# Version a mostrar: el Vestidor manda (0 normal, 1 shiny); -1 = el interruptor shiny global de siempre.
+static func show_shiny(dex: int) -> bool:
+	if not owns(dex) or not bool(d["owned"][str(dex)].get("shiny", false)):
+		return false
+	var s: int = int(dress(dex).get("shiny", -1))
+	return bool(d["shiny_on"]) if s < 0 else s == 1
+
+
+# 7.0: Huevos (del original). Salen del gacha (cada 10 tiradas x10), de las grietas y de las misiones semanales.
+# Se incuban en la Mochila con los minutos que juegas; al eclosionar el Pokemon es tuyo (puede salir shiny).
+const EGG_MAX := 6
+const EGG_SHINY := 0.05
+const EGG_SECS := [600, 600, 900, 1200, 1200]   # por rareza (1-5): 10, 15 o 20 minutos de juego
+static var _egg_base: Array = []
+static var last_egg := false   # la ultima tirada dio huevo
+
+
+# Primeras fases (no son evolucion de nadie) de rareza 1-3, con sprite.
+static func _egg_pool() -> Array:
+	if not _egg_base.is_empty():
+		return _egg_base
+	var evo_to := {}
+	var ej = JSON.parse_string(FileAccess.get_file_as_string("res://data/evolutions.json"))
+	if ej is Dictionary:
+		for k in ej:
+			for t in (ej[k] as Array):
+				evo_to[int(t)] = true
+	for p in dex_list:
+		var dx: int = int(p["dex"])
+		if not evo_to.has(dx) and int(p["rarity"]) <= 3 and smeta.has(str(dx)):
+			_egg_base.append(p)
+	return _egg_base
+
+
+static func eggs() -> Array:
+	if not d.has("eggs"):
+		d["eggs"] = []
+	return d["eggs"]
+
+
+# Anade un huevo a la Mochila. Devuelve false si ya esta llena.
+static func add_egg(src: String) -> bool:
+	var eg: Array = eggs()
+	if eg.size() >= EGG_MAX:
+		return false
+	var pool: Array = _egg_pool()
+	if pool.is_empty():
+		return false
+	var p: Dictionary = pool[randi() % pool.size()]
+	var dx: int = int(p["dex"])
+	var sh: bool = randf() < EGG_SHINY and bool(smeta[str(dx)].get("sh", 0))
+	eg.append({"dex": dx, "need": int(EGG_SECS[clampi(int(p["rarity"]) - 1, 0, 4)]), "prog": 0, "shiny": sh, "src": src})
+	return true
+
+
+# Suma segundos de juego a todos los huevos y abre los que esten listos. Devuelve los nacidos: {dex, shiny, new, refund}.
+static func incubate(secs: float) -> Array:
+	var born: Array = []
+	var eg: Array = eggs()
+	for i in range(eg.size() - 1, -1, -1):
+		var e: Dictionary = eg[i]
+		e["prog"] = int(e["prog"]) + int(secs)
+		if int(e["prog"]) >= int(e["need"]):
+			var dx: int = int(e["dex"])
+			var sh: bool = bool(e["shiny"])
+			var had: bool = owns(dx) and (not sh or bool(d["owned"][str(dx)]["shiny"]))
+			var refund := 0
+			if had:
+				refund = int(REFUND[clampi(int(dex_by[dx]["rarity"]) - 1, 0, REFUND.size() - 1)]) * (3 if sh else 1)
+				d["coins"] = int(d["coins"]) + refund
+			add_owned(dx, sh and not (owns(dx) and bool(d["owned"][str(dx)]["shiny"])))
+			born.append({"dex": dx, "shiny": sh, "new": not had, "refund": refund})
+			eg.remove_at(i)
+	return born
+
+
+# 7.0: Maestria de cada Pokemon (del original). Suma puntos por los derrotados y los minutos que juegas con el,
+# y por jefes, grietas, llegar a Arceus y vencer a Eternatus. Al nivel 5 eres Maestro: titulo, marco dorado y aura.
+const MASTERY_LV := [0, 150, 400, 900, 1700, 3000]
+const MASTERY_MAX := 5
+
+
+static func mastery(dex: int) -> Dictionary:
+	var all: Dictionary = d.get("mastery", {})
+	return all.get(str(dex), {"pts": 0, "runs": 0, "time": 0, "kills": 0, "arceus": 0, "best": 0, "bosses": 0, "rifts": 0, "eter": 0})
+
+
+static func mastery_level(pts: int) -> int:
+	var lv := 0
+	for i in range(MASTERY_LV.size()):
+		if pts >= int(MASTERY_LV[i]):
+			lv = i
+	return lv
+
+
+static func is_master(dex: int) -> bool:
+	return mastery_level(int(mastery(dex)["pts"])) >= MASTERY_MAX
+
+
+# Suma una partida a la maestria del Pokemon elegido. Devuelve [nivel antes, nivel despues, puntos ganados].
+static func add_mastery(dex: int, r: Dictionary) -> Array:
+	var all: Dictionary = d.get("mastery", {})
+	var ms: Dictionary = mastery(dex).duplicate()
+	var before: int = mastery_level(int(ms["pts"]))
+	var mins: int = int(float(r.get("time", 0)) / 60.0)
+	var gain: int = int(int(r.get("kills", 0)) / 10) + mins * 5 + int(r.get("bosses", 0)) * 3 + int(r.get("rifts", 0)) * 5 \
+		+ (20 if bool(r.get("arceus", false)) else 0) + (50 if bool(r.get("eter", false)) else 0)
+	ms["pts"] = int(ms["pts"]) + gain
+	ms["runs"] = int(ms["runs"]) + 1
+	ms["time"] = int(ms["time"]) + int(r.get("time", 0))
+	ms["kills"] = int(ms["kills"]) + int(r.get("kills", 0))
+	ms["bosses"] = int(ms["bosses"]) + int(r.get("bosses", 0))
+	ms["rifts"] = int(ms["rifts"]) + int(r.get("rifts", 0))
+	ms["arceus"] = int(ms["arceus"]) + (1 if bool(r.get("arceus", false)) else 0)
+	ms["eter"] = int(ms["eter"]) + (1 if bool(r.get("eter", false)) else 0)
+	ms["best"] = maxi(int(ms["best"]), int(r.get("time", 0)))
+	all[str(dex)] = ms
+	d["mastery"] = all
+	return [before, mastery_level(int(ms["pts"])), gain]
+
+
+# Dificultad mas alta desbloqueada: Dificil al llegar a la Sentencia de Arceus (o vencer a Eternatus);
+# Pesadilla al vencer a Eternatus en Dificil. Las partidas de antes de la 7.0 tambien cuentan.
+static func diff_unlocked() -> int:
+	var u: int = int(d.get("diff_unlock", 0))
+	var st: Dictionary = d.get("stats", {})
+	if u < 1 and (int(st.get("arceusReached", 0)) > 0 or int(st.get("judgeTime", 0)) > 0 or int(st.get("eternatusKills", 0)) > 0):
+		u = 1
+	return clampi(u, 0, 2)
 static var last_run: Dictionary = {}
 static var reopen := ""
 
@@ -627,6 +799,12 @@ static func pull(region: int, n: int = 1, use: String = "t1") -> Array:
 		add_owned(dex, shiny and not shiny_owned)
 		out.append({"dex": dex, "new": was_new, "shiny": shiny, "refund": refund, "rarity": rarity, "name": String(sp["name"])})
 	d["stats"]["pulls"] = int(d["stats"]["pulls"]) + n
+	# 7.0: cada 10 tiradas x10, un huevo de regalo (si cabe en la Mochila)
+	last_egg = false
+	if n >= 10:
+		d["egg_pulls"] = int(d.get("egg_pulls", 0)) + 1
+		if int(d["egg_pulls"]) % 10 == 0:
+			last_egg = add_egg("gacha")
 	# Premio extra: cristal Z de un tipo que aun no tengas (solo en tiradas de 10)
 	var ZM = load("res://scripts/zmove.gd")
 	if n >= 10 and randf() < (Z_CRYSTAL_P_PURPLE if purple else Z_CRYSTAL_P):
@@ -685,9 +863,12 @@ static func finish_run(r: Dictionary) -> Dictionary:
 	d["gcoins"] = int(d.get("gcoins", 0)) + int(r.get("gcoins", 0))
 	d["hw_candy"] = int(d.get("hw_candy", 0)) + int(r.get("hw_candy", 0))
 	d["gold_coins"] = int(d.get("gold_coins", 0)) + int(r.get("gold_gcoins", 0))
+	var born: Array = incubate(float(r["time"]))   # 7.0: los huevos de la Mochila se incuban con lo jugado
 	_add_top({"time": int(r["time"]), "kills": int(r["kills"]), "level": int(r["level"]), "dex": int(r.get("dex", 25)), "judge": int(r.get("judge", {}).get("time", 0)) if r.get("judge", {}) is Dictionary else 0, "date": Time.get_date_string_from_system()})
 	last_run = {"judge": r.get("judge", {}), "time": int(r["time"]), "kills": int(r["kills"]), "level": int(r["level"]), "coins": coins, "tickets": tickets, "tickets10": tickets10, "gcoins": int(r.get("gcoins", 0)), "bosses": int(r["bosses"]), "dex": int(r.get("dex", 25)),
 		"dead": bool(r.get("dead", true)), "record": record, "moves": r.get("moves", []), "other_dmg": int(r.get("other_dmg", 0)), "other_kills": int(r.get("other_kills", 0)), "ally_dmg": int(r.get("ally_dmg", 0)), "ally_kills": int(r.get("ally_kills", 0)),
 		"breakdown": "Recogidas %d · Tiempo +%d · Derrotados +%d" % [picked, int(float(r["time"]) / 6.0), int(float(r["kills"]) / 10.0)] + String(r.get("extra", ""))}
+	last_run["eggs"] = born                    # 7.0: huevos que han nacido con esta partida
+	last_run["notes"] = r.get("notes", [])     # 7.0: lineas extra del resumen (maestria...), ya traducidas
 	save()
 	return last_run

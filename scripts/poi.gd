@@ -520,6 +520,10 @@ func update(delta: float) -> void:
 		m.hud.act_txt = m.L.t("Rescatar")
 		if pressed:
 			m.rescue.interact()
+	elif m.munch != null and m.munch.can_interact(pp):
+		m.hud.act_txt = m.munch.act_text(pp)
+		if pressed:
+			m.munch.interact()
 	elif m.kec.near(pp):
 		m.hud.act_txt = m.L.t("Comerciar")
 		m.hud.act_sp = m.get_viewport().get_canvas_transform() * (m.kec.active.position + Vector2(0.0, -128.0))   # sobre la cabeza de Kecleon
@@ -539,7 +543,7 @@ func update(delta: float) -> void:
 	var am = m.alpha.mark()
 	if am != null:
 		m.hud.poi_marks.append(am)
-	for mod in [m.cave, m.inv, m.meteor, m.mew]:
+	for mod in [m.cave, m.inv, m.meteor, m.mew, m.munch]:
 		var mk = mod.mark()
 		if mk != null:
 			m.hud.poi_marks.append(mk)

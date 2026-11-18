@@ -15,6 +15,8 @@ const DYN = preload("res://scripts/dynamax.gd")
 const POI = preload("res://scripts/poi.gd")
 const KC = preload("res://scripts/kecleon.gd")
 const RSC = preload("res://scripts/rescue.gd")
+const MUN = preload("res://scripts/munchlax.gd")   # 7.0: evento Munchlax hambriento
+const ETF = preload("res://scripts/eternatus.gd")   # 7.0: pelea de Eternatus en tres fases
 const ALP = preload("res://scripts/alpha.gd")
 const DNC = preload("res://scripts/daynight.gd")
 const HZD = preload("res://scripts/hazard.gd")
@@ -167,8 +169,21 @@ const TOWER_XP_K := 0.65   # en la Torre se sube de nivel mas despacio
 const SHINY_RATE := 1.0 / 4096.0
 
 # Mejoras de estadistica (levelup.js). "w" = peso al sortear la carta.
-const STAT_ICON := {"hp": "heart", "atk": "fist", "spd": "boot", "cd": "clock", "def": "shield", "rgn": "sprout", "mag": "magnet", "xp": "book", "size": "size", "heal": "berry", "mult": "cards", "pierce": "quickclaw", "amp": "star", "lens": "scopelens", "trs": "amuletcoin", "fang": "lifeorb", "edge": "expertbelt", "dstrike": "choiceband"}
-const STAT_IDS := ["hp", "atk", "spd", "cd", "def", "rgn", "mag", "xp", "size", "heal", "mult", "pierce", "amp", "lens", "trs", "fang", "edge", "dstrike"]
+const STAT_ICON := {"hp": "heart", "atk": "fist", "spd": "boot", "cd": "clock", "def": "shield", "rgn": "sprout", "mag": "magnet", "xp": "book", "size": "size", "heal": "berry", "mult": "cards", "pierce": "quickclaw", "amp": "star", "lens": "scopelens", "trs": "amuletcoin", "fang": "lifeorb", "edge": "expertbelt", "dstrike": "choiceband",
+	"hunt": "crown", "dodge": "choicescarf", "pcd": "bigorb", "wis": "r_scholar", "slot4": "bag"}
+const STAT_IDS := ["hp", "atk", "spd", "cd", "def", "rgn", "mag", "xp", "size", "heal", "mult", "pierce", "amp", "lens", "trs", "fang", "edge", "dstrike",
+	"hunt", "dodge", "pcd", "wis", "slot4"]
+const CRIT_CAP := 0.95   # tope de critico de siempre del port (el 60% del original recortaba mejoras ya compradas)
+const CARD_N := 4       # 7.0: cartas por nivel (antes 3)
+# 7.0: dificultades de la Partida normal (como el original): Normal, Dificil, Pesadilla.
+# Vencer a Eternatus en una desbloquea la siguiente. Dan mas monedas y tickets.
+const DIFF_HP := [1.0, 1.5, 2.2]
+const DIFF_DMG := [1.0, 1.3, 1.7]
+const DIFF_SPAWN := [1.0, 1.0, 1.25]
+const DIFF_REWARD := [1.0, 1.5, 2.0]
+var diff := 0
+var run_eter := false   # 7.0: Eternatus vencido en esta partida (maestria)
+var run_notes: Array = []   # 7.0: lineas extra del resumen de la partida (maestria, huevos encontrados...)
 const STATS := {
 	"hp": {"title": "Vigor", "desc": "+20 de vida máxima (y la recupera).", "max": 9999},
 	"atk": {"title": "Potencia", "desc": "+10% de daño con todos los movimientos.", "max": 40},
@@ -188,6 +203,12 @@ const STATS := {
 	"fang": {"title": "Colmillo Vampírico", "desc": "Recuperas un 4% del daño que haces (3 niveles: 12%; luego rinde menos, tope 25%).", "max": 99999},
 	"edge": {"title": "Filo Fatal", "desc": "+12% de daño crítico (rinde menos con cada nivel, tope x3).", "max": 99999},
 	"dstrike": {"title": "Golpe Doble", "desc": "+6% de probabilidad de golpear dos veces (rinde menos, tope 45%).", "max": 99999},
+	# 7.0: cartas nuevas (del original)
+	"hunt": {"title": "Cazador", "desc": "+10% de daño a jefes, legendarios y Eternatus.", "max": 10},
+	"dodge": {"title": "Esquiva", "desc": "+3% de probabilidad de esquivar un golpe (tope 30%).", "max": 10},
+	"pcd": {"title": "Poder rápido", "desc": "-10% de recarga del Dynamax y del movimiento Z (tope -50%).", "max": 5},
+	"wis": {"title": "Sabiduría", "desc": "+15% de experiencia en esta partida. Carta rara: una vez por partida.", "max": 1},
+	"slot4": {"title": "Cuarto objeto", "desc": "Llevas un objeto más. Carta muy rara: solo si ya llevas tres.", "max": 1},
 }
 
 var flash_shader: Shader
@@ -329,6 +350,8 @@ var jd = null
 var poi = null
 var kec = null
 var rescue = null
+var munch = null
+var eterf = null
 var alpha = null
 var hz = null
 var cave = null
@@ -370,6 +393,7 @@ var base_atk := 1.0
 var item := ""
 var reap_kills := 0       # Sed de victoria: derrotas acumuladas (+0,3% de dano cada una)
 var item3 := ""          # tercer objeto (mejora permanente Mochila grande)
+var item4 := ""          # 7.0: cuarto objeto (carta muy rara Cuarto objeto)
 var item2 := ""          # segundo objeto (carta legendaria Doble equipaje)
 var sash_t := -999.0
 var bell_heal := 0.0
@@ -541,6 +565,7 @@ func _ready() -> void:
 
 	_load_data()
 	mode = SV.run_mode
+	diff = mini(clampi(int(SV.d.get("difficulty", 0)), 0, 2), SV.diff_unlocked()) if mode == "normal" else 0
 	mods = SV.run_mods.duplicate()
 	PG.off = mode == "party"
 	if mode == "daily":
@@ -608,7 +633,15 @@ func _ready() -> void:
 	sh_aura.m = self
 	sh_aura.z_index = 2
 	player.add_child(sh_aura)
-	if SV.owns(sel_dex) and bool(SV.d["owned"][str(sel_dex)]["shiny"]) and bool(SV.d["shiny_on"]):
+	if SV.is_master(sel_dex):   # 7.0: aura de maestro (maestria al maximo)
+		var ma := MasterAura.new()
+		ma.w = player.radius * 1.6
+		ma.h = player.body_h
+		player.add_child(ma)
+	trail_id = String(SV.dress(sel_dex).get("trail", ""))   # 7.0: estela elegida en el Vestidor
+	if not SV.TRAILS.has(trail_id) or not SV.has_trail(trail_id):
+		trail_id = ""
+	if SV.show_shiny(sel_dex):   # 7.0: el Vestidor elige normal o shiny por Pokemon
 		player.set_shiny()
 	player.max_hp = float(st["hp"]) + float(perks["hp"])
 	if _has_mod("frail"):
@@ -655,6 +688,10 @@ func _ready() -> void:
 	rescue = RSC.new()
 	rescue.m = self
 	rescue.poi = poi
+	munch = MUN.new()
+	munch.m = self
+	munch.poi = poi
+	eterf = ETF.new()
 	alpha = ALP.new()
 	alpha.m = self
 	alpha.poi = poi
@@ -1012,6 +1049,13 @@ func _finish_run() -> void:
 	var js: Dictionary = jd.summary()
 	if not js.is_empty():
 		var stt: Dictionary = SV.d["stats"]
+		var unl0: int = SV.diff_unlocked()
+		var tera0: bool = DYN.power_ok("tera", stt)
+		stt["arceusReached"] = int(stt.get("arceusReached", 0)) + 1   # 7.0: llegar a la Sentencia desbloquea Dificil y Teracristal
+		if SV.diff_unlocked() > unl0:
+			run_notes.append(L.t("¡Nueva dificultad desbloqueada: %s!") % L.t(String(SV.DIFF_NAMES[SV.diff_unlocked()])))
+		if not tera0 and DYN.power_ok("tera", stt):
+			run_notes.append(L.t("¡Has desbloqueado el Teracristal!"))
 		stt["judgeTime"] = maxi(int(stt.get("judgeTime", 0)), int(js["time"]))
 		stt["judgeBosses"] = maxi(int(stt.get("judgeBosses", 0)), int(js["bosses"]))
 	var own_ids := {}
@@ -1031,7 +1075,7 @@ func _finish_run() -> void:
 			"dmg": int(run_dmg.get(String(mv["id"]), 0.0)), "kills": int(run_kills_by.get(String(mv["id"]), 0)),
 			"desc": String(mv.get("desc", ""))})
 	var item_list: Array = []
-	for iid in [item, item2, item3]:
+	for iid in [item, item2, item3, item4]:
 		if String(iid) != "":
 			item_list.append(String(iid))
 	if mode == "party":
@@ -1052,6 +1096,11 @@ func _finish_run() -> void:
 		SV.d["rush_best"] = maxi(rb, run_bosses)
 		extra = " · " + L.t("Rush de Jefes: %d jefes") % run_bosses + ((" · " + L.t("¡Récord!")) if run_bosses > rb else "")
 	var mul: float = 1.0 + 0.25 * float(mods.size()) if mode != "daily" else 1.25
+	if diff > 0:   # Dificil x1,5 y Pesadilla x2 en monedas y tickets
+		mul *= float(DIFF_REWARD[diff])
+		tickets = roundi(float(tickets) * float(DIFF_REWARD[diff]))
+		tickets10 = roundi(float(tickets10) * float(DIFF_REWARD[diff]))
+		extra += " · " + L.t(String(SV.DIFF_NAMES[diff]))
 	if _has_item("amuletcoin"):
 		mul *= 1.5   # Moneda Amuleto: +50% de Pokemonedas al acabar la run
 	mul *= 1.0 + _abn("coin")
@@ -1076,6 +1125,13 @@ func _finish_run() -> void:
 		var rbest: int = int(SV.d.get("rifts_best", 0))
 		SV.d["rifts_best"] = maxi(rbest, run_rifts)
 		extra = " · " + L.t("Contrarreloj de grietas: %d") % run_rifts + ((" · " + L.t("¡Récord!")) if run_rifts > rbest else "")
+	# 7.0: maestria del Pokemon elegido (no en el Modo Fiesta)
+	if mode != "party" and SV.dex_by.has(int(SV.run_dex)):
+		var mres: Array = SV.add_mastery(int(SV.run_dex), {"time": run_time, "kills": kills, "bosses": run_bosses, "rifts": run_rifts,
+			"arceus": not js.is_empty(), "eter": run_eter})
+		run_notes.append(L.t("Maestría +%d") % int(mres[2]))
+		if int(mres[1]) > int(mres[0]):
+			run_notes.append(L.t("¡Maestría de %s: nivel %d!") % [L.t(String(SV.dex_by[int(SV.run_dex)]["name"])), int(mres[1])])
 	var st2: Dictionary = SV.d["stats"]
 	var rmin: int = int(run_time / 60.0)
 	if mode == "daily":
@@ -1112,7 +1168,7 @@ func _finish_run() -> void:
 		"chests": run_chests, "coins": coins, "tickets": tickets, "tickets10": tickets10, "gcoins": gcoins_run, "gold_gcoins": gold_gcoins_run, "hw_candy": hw_candy_run, "dex": SV.run_dex,
 		"dead": player.dead and not timeup, "moves": mv_list, "items": item_list, "mul": mul, "extra": extra,
 		"other_dmg": int(run_dmg.get("_other", 0.0)), "other_kills": int(run_kills_by.get("_other", 0)),
-		"ally_dmg": int(ally_dmg), "ally_kills": ally_kills})
+		"ally_dmg": int(ally_dmg), "ally_kills": ally_kills, "notes": run_notes})
 	PG.event("runEnd", {"time": run_time, "level": player.level, "coins": coins, "types": player.types, "group": false, "mode": mode, "nmods": (0 if mode == "daily" else mods.size()), "bosses": run_bosses, "rifts": run_rifts, "floor": tw_clears})
 	PG.check()
 
@@ -1311,6 +1367,8 @@ func _process(delta: float) -> void:
 			poi.update(delta)
 			kec.update(delta)
 			rescue.update(delta)
+			munch.update(delta)
+			eterf.update(delta)
 			alpha.update(delta)
 			hz.update(delta)
 			cave.update(delta)
@@ -1347,6 +1405,8 @@ func _process(delta: float) -> void:
 		# v6.1: ninguna eleccion interrumpe un Movimiento Z: las subidas de nivel y objetos esperan a que termine
 		if z_state != "":
 			pass
+		elif _pevo_ready() and not choosing:
+			_offer_pevo()   # 7.0: evolucion en plena partida (niveles 20 y 40), antes de las cartas de nivel
 		elif pending_levels > 0 and not choosing:
 			_open_cards()
 		elif pending_items > 0 and not choosing:
@@ -1375,7 +1435,9 @@ func _process(delta: float) -> void:
 	hud.dyn_left = maxf(0.0, dyn.t) if _dyn_on() else -1.0
 	hud.dyn_flash = dyn_flash if dyn != null else 99.0
 	hud.dyn_type = String(player.types[0])
-	hud.dyn_btn = 0 if (mode == "tower" or not DYN.unlocked(SV.d["stats"]) or _dyn_on()) else (3 if dyn_used else (2 if run_time >= DYN.MIN_TIME else 0))
+	hud.dyn_btn = 0 if (mode == "tower" or _power_kind() == "" or _dyn_on()) else (3 if dyn_used else (2 if run_time >= DYN.MIN_TIME else 0))
+	if not _dyn_on():
+		hud.dyn_kind = _power_kind() if _power_kind() != "" else "dyna"
 	hud.dyn_cd = dyn_cd
 	hud.ab_name = L.t(String(AB.FX[AB.of(_pdex())]["name"]))
 	hud.show_stats = bool(SV.setting("stats_box"))
@@ -1472,7 +1534,7 @@ func _buff_mul(stat: String) -> float:
 
 
 func _has_item(id: String) -> bool:
-	return item == id or (item2 != "" and item2 == id) or (item3 != "" and item3 == id)
+	return item == id or (item2 != "" and item2 == id) or (item3 != "" and item3 == id) or (item4 != "" and item4 == id)
 
 
 var _items_hud_t := 0.0
@@ -1492,7 +1554,7 @@ func _item_cd(id: String) -> Variant:
 # Caja compacta del HUD (Seccion 39): objetos equipados y mejoras con nivel; si hay mas de 4 se pagina sola.
 func _build_items_hud() -> Array:
 	var out: Array = []
-	for id in [item, item2, item3]:
+	for id in [item, item2, item3, item4]:
 		if String(id) == "":
 			continue
 		var e := {"icon": String(id), "name": _item_name_of(String(id)), "lv": 0, "cd": -1.0, "cdmax": 0.0}
@@ -1548,7 +1610,7 @@ func _rk_add(key: String) -> float:
 # Dificultad adaptativa (solo partida normal): empieza facil (mas aun para jugadores nuevos) y sube con tus mejoras.
 # Mide tu poder (mejoras de la partida + nivel + mejoras permanentes) y mueve vida, dano, spawn, hordas y experiencia necesaria.
 func _adapt_on() -> bool:
-	return mode == "normal" and bool(SV.d["settings"].get("adaptive", true)) and arena == null
+	return mode == "normal" and diff == 0 and bool(SV.d["settings"].get("adaptive", true)) and arena == null   # 7.0: en Dificil y Pesadilla, sin adaptativa
 
 
 func _power() -> float:
@@ -1611,6 +1673,7 @@ func _xp_need(level: int) -> float:
 
 # Enfriamiento de Z y Dynamax: cuenta desde que terminan; las guaridas Dynamax recargan el Dynamax al instante.
 func _cooldowns(delta: float) -> void:
+	delta /= maxf(0.5, 1.0 - 0.1 * float(_lv("pcd")))   # carta Poder rapido: la recarga corre mas deprisa
 	if z_used and z_state == "" and z_cd > 0.0:
 		z_cd -= delta
 		if z_cd <= 0.0:
@@ -1622,7 +1685,8 @@ func _cooldowns(delta: float) -> void:
 		if dyn_cd <= 0.0:
 			dyn_cd = 0.0
 			dyn_used = false
-			add_text(player.position + Vector2(0.0, -player.body_h - 20.0), L.t("¡Dynamax listo!"), Color("#ff5a8a"), 18)
+			var pk: String = _power_kind()
+			add_text(player.position + Vector2(0.0, -player.body_h - 20.0), L.t("¡Dynamax listo!") if pk == "dyna" else L.t("¡%s listo!") % L.t(String(DYN.POWER_NAMES.get(pk, "Dynamax"))), Color(String(DYN.POWER_COL.get(pk, "#ff5a8a"))), 18)
 
 
 func _z_can() -> bool:
@@ -1650,12 +1714,26 @@ func _dyn_on() -> bool:
 
 
 func _dyn_can() -> bool:
-	return mode != "tower" and DYN.unlocked(SV.d["stats"]) and not dyn_used and not _dyn_on() and z_state != "cine" and run_time >= DYN.MIN_TIME and not player.dead and not down and not paused and not choosing and not jd.active() and not timeup
+	return mode != "tower" and _power_kind() != "" and not dyn_used and not _dyn_on() and z_state != "cine" and run_time >= DYN.MIN_TIME and not player.dead and not down and not paused and not choosing and not jd.active() and not timeup
+
+
+# 7.0: poder de la partida elegido en el menu (Dynamax, Megaevolucion o Teracristal). Si el elegido no vale
+# (bloqueado, o tu Pokemon de ahora no tiene Mega) se usa el Dynamax si lo tienes. "" = ninguno.
+func _power_kind() -> String:
+	var st: Dictionary = SV.d["stats"]
+	var want: String = String(SV.d.get("power", "dyna"))
+	if want == "mega" and DYN.power_ok("mega", st) and DYN.MEGA_DEX.has(int(player.dex)):
+		return "mega"
+	if want == "tera" and DYN.power_ok("tera", st):
+		return "tera"
+	return "dyna" if DYN.unlocked(st) else ""
 
 
 func _dyn_start() -> void:
 	dyn_used = true
 	dyn = DYN.new()
+	dyn.kind = _power_kind()
+	hud.dyn_kind = dyn.kind
 	dyn.start(self)
 	dyn_flash = 0.0
 	Aud.sfx("legend")
@@ -1731,14 +1809,14 @@ func _atk() -> float:
 		k *= 1.4
 	if _has_item("lifeorb"):
 		k *= 1.3   # antes, con las dos a la vez (Doble equipaje) la Vidasfera no sumaba daño pero seguía quitando vida
-	return (1.0 + float(rc_bonus["atk"])) * base_atk * pow(1.10, float(_lv("atk"))) * (1.0 + _buff_mul("atk")) * k * (1.5 if _pw("fury") else 1.0) * (1.5 if wp_t > 0.0 else 1.0) * _rk("atk") * (1.0 + 0.003 * float(reap_kills)) * (1.0 + _abn("dmg") + _moxie() + (_abn("defiant") if defiant_t > 0.0 else 0.0)) * (DYN.DMG_K if _dyn_on() else 1.0)
+	return (1.0 + float(rc_bonus["atk"])) * base_atk * pow(1.10, float(_lv("atk"))) * (1.0 + _buff_mul("atk")) * k * (1.5 if _pw("fury") else 1.0) * (1.5 if wp_t > 0.0 else 1.0) * _rk("atk") * (1.0 + 0.003 * float(reap_kills)) * (1.0 + _abn("dmg") + _moxie() + (_abn("defiant") if defiant_t > 0.0 else 0.0)) * (dyn.k_dmg() if _dyn_on() else 1.0)
 
 
 func _spd() -> float:
 	if mode == "chal" and _ch_rs("no_move"):
 		return 0.0
 	var k: float = (1.35 if _has_item("choicescarf") else 1.0) * (1.1 if _has_item("ti_flying") else 1.0)
-	return (1.0 + float(rc_bonus["spd"])) * base_spd * pow(1.07, float(_lv("spd"))) * (1.0 + _buff_mul("spd")) * k * (1.4 if _pw("haste") else 1.0) * (0.8 if _has_mod("slow") else 1.0) * _rk("spd") * (1.0 + _abn("spd") + _ab_wspd()) * (DYN.STAT_K if _dyn_on() else 1.0) * (kec.spd_mul() if kec != null else 1.0)
+	return (1.0 + float(rc_bonus["spd"])) * base_spd * pow(1.07, float(_lv("spd"))) * (1.0 + _buff_mul("spd")) * k * (1.4 if _pw("haste") else 1.0) * (0.8 if _has_mod("slow") else 1.0) * _rk("spd") * (1.0 + _abn("spd") + _ab_wspd()) * (dyn.k_stat() if _dyn_on() else 1.0) * (kec.spd_mul() if kec != null else 1.0)
 
 
 func _cd_mul() -> float:
@@ -1747,12 +1825,12 @@ func _cd_mul() -> float:
 
 func _cd_mul_raw() -> float:
 	var k: float = 0.8 if _has_item("quickclaw") else 1.0
-	return (1.0 - float(rc_bonus["cd"])) * pow(0.92, float(_lv("cd"))) * k * float(perks["cd"]) * (0.65 if _pw("frenzy") else 1.0) * _rk("cd") * (1.0 - _abn("cd")) / (DYN.STAT_K if _dyn_on() else 1.0) * (kec.cd_mul() if kec != null else 1.0)
+	return (1.0 - float(rc_bonus["cd"])) * pow(0.92, float(_lv("cd"))) * k * float(perks["cd"]) * (0.65 if _pw("frenzy") else 1.0) * _rk("cd") * (1.0 - _abn("cd")) / (dyn.k_stat() if _dyn_on() else 1.0) * (kec.cd_mul() if kec != null else 1.0)
 
 
 func _reduction() -> float:
 	var vest: float = (0.2 if _has_item("assaultvest") else 0.0) + (0.08 if _has_item("ti_rock") else 0.0)
-	return minf(0.8, minf(0.7, 0.06 * float(_lv("def"))) + vest + float(perks["def"]) + _buff_mul("def") + _rk_add("def") + _abn("taken") + (kec.def_add() if kec != null else 0.0) + (0.4 if _pw("aegis") else 0.0) + (DYN.TAKEN if _dyn_on() else 0.0))
+	return minf(0.8, minf(0.7, 0.06 * float(_lv("def"))) + vest + float(perks["def"]) + _buff_mul("def") + _rk_add("def") + _abn("taken") + (kec.def_add() if kec != null else 0.0) + (0.4 if _pw("aegis") else 0.0) + (dyn.k_taken() if _dyn_on() else 0.0))
 
 
 func _regen() -> float:
@@ -1766,7 +1844,7 @@ func _magnet() -> float:
 
 func _xp_mul() -> float:
 	var k: float = 1.3 if _has_item("luckyegg") else 1.0
-	return pow(1.12, float(_lv("xp"))) * k * (1.5 if _has_mod("brainy") else 1.0) * float(perks["xp"]) * _rk("xp") * (1.0 + _abn("xp")) * (kec.xp_mul() if kec != null else 1.0)
+	return pow(1.12, float(_lv("xp"))) * k * (1.15 if _lv("wis") > 0 else 1.0) * (1.5 if _has_mod("brainy") else 1.0) * float(perks["xp"]) * _rk("xp") * (1.0 + _abn("xp")) * (kec.xp_mul() if kec != null else 1.0)
 
 
 func _buff_text() -> String:
@@ -1799,7 +1877,7 @@ func _f(m: Dictionary, key: String, def: float = 0.0) -> float:
 		var kv: float = float(MD.KNOCK_BASE.get(String(m["id"]), 0.0)) if kl < 2 else float(MD.KNOCK_LV[String(m["id"])]) * (1.0 + 0.5 * float(kl - 2)) + v
 		return kv * (1.5 if bool(m.get("evolved", false)) else 1.0)   # la evolucion empuja un 50% mas
 	if key == "radius":
-		if item == "widelens" or item2 == "widelens" or item3 == "widelens":
+		if _has_item("widelens"):
 			v *= 1.2   # Lente Amplia
 		if String(m.get("type", "")) == "ground" and _has_item("ti_ground"):
 			v *= 1.2   # Arena Fina
@@ -2027,6 +2105,24 @@ func _clear_orbit_orbs() -> void:
 # ---------------------------------------------------------------
 # Jugador
 # ---------------------------------------------------------------
+# 7.0: estela del Vestidor: lo que deja tu Pokemon al moverse (no se dibuja en modo Rendimiento Minimo).
+var trail_cd := 0.0
+var trail_id := ""
+
+
+func _dress_trail(delta: float, moving: bool) -> void:
+	if trail_id == "" or not moving or perf_lv >= 2 or player_vel.length() < 20.0:
+		return
+	trail_cd -= delta
+	if trail_cd > 0.0:
+		return
+	trail_cd = 0.09 if perf_lv == 0 else 0.16
+	var td: Array = SV.TRAILS[trail_id]
+	var back: Vector2 = -player_vel.normalized()
+	pfx.sp(String(td[1]), String(td[2]), player.position + back * player.radius * 0.6 + Vector2(randf_range(-6.0, 6.0), -4.0 + randf_range(-4.0, 4.0)),
+		{"v": back * 18.0 + Vector2(0.0, -14.0), "life": 0.7, "scale": 0.8, "spin": randf_range(-3.0, 3.0), "force": true})
+
+
 func _update_player(delta: float) -> void:
 	if arena_down:
 		return
@@ -2052,6 +2148,7 @@ func _update_player(delta: float) -> void:
 	player.position += v * spd * delta
 	player.position = _collide(player.position, player.radius * 0.55)
 	player_vel = (player.position - old_pos) / maxf(delta, 0.0001)
+	_dress_trail(delta, moving)
 	player.invuln = maxf(0.0, player.invuln - delta)
 	defiant_t = maxf(0.0, defiant_t - delta)
 	if bell_heal > 0.0:
@@ -2288,7 +2385,7 @@ func _swap_team(i: int, auto: bool = false) -> void:
 	team_cur = i
 	ab_fx = AB.fx_of(_pdex())
 	var dx: int = int(nx["dex"])
-	var shn: bool = SV.owns(dx) and bool(SV.d["owned"][str(dx)]["shiny"]) and bool(SV.d["shiny_on"])
+	var shn: bool = SV.show_shiny(dx)
 	player.rebody(dx, _sm(dx), shn)
 	player.max_hp = float(nx["base"]) + team_bonus
 	player.hp = minf(player.max_hp, float(nx["hp"]))
@@ -2340,7 +2437,7 @@ func _hurt_player(amount: float, atk_type: String = "", pure: bool = false) -> v
 		return
 	if player.invuln > 0.0:
 		return
-	if kec.dodge():
+	if kec.dodge() or (not pure and _lv("dodge") > 0 and randf() < 0.03 * float(_lv("dodge"))):   # Kecleon o carta Esquiva
 		player.invuln = 0.3
 		add_text(player.position + Vector2(0.0, -player.body_h - 4.0), L.t("¡Esquivado!"), Color("#7fe0ff"), 18)
 		return
@@ -3912,7 +4009,11 @@ func _hit_enemy(e, dmg: float, col: Color, dir: Vector2, knock: float, mtype: St
 			d_final *= 1.0 + _abn("boss_dmg")
 		if eff == "weak":
 			d_final *= 1.0 + _abn("tinted")
-	var crit_p: float = minf(0.95, float(perks["crit"]) + (0.15 if _has_item("scopelens") else 0.0) + (0.05 if _has_item("ti_normal") else 0.0) + _lens_add() + _abn("crit"))
+	if e.boss and _lv("hunt") > 0:
+		d_final *= 1.0 + 0.1 * float(_lv("hunt"))   # carta Cazador
+	if _dyn_on() and dyn.kind == "tera" and mtype == String(dyn.type):
+		d_final *= 1.5   # Teracristal: +50% con los movimientos de su tipo
+	var crit_p: float = minf(CRIT_CAP, float(perks["crit"]) + (0.15 if _has_item("scopelens") else 0.0) + (0.05 if _has_item("ti_normal") else 0.0) + _lens_add() + _abn("crit"))
 	if crit_p > 0.0 and randf() < crit_p:
 		d_final *= _edge_mul()
 		if _ch_on() and not _ch_rs("no_crit"):
@@ -4218,6 +4319,111 @@ func _load_data() -> void:
 	_dex_list = SV.dex_list
 	_dex_by = SV.dex_by
 	_smeta = SV.smeta
+	var ej = JSON.parse_string(FileAccess.get_file_as_string("res://data/evolutions.json"))
+	_evos = ej if ej is Dictionary else {}
+
+
+# ---------------------------------------------------------------
+# 7.0: evolucion en plena partida (como el original). A los niveles 20 y 40 eliges evolucionar
+# (cambian aspecto, tipos y stats) o mantener su aspecto (solo suben las stats). Los que no evolucionan
+# se hacen mas fuertes igualmente. data/evolutions.json: dex -> [evoluciones].
+# ---------------------------------------------------------------
+const PEVO_LV := [20, 40]
+var _evos: Dictionary = {}
+var pevo_done := 0          # evoluciones (o subidas) ya resueltas en esta partida
+var pevo_dex := 0           # Pokemon cuya fuerza tienes ahora (si mantienes el aspecto, no cambia el cuerpo)
+
+
+func _pevo_targets(dex: int) -> Array:
+	var out: Array = []
+	for t in (_evos.get(str(dex), []) as Array):
+		var td: int = int(t)
+		if _dex_by.has(td) and _smeta.has(str(td)):
+			out.append(td)
+	return out
+
+
+func _pevo_ready() -> bool:
+	return mode != "team" and pevo_done < PEVO_LV.size() and player.level >= int(PEVO_LV[pevo_done]) and not player.dead
+
+
+func _offer_pevo() -> void:
+	var cur: int = pevo_dex if pevo_dex > 0 else _pdex()
+	var tg: Array = _pevo_targets(cur)
+	if tg.is_empty():
+		_pevo_boost()
+		return
+	tg.shuffle()
+	tg = tg.slice(0, 5)   # Eevee y compania: como mucho 5 opciones + mantener
+	var picks: Array = []
+	var cd: Dictionary = _dex_by[cur]
+	for t in tg:
+		_preload_dex(int(t))
+		var d: Dictionary = _dex_by[int(t)]
+		var tys: Array = (d["types"] as Array).map(func(x): return L.t(String(MD.TYPE_NAME.get(String(x), String(x)))))
+		picks.append({"cat": "pevo", "id": str(t), "key": "pevo:%d" % int(t), "w": 1.0, "legend": true,
+			"title": L.t("Evolucionar a %s") % L.t(String(d["name"])),
+			"desc": L.t("Tipos: %s. Vida %d > %d · Velocidad %d > %d.") % [" / ".join(tys), int(cd["hp"]), int(d["hp"]), int(cd["spd"]), int(d["spd"])],
+			"icon": "up", "tag": "EVOLUCIÓN", "color": Color("#ffd23f")})
+	var strong: Dictionary = _dex_by[int(tg[0])]
+	picks.append({"cat": "pevo", "id": "keep:%d" % int(tg[0]), "key": "pevo:keep", "w": 1.0,
+		"title": "Mantener su aspecto",
+		"desc": L.t("Sigue siendo %s y de sus tipos, con la fuerza de %s.") % [L.t(String(_dex_by[player.dex]["name"])), L.t(String(strong["name"]))],
+		"icon": "star", "tag": "Aspecto", "color": Color("#8fa3c4")})
+	choosing = true
+	Aud.sfx("legend")
+	cards.show_cards(picks, L.t("Nivel %d: tu Pokémon puede evolucionar") % player.level, L.t("¡Evolución!"), false)
+
+
+# Elegida una carta de evolucion: "123" evoluciona; "keep:123" solo toma la fuerza de 123.
+func _apply_pevo(id: String) -> void:
+	var keep: bool = id.begins_with("keep:")
+	var nd: int = int(id.substr(5)) if keep else int(id)
+	var cur: int = pevo_dex if pevo_dex > 0 else _pdex()
+	var o: Dictionary = _dex_by[cur]
+	var n: Dictionary = _dex_by[nd]
+	var dhp: float = float(n["hp"]) - float(o["hp"])
+	player.max_hp = maxf(1.0, player.max_hp + dhp)
+	player.hp = clampf(player.hp + maxf(0.0, dhp), 1.0, player.max_hp)
+	player.spd = float(n["spd"])
+	player.atk = float(n["atk"])
+	base_spd = player.spd * float(perks["spd"])
+	base_atk = player.atk * float(perks["atk"])
+	nh_max = player.max_hp
+	nh_last = player.hp
+	pevo_dex = nd
+	pevo_done += 1
+	var nm: String = L.t(String(n["name"]))
+	if not keep:
+		player.rebody(nd, _sm(nd), player.shiny)
+		player.types = (n["types"] as Array).duplicate()
+		ab_fx = AB.fx_of(nd)
+		hud.poke_name = nm
+		SV.d["stats"]["evolutions_run"] = int(SV.d["stats"].get("evolutions_run", 0)) + 1
+		_say(L.t("¡Tu Pokémon ha evolucionado a %s!") % nm, 2.6)
+	else:
+		_say(L.t("Mantiene su aspecto con la fuerza de %s") % nm, 2.4)
+	player.invuln = maxf(player.invuln, 1.2)
+	player.flash = 0.6
+	shake = maxf(shake, 6.0)
+	_ring(player.position, 10.0, 170.0, Color("#ffd23f"), 0.7, 5.0)
+	_ring(player.position, 10.0, 120.0, Color.WHITE, 0.5, 3.0)
+	pfx.burst(player.position + Vector2(0.0, -player.body_h * 0.5), Color("#ffd23f"), 30, 200.0)
+	Aud.sfx("levelup")
+
+
+# Sin evolucion posible: tambien se hace mas fuerte (+15% de vida maxima y +10% de dano).
+func _pevo_boost() -> void:
+	pevo_done += 1
+	var add: float = roundf(player.max_hp * 0.15)
+	player.max_hp += add
+	player.hp = minf(player.max_hp, player.hp + add)
+	base_atk *= 1.1
+	nh_max = player.max_hp
+	nh_last = player.hp
+	_ring(player.position, 10.0, 150.0, Color("#ffd23f"), 0.6, 4.0)
+	_say(L.t("¡Tu Pokémon se hace más fuerte! +15% de vida y +10% de daño"), 2.6)
+	Aud.sfx("levelup")
 
 
 func _sm(dex: int) -> Dictionary:
@@ -4846,6 +5052,10 @@ func _make_enemy(def: Dictionary, pos: Vector2, sc: Dictionary, boss: bool = fal
 		if hpk != 1.0:
 			e.max_hp = roundf(e.max_hp * hpk)
 			e.hp = e.max_hp
+	if diff > 0:   # Dificil / Pesadilla
+		e.max_hp = roundf(e.max_hp * float(DIFF_HP[diff]))
+		e.hp = e.max_hp
+		e.dmg *= float(DIFF_DMG[diff])
 	if mode == "tower":
 		var ek: float = _rk("ehp") * TOWER_HP_K
 		var es: float = _rk("espd") * (1.0 + 0.02 * float(maxi(0, tw_floor - 10)))
@@ -4957,6 +5167,21 @@ func _spawn_one(angle: float = -999.0, near: bool = false) -> Enemy:
 	return e
 
 
+# 7.0: enemigo de una especie concreta junto a un punto (enjambre de Combee del evento de Munchlax).
+func _spawn_dex_at(dex: int, pos: Vector2) -> Enemy:
+	var bag: Array = _bag_at(_dt())
+	var def: Dictionary = (bag[randi() % bag.size()] as Dictionary).duplicate()
+	def["dex"] = dex
+	def["name"] = String(_dex_by[dex]["name"])
+	def["behavior"] = "chase"
+	var base: Dictionary = _scale_at(_dt())
+	var sc := {"hp": float(base["hp"]) * _hp_k(_dt()), "dmg": float(base["dmg"]), "spd": float(base["spd"]) * 1.15}
+	var e: Enemy = _make_enemy(def, _free_spot(pos, 14.0), sc)
+	e.dmg *= DMG_K
+	e.xp_val = roundf(e.xp_val * XP_K)
+	return e
+
+
 # v6.2: Gengar gigante del modo Halloween.
 func _hw_spawn_gengar() -> void:
 	hw_gengar_done = true
@@ -5034,7 +5259,7 @@ func _update_spawner(delta: float) -> void:
 		Aud.sfx("boss")
 	var fight: bool = _boss_alive()
 	if enemies.size() < ENEMY_CAP:
-		var rate: float = (1.6 + t * 0.028 + pow(t / 60.0, 1.6) * 0.4) * 0.15 * (1.0 + 0.7 * clampf(1.0 - t / 240.0, 0.0, 1.0)) * (1.8 if _has_mod("horde") else 1.0) * (2.5 if _has_mod("plague") else 1.0) * (0.75 if _has_item("pureincense") else 1.0)
+		var rate: float = (1.6 + t * 0.028 + pow(t / 60.0, 1.6) * 0.4) * 0.15 * (1.0 + 0.7 * clampf(1.0 - t / 240.0, 0.0, 1.0)) * float(DIFF_SPAWN[diff]) * (1.8 if _has_mod("horde") else 1.0) * (2.5 if _has_mod("plague") else 1.0) * (0.75 if _has_item("pureincense") else 1.0)
 		spawn_acc += rate * (1.0 + 1.5 * _late_x(t)) * _adapt_k() * (0.25 if fight else 1.0) * delta
 		while spawn_acc >= 1.0:
 			spawn_acc -= 1.0
@@ -5163,6 +5388,7 @@ func _spawn_eternatus() -> void:
 	var e = _spawn_boss(def, 3600.0)
 	e.set_meta("enc", "eternatus")
 	dir_eter = e
+	eterf.start(self, e)
 	_say(L.t("¡ETERNATUS ha despertado!"), 4.0)
 	shake = 20.0
 
@@ -5172,6 +5398,10 @@ func _eternatus_win() -> void:
 		return
 	var st: Dictionary = SV.d["stats"]
 	st["eternatusKills"] = int(st.get("eternatusKills", 0)) + 1
+	run_eter = true
+	if mode == "normal" and diff + 1 > SV.diff_unlocked() and diff < 2:
+		SV.d["diff_unlock"] = diff + 1   # 7.0: desbloquea la siguiente dificultad
+		_say(L.t("¡Nueva dificultad desbloqueada: %s!") % L.t(String(SV.DIFF_NAMES[diff + 1])), 4.0)
 	timeup = true
 	hud.timeup = true
 	hud.end_big = L.t("¡ETERNATUS DERROTADO!")
@@ -7893,44 +8123,51 @@ func _collect(kind: String, value: float) -> void:
 
 
 # Construye las cartas candidatas (levelup.js) y devuelve tres.
+# Cartas de movimientos que tu Pokemon puede aprender (los de tu tipo pesan mas que los Normal).
+func _new_move_cards(n: int) -> Array:
+	var owned := {}
+	var buffs := 0
+	for m in player.moves:
+		owned[String(m["id"])] = true
+		if String(m["kind"]) == "buff":
+			buffs += 1
+	var cand: Array = []
+	for id in MD.ORDER:
+		var d: Dictionary = MD.MOVES[id]
+		var ty: String = String(d["type"])
+		if ty != "normal" and not player.types.has(ty):
+			continue
+		if not GPM.playable(String(id)):
+			continue
+		if owned.has(id) or banned.has(id) or fused_away.has(String(id)):
+			continue
+		if buffs >= 2 and String(d["kind"]) == "buff":
+			continue
+		cand.append(id)
+	# Los movimientos de tipo Normal salen menos (peso 0.15) para que los de tu propio tipo no queden opacados.
+	var keyed: Array = []
+	for id in cand:
+		var wgt: float = NORMAL_MOVE_W if String(MD.MOVES[id]["type"]) == "normal" else 1.0
+		keyed.append([pow(maxf(0.0001, randf()), 1.0 / wgt), id])
+	keyed.sort_custom(func(a, b): return a[0] > b[0])
+	cand = keyed.map(func(x): return x[1])
+	var out: Array = []
+	for i in range(mini(n, cand.size())):
+		var nid: String = String(cand[i])
+		var nd: Dictionary = MD.MOVES[nid]
+		out.append({"cat": "new", "id": nid, "key": "new:" + nid, "w": 10.0, "title": String(nd["name"]),
+			"desc": _move_desc(nd), "icon": "move:" + nid, "tag": String(MD.TYPE_NAME[String(nd["type"])]),
+			"color": Color.html(String(MD.TYPE_COLOR[String(nd["type"])]))})
+	return out
+
+
 func _offer() -> Array:
 	var pool: Array = []
 	var waiting := {}
 
 	# --- movimientos nuevos ---
 	if _slot_list().size() < _max_moves():
-		var owned := {}
-		var buffs := 0
-		for m in player.moves:
-			owned[String(m["id"])] = true
-			if String(m["kind"]) == "buff":
-				buffs += 1
-		var cand: Array = []
-		for id in MD.ORDER:
-			var d: Dictionary = MD.MOVES[id]
-			var ty: String = String(d["type"])
-			if ty != "normal" and not player.types.has(ty):
-				continue
-			if not GPM.playable(String(id)):
-				continue
-			if owned.has(id) or banned.has(id) or fused_away.has(String(id)):
-				continue
-			if buffs >= 2 and String(d["kind"]) == "buff":
-				continue
-			cand.append(id)
-		# Los movimientos de tipo Normal salen menos (peso 0.15) para que los de tu propio tipo no queden opacados.
-		var keyed: Array = []
-		for id in cand:
-			var wgt: float = NORMAL_MOVE_W if String(MD.MOVES[id]["type"]) == "normal" else 1.0
-			keyed.append([pow(maxf(0.0001, randf()), 1.0 / wgt), id])
-		keyed.sort_custom(func(a, b): return a[0] > b[0])
-		cand = keyed.map(func(x): return x[1])
-		for i in range(mini(6, cand.size())):
-			var nid: String = String(cand[i])
-			var nd: Dictionary = MD.MOVES[nid]
-			pool.append({"cat": "new", "id": nid, "key": "new:" + nid, "w": 10.0, "title": String(nd["name"]),
-				"desc": _move_desc(nd), "icon": "move:" + nid, "tag": String(MD.TYPE_NAME[String(nd["type"])]),
-				"color": Color.html(String(MD.TYPE_COLOR[String(nd["type"])]))})
+		pool.append_array(_new_move_cards(6))
 
 	# --- evoluciones: movimiento al maximo + su condicion cumplida ---
 	for m in player.moves:
@@ -7963,6 +8200,10 @@ func _offer() -> Array:
 			continue
 		if _lv(sid) >= int(STATS[sid]["max"]):
 			continue
+		if sid == "pcd" and (mode == "tower" or (z_type == "" and _power_kind() == "")):
+			continue   # Poder rapido: solo si tienes Dynamax o movimiento Z
+		if sid == "slot4" and not (has_bag3 and item3 != ""):
+			continue   # Cuarto objeto: solo con los tres huecos ocupados
 		cand_s.append(sid)
 	cand_s.shuffle()
 	var picks_s: Array = cand_s.slice(0, 5)
@@ -7976,6 +8217,10 @@ func _offer() -> Array:
 			w = 14.0
 		elif _slot_list().size() < _max_moves():
 			w = 4.0
+		if sid == "wis":
+			w = 2.0    # carta rara
+		elif sid == "slot4":
+			w = 0.8    # carta muy rara
 		var tag := "Mejora"
 		var colr := Color("#8fa3c4")
 		if evo_for:
@@ -7983,6 +8228,11 @@ func _offer() -> Array:
 			colr = Color("#ffd23f")
 		pool.append({"cat": "stat", "id": String(sid), "key": "stat:" + String(sid), "w": w,
 			"title": String(sd["title"]), "desc": String(sd["desc"]), "icon": String(STAT_ICON.get(sid, "star")), "tag": tag, "color": colr})
+
+	# --- Quitamovimientos: con todos los huecos llenos, olvida uno para dejar sitio a otro ---
+	if _slot_list().size() >= _max_moves() and _slot_list().size() >= 2 and not (mode == "chal" and (_ch_rs("one_move") or _ch_rs("no_upgrade"))):
+		pool.append({"cat": "unlearn", "id": "unlearn", "key": "unlearn", "w": 2.5, "title": "Quitamovimientos",
+			"desc": "Olvida uno de tus movimientos y aprende otro de tu Pokémon en su hueco, o déjalo libre.", "icon": "tm", "tag": "Especial", "color": Color("#c49bff")})
 
 	# --- reto "sin mejoras": solo movimientos nuevos, objetos y curacion ---
 	if mode == "chal" and _ch_rs("no_upgrade"):
@@ -7997,14 +8247,14 @@ func _offer() -> Array:
 				if String(c["cat"]) == "stat" and String(c["id"]) == "heal":
 					keep.append(c)
 		pool = keep
-	# --- elegir tres ---
+	# --- elegir cuatro (7.0: antes tres, como el original) ---
 	var picked: Array = []
 	for i in range(pool.size()):
 		if String(pool[i]["cat"]) == "evo":
 			picked.append(pool[i])
 			pool.remove_at(i)
 			break
-	while picked.size() < 3 and not pool.is_empty():
+	while picked.size() < CARD_N and not pool.is_empty():
 		var total := 0.0
 		for c in pool:
 			total += float(c["w"])
@@ -8290,7 +8540,7 @@ func _ptypes_text() -> Array:
 
 
 func pause_summary() -> Dictionary:
-	var crit_p: float = minf(0.95, float(perks["crit"]) + (0.15 if _has_item("scopelens") else 0.0) + (0.05 if _has_item("ti_normal") else 0.0) + _lens_add() + _abn("crit"))
+	var crit_p: float = minf(CRIT_CAP, float(perks["crit"]) + (0.15 if _has_item("scopelens") else 0.0) + (0.05 if _has_item("ti_normal") else 0.0) + _lens_add() + _abn("crit"))
 	var all_stats: Array = [
 		[L.t("Vida"), "%d / %d" % [int(player.hp), int(player.max_hp)], "heart"],
 		[L.t("Daño"), "%d%%" % roundi(_atk() / maxf(0.001, base_atk) * 100.0), "fist"],
@@ -8336,7 +8586,7 @@ func pause_summary() -> Dictionary:
 		var lv: int = _lv(String(sid))
 		if lv > 0 and String(sid) != "heal":
 			out["stats"].append({"name": L.t(String(STATS[sid]["title"])), "lv": lv, "icon": String(STAT_ICON.get(sid, "star"))})
-	for it in [item, item2, item3]:
+	for it in [item, item2, item3, item4]:
 		if String(it) != "":
 			var idesc := ""
 			for td in TD.ITEMS:
@@ -8421,9 +8671,70 @@ func _fuse_hint(pair: Array) -> void:
 func _picks_useful(picks: Array) -> bool:
 	for c in picks:
 		var cat: String = String(c["cat"])
-		if cat == "evo" or cat == "up" or (cat == "stat" and String(c["id"]) != "heal"):
+		if cat == "evo" or cat == "up" or cat == "unlearn" or (cat == "stat" and String(c["id"]) != "heal"):
 			return true
 	return false
+
+
+# ---------------------------------------------------------------
+# 7.0: carta Quitamovimientos (del original). Paso 1: eliges que hueco olvidas
+# (un vinculo o una fusion se olvida entero). Paso 2: aprendes otro movimiento en su hueco o lo dejas libre.
+# ---------------------------------------------------------------
+var _unl_prev: Array = []   # cartas de nivel que habia, para el boton Volver
+var _unl_title := ""
+
+
+func _unlearn_open() -> void:
+	_unl_prev = cards.items
+	_unl_title = cards.title
+	var picks: Array = []
+	var sl: Array = _slot_list()
+	for gi in range(sl.size()):
+		var g: Array = sl[gi]
+		var m0: Dictionary = g[0]
+		var names: Array = []
+		for m in g:
+			names.append(L.t(String(m["name"])))
+		var desc: String = L.t("Olvidas este movimiento (Nv.%d).") % int(m0.get("lvl", 1))
+		if g.size() > 1:
+			desc = L.t("Olvidas este vínculo entero: %s.") % " + ".join(names)
+		elif m0.has("parts"):
+			desc = L.t("Olvidas este movimiento fusionado.")
+		picks.append({"cat": "unl_pick", "id": String(m0["id"]), "slot": gi, "key": "unl:%d" % gi, "w": 1.0,
+			"title": " + ".join(names), "desc": desc, "icon": "move:" + (String(m0["parts"][0]["id"]) if m0.has("parts") else String(m0["id"])), "tag": "Olvidar", "color": _col(m0)})
+	picks.append({"cat": "unl_back", "id": "back", "key": "unl:back", "w": 1.0, "title": "Volver",
+		"desc": "Vuelve a las cartas de nivel sin olvidar nada.", "icon": "tm", "tag": "Cancelar", "color": Color("#8fa3c4")})
+	Aud.sfx("select")
+	cards.show_cards(picks, L.t("Elige el movimiento que olvidas"), L.t("Quitamovimientos"), false)
+
+
+func _unlearn_pick(gi: int) -> void:
+	var sl: Array = _slot_list()
+	if gi < 0 or gi >= sl.size():
+		return
+	var g: Array = sl[gi]
+	var ids := {}
+	var names: Array = []
+	for m in g:
+		ids[String(m["id"])] = true
+		names.append(L.t(String(m["name"])))
+		player.moves.erase(m)
+	for pi in range(bond_pairs.size() - 1, -1, -1):
+		for pid in (bond_pairs[pi] as Array):
+			if ids.has(String(pid)):
+				bond_pairs.remove_at(pi)
+				break
+	for i in range(bullets.size() - 1, -1, -1):
+		if bullets[i].orb and ids.has(String(bullets[i].mid)):
+			bullets[i].queue_free()
+			bullets.remove_at(i)
+	player.slot = clampi(player.slot, 0, maxi(0, _slot_list().size() - 1))
+	add_text(player.position + Vector2(0.0, -player.body_h - 8.0), L.t("Olvidado: %s") % " + ".join(names), Color("#c49bff"), 20)
+	Aud.sfx("confirm")
+	var picks: Array = _new_move_cards(CARD_N - 1)
+	picks.append({"cat": "unl_free", "id": "free", "key": "unl:free", "w": 1.0, "title": "Dejar libre",
+		"desc": "Dejas el hueco libre: podrás aprender otro movimiento al subir de nivel.", "icon": "tm", "tag": "Hueco libre", "color": Color("#8fa3c4")})
+	cards.show_cards(picks, L.t("Elige el movimiento que aprende en su hueco"), L.t("Quitamovimientos"), false)
 
 
 func _rc_random_bonus() -> void:
@@ -8491,7 +8802,9 @@ func _on_card_chosen(idx: int) -> void:
 			_open_cards()
 			return
 		elif cat == "itemtake":
-			if int(c.get("slot", 1)) == 3:
+			if int(c.get("slot", 1)) == 4:
+				item4 = id
+			elif int(c.get("slot", 1)) == 3:
 				item3 = id
 			elif int(c.get("slot", 1)) == 2:
 				item2 = id
@@ -8510,6 +8823,29 @@ func _on_card_chosen(idx: int) -> void:
 		choosing = false
 		if id == "yes":
 			_do_fuse()
+		return
+	if cat == "pevo":
+		cards.hide_cards()
+		choosing = false
+		_apply_pevo(id)
+		return
+	if cat == "unlearn":
+		_unlearn_open()
+		return
+	if cat == "unl_pick":
+		_unlearn_pick(int(c.get("slot", -1)))
+		return
+	if cat == "unl_back":
+		cards.show_cards(_unl_prev, _unl_title, L.t("¡Subes de nivel!"), true)
+		cards.age = cards.GRACE
+		cards.rerolls = rerolls
+		cards.bans = bans
+		return
+	if cat == "unl_free":
+		Aud.sfx("confirm")
+		pending_levels = maxi(0, pending_levels - 1)
+		cards.hide_cards()
+		choosing = false
 		return
 	if cat == "new":
 		var nm: Dictionary = _new_move(id, 1)
@@ -8569,9 +8905,10 @@ func _next_item(pool: Array) -> Dictionary:
 func _offer_item() -> void:
 	var two: bool = tw_risk.has("l_bag") or has_bag
 	var three: bool = has_bag3
+	var four: bool = three and _lv("slot4") > 0   # carta Cuarto objeto
 	var pool: Array = []
 	for it in TD.ITEMS:
-		if String(it["id"]) != item and not (two and String(it["id"]) == item2) and not (three and String(it["id"]) == item3) and _item_ok_for(String(it["id"])):
+		if String(it["id"]) != item and not (two and String(it["id"]) == item2) and not (three and String(it["id"]) == item3) and not (four and String(it["id"]) == item4) and _item_ok_for(String(it["id"])):
 			pool.append(it)
 	var blocked: Array = run_item_block
 	var pool2: Array = []
@@ -8606,21 +8943,24 @@ func _offer_item() -> void:
 		slots.append(2)
 	elif three and item3 == "":
 		slots.append(3)
+	elif four and item4 == "":
+		slots.append(4)
 	else:
-		slots = [1, 2, 3] if three else [1, 2]
+		slots = [1, 2, 3, 4] if four else ([1, 2, 3] if three else [1, 2])
 	if String(nw["id"]) == "rarecandy":
 		slots = [1]   # el Caramelo Raro no ocupa hueco: una sola carta
+	var held: Array = [item, item2, item3, item4]
 	for sl in slots:
 		var tg: String = "Objeto nuevo"
 		if slots.size() >= 2:
-			tg = L.t("Sustituye: %s") % L.t(_item_name_of(item if int(sl) == 1 else (item2 if int(sl) == 2 else item3)))
+			tg = L.t("Sustituye: %s") % L.t(_item_name_of(String(held[int(sl) - 1])))
 		picks.append({"cat": "itemtake", "slot": int(sl), "id": String(nw["id"]), "key": "it:%s:%d" % [String(nw["id"]), int(sl)], "w": 1.0,
 			"title": String(nw["name"]), "desc": String(nw["desc"]), "icon": String(nw["id"]), "tag": tg, "color": Color("#ff8ad8")})
 	if item != "":
 		picks.append({"cat": "itemkeep", "id": item, "key": "keep", "w": 1.0, "title": "Quedarte con los tuyos",
 			"desc": L.t("Sigues con tus objetos actuales."), "icon": item, "tag": "Sin cambios", "color": Color("#8fa3c4")})
 	choosing = true
-	cards.show_cards(picks, L.t("Puedes llevar tres objetos") if three else L.t("Puedes llevar dos objetos"), L.t("Has encontrado un objeto"), false)
+	cards.show_cards(picks, L.t("Puedes llevar cuatro objetos") if four else (L.t("Puedes llevar tres objetos") if three else L.t("Puedes llevar dos objetos")), L.t("Has encontrado un objeto"), false)
 	_item_ui(String(nw["id"]))
 
 
@@ -8815,6 +9155,15 @@ func _update_thief_hud() -> void:
 				lst.append({"sp": ct * (e.position + Vector2(0.0, -e.body_h * 0.5)), "name": e.enemy_name,
 					"m": roundi((e.position - player.position).length() / ground.TS), "life": maxf(0.0, e.life)})
 	hud.thieves_hud = lst
+	# 7.0: jefes fuera de la vista -> flecha roja en el borde con su distancia (como el original)
+	var bl: Array = []
+	if arena == null:
+		var ct2: Transform2D = get_viewport().get_canvas_transform()
+		for e in enemies:
+			if is_instance_valid(e) and not e.dead and e.boss and e.behavior != "thief":
+				bl.append({"sp": ct2 * (e.position + Vector2(0.0, -e.body_h * 0.5)), "name": e.enemy_name,
+					"m": roundi((e.position - player.position).length() / ground.TS)})
+	hud.bosses_hud = bl
 
 
 func _update_rift_hud() -> void:
@@ -9064,6 +9413,9 @@ func _legend_down(e) -> void:
 	var st: Dictionary = SV.d["stats"]
 	st["rifts"] = int(st.get("rifts", 0)) + 1
 	run_rifts += 1
+	if randf() < 0.3 and SV.add_egg("rift"):   # 7.0: las grietas a veces dejan un huevo
+		run_notes.append(L.t("¡Has encontrado un huevo en una grieta!"))
+		add_text(player.position + Vector2(0.0, -player.body_h - 30.0), L.t("¡Huevo!"), Color("#7dffb0"), 22)
 	SV.save()
 	PG.event("rift", {"type": String(ainfo["type"])})
 	var n := 14
@@ -9601,6 +9953,34 @@ class Legend extends Actor:
 		draw_rect(Rect2(-w * 0.5 - 1.0, y - 1.0, w + 2.0, 8.0), Color(0, 0, 0, 0.8))
 		draw_rect(Rect2(-w * 0.5, y, w * clampf(hp / max_hp, 0.0, 1.0), 6.0), Color("#ffd23f"))
 		draw_string(ThemeDB.fallback_font, Vector2(-w * 0.5, y - 5.0), lname, HORIZONTAL_ALIGNMENT_LEFT, 120, 11, Color.WHITE)
+
+
+# 7.0: aura de maestro: brillo dorado a los pies y chispas que suben (Pokemon con la maestria al maximo).
+class MasterAura extends Node2D:
+	var t := randf() * 10.0
+	var w := 20.0
+	var h := 40.0
+
+	func _init() -> void:
+		show_behind_parent = true
+
+	func _process(d: float) -> void:
+		t += d
+		queue_redraw()
+
+	func _draw() -> void:
+		var beat: float = 0.5 + 0.5 * sin(t * 3.0)
+		var pts := PackedVector2Array()
+		for i in range(20):
+			var a: float = TAU * float(i) / 20.0
+			pts.append(Vector2(cos(a) * w * (1.3 + 0.08 * beat), sin(a) * w * 0.45))
+		draw_colored_polygon(pts, Color(1.0, 0.82, 0.25, 0.18 + 0.08 * beat))
+		draw_polyline(pts + PackedVector2Array([pts[0]]), Color(1.0, 0.88, 0.4, 0.55), 1.5)
+		for i in range(6):
+			var ph: float = fposmod(t * 0.5 + float(i) / 6.0, 1.0)
+			var x: float = sin(float(i) * 2.7 + t) * w
+			var y: float = -ph * h * 1.2
+			draw_rect(Rect2(roundf(x) - 1.5, roundf(y) - 1.5, 3.0, 3.0), Color(1.0, 0.9, 0.45, sin(ph * PI) * 0.85))
 
 
 # Aura azul circular del escudo del jugador (escudo del descanso de la Torre). Sigue al valor real del escudo
@@ -10805,6 +11185,10 @@ class Cards extends Node2D:
 					_pick(1)
 				KEY_3:
 					_pick(2)
+				KEY_4:
+					_pick(3)
+				KEY_5:
+					_pick(4)
 				KEY_LEFT, KEY_A:
 					_move(-1)
 				KEY_RIGHT, KEY_D:
@@ -11056,6 +11440,8 @@ func _mm_events() -> Array:
 		out.append([kec.active.position, Color(String(kec.VAR[kec.variant]["col"])), "npc"])
 	if rescue != null and rescue.cur != null and String(rescue.cur["state"]) == "active":
 		out.append([rescue.cur["pos"], Color("#ff9ad0"), "npc"])
+	if munch != null and munch.cur != null and String(munch.cur["state"]) == "active":
+		out.append([munch.cur["pos"], Color("#4fae4a"), "npc"])
 	if alpha != null and alpha.cur != null:
 		out.append([alpha.cur["pos"], Color("#ffd23f"), "star"])
 	if cave != null and cave.cur != null:
@@ -11483,6 +11869,7 @@ class Hud extends Node2D:
 	var dyn_flash := 99.0
 	var dyn_type := "normal"
 	var dyn_btn := 0
+	var dyn_kind := "dyna"   # 7.0: poder activo o elegido (dyna, mega, tera)
 	var act_txt := ""
 	var act_sp := Vector2(-9999.0, -9999.0)
 	var poi_marks: Array = []
@@ -11536,6 +11923,7 @@ class Hud extends Node2D:
 
 	var rift_notice := -1.0
 	var thieves_hud: Array = []
+	var bosses_hud: Array = []
 	var thief_notice := -1.0
 	var thief_name := ""
 	var thief_gold := false
@@ -11798,6 +12186,31 @@ class Hud extends Node2D:
 				draw_colored_polygon(PackedVector2Array([p + Vector2(-14.0, -12.0), p + Vector2(14.0, -12.0), p + Vector2(0.0, 8.0)]), gcol)
 				_dso(font, p + Vector2(-110.0, -22.0), label, HORIZONTAL_ALIGNMENT_CENTER, 220.0, 15, 5, Color(0, 0, 0, 0.85))
 				_ds(font, p + Vector2(-110.0, -22.0), label, HORIZONTAL_ALIGNMENT_CENTER, 220.0, 15, Color("#ffe27a"))
+
+	# 7.0: flecha roja en el borde hacia cada jefe que no ves, con su nombre y distancia.
+	func draw_bosses(font: Font, vp: Vector2) -> void:
+		var beat: float = 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.001 * 6.0)
+		var rcol: Color = Color("#ff5a6e") if beat > 0.5 else Color("#ffb0b8")
+		for bs in bosses_hud:
+			var sp: Vector2 = bs["sp"]
+			if not (sp.x < 0.0 or sp.x > vp.x or sp.y < 0.0 or sp.y > vp.y):
+				continue   # se ve en pantalla: sin flecha
+			var M := 52.0
+			var e := Vector2(clampf(sp.x, M, vp.x - M), clampf(sp.y, M + 70.0, vp.y - M - 80.0))
+			if e.x > vp.x - 150.0 and e.y < 150.0:
+				e.y = 150.0   # no tapar el boton de pausa
+			var a: float = (sp - e).angle()
+			draw_circle(e, 26.0 + beat * 6.0, Color(1.0, 0.3, 0.4, 0.14 + beat * 0.18))
+			draw_colored_polygon(PackedVector2Array([e + Vector2.from_angle(a) * 42.0, e + Vector2.from_angle(a + 2.45) * 21.0, e + Vector2.from_angle(a - 2.45) * 21.0]), Color("#2a0610"))
+			draw_colored_polygon(PackedVector2Array([e + Vector2.from_angle(a) * 37.0, e + Vector2.from_angle(a + 2.45) * 19.0, e + Vector2.from_angle(a - 2.45) * 19.0]), rcol)
+			var label: String = "%s · %d m" % [L.t(String(bs["name"])), int(bs["m"])]
+			var ca: float = cos(a)
+			var ha := HORIZONTAL_ALIGNMENT_RIGHT if ca > 0.3 else (HORIZONTAL_ALIGNMENT_LEFT if ca < -0.3 else HORIZONTAL_ALIGNMENT_CENTER)
+			var lp: Vector2 = e + Vector2(-ca * 34.0, -sin(a) * 30.0 + 4.0)
+			var lw: float = 240.0
+			var lx: float = lp.x - (lw if ha == HORIZONTAL_ALIGNMENT_RIGHT else (0.0 if ha == HORIZONTAL_ALIGNMENT_LEFT else lw * 0.5))
+			_dso(font, Vector2(lx, lp.y), label, ha, lw, 16, 5, Color(0, 0, 0, 0.85))
+			_ds(font, Vector2(lx, lp.y), label, ha, lw, 16, Color("#ffd0d6"))
 
 	func draw_rift_notice(font: Font, vp: Vector2) -> void:
 		if rift_notice < 0.0:
@@ -12074,28 +12487,28 @@ class Hud extends Node2D:
 
 	# Dynamax: boton (listo / bloqueado por nivel), barra de tiempo, borde rojo y cartel "DYNAMAX" al activarse.
 	func draw_dyn(font: Font, vp: Vector2) -> void:
-		var tcol: Color = Color("#ff3d6e")
+		var tcol: Color = Color(String(DYN.POWER_COL.get(dyn_kind, "#ff3d6e")))
 		var beat: float = 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.001 * 6.0)
 		if dyn_left >= 0.0:
 			var a: float = 0.10 + 0.06 * beat
 			var th: float = 26.0
-			draw_rect(Rect2(0, 0, vp.x, th), Color(1.0, 0.1, 0.3, a))
-			draw_rect(Rect2(0, vp.y - th, vp.x, th), Color(1.0, 0.1, 0.3, a))
-			draw_rect(Rect2(0, 0, th, vp.y), Color(1.0, 0.1, 0.3, a))
-			draw_rect(Rect2(vp.x - th, 0, th, vp.y), Color(1.0, 0.1, 0.3, a))
+			draw_rect(Rect2(0, 0, vp.x, th), Color(tcol.r, tcol.g, tcol.b, a))
+			draw_rect(Rect2(0, vp.y - th, vp.x, th), Color(tcol.r, tcol.g, tcol.b, a))
+			draw_rect(Rect2(0, 0, th, vp.y), Color(tcol.r, tcol.g, tcol.b, a))
+			draw_rect(Rect2(vp.x - th, 0, th, vp.y), Color(tcol.r, tcol.g, tcol.b, a))
 			var w: float = minf(360.0, vp.x - 380.0)
 			var x0: float = vp.x * 0.5 - w * 0.5
 			var fr: float = clampf(dyn_left / DYN.DUR, 0.0, 1.0)
 			draw_rect(Rect2(x0 - 2.0, 62.0, w + 4.0, 20.0), Color(0, 0, 0, 0.65))
 			draw_rect(Rect2(x0, 64.0, w * fr, 16.0), tcol if fr > 0.25 else Color("#ffb347"))
-			_ds(font, Vector2(x0, 58.0), "DYNAMAX  %d s" % ceili(dyn_left), HORIZONTAL_ALIGNMENT_CENTER, w, 16, Color.WHITE)
+			_ds(font, Vector2(x0, 58.0), "%s  %d s" % [String(DYN.POWER_WORD.get(dyn_kind, "DYNAMAX")), ceili(dyn_left)], HORIZONTAL_ALIGNMENT_CENTER, w, 16, Color.WHITE)
 		if dyn_flash < 2.7:
 			var fl: float = clampf(1.0 - dyn_flash / 0.25, 0.0, 1.0)
 			if fl > 0.0:
 				draw_rect(Rect2(Vector2.ZERO, vp), Color(1.0, 0.6, 0.7, 0.45 * fl))
 			var al: float = clampf((2.7 - dyn_flash) / 0.5, 0.0, 1.0)
 			var fs: int = 84
-			var word := "DYNAMAX"
+			var word: String = String(DYN.POWER_WORD.get(dyn_kind, "DYNAMAX"))
 			var widths: Array = []
 			var tw: float = 0.0
 			for ch in word:
@@ -12117,7 +12530,7 @@ class Hud extends Node2D:
 					var ox: float = cx + cwid * 0.5
 					var oy: float = by - drop + wave
 					draw_set_transform(Vector2(ox, oy), 0.0, Vector2(sc, sc))
-					var base: Color = Color("#ff2f63").lerp(Color("#ffd6e0"), clampf(float(i) / 6.0 + 0.15 * sin(dyn_flash * 6.0 - float(i)), 0.0, 1.0))
+					var base: Color = tcol.lerp(Color("#ffd6e0"), clampf(float(i) / 6.0 + 0.15 * sin(dyn_flash * 6.0 - float(i)), 0.0, 1.0))
 					var pos := Vector2(-cwid * 0.5, 0.0)
 					_dso(font, pos + Vector2(0.0, 6.0), String(word[i]), HORIZONTAL_ALIGNMENT_LEFT, -1.0, fs, 16, Color(0.22, 0.0, 0.1, 0.92 * al))
 					_ds(font, pos + Vector2(3.0, 9.0), String(word[i]), HORIZONTAL_ALIGNMENT_LEFT, -1.0, fs, Color(0.55, 0.0, 0.2, 0.9 * al))
@@ -12142,7 +12555,7 @@ class Hud extends Node2D:
 				draw_circle(c, 52.0 + beat * 6.0, Color(tcol.r, tcol.g, tcol.b, 0.25 + beat * 0.25))
 			draw_circle(c, 46.0, Color(0.14, 0.03, 0.07, 0.88))
 			draw_arc(c, 46.0, 0.0, TAU, 40, tcol if ready else Color(0.5, 0.52, 0.58), 4.0)
-			_ds(font, Vector2(c.x - 44.0, c.y + (2.0 if dyn_btn == 3 else 11.0)), "MAX", HORIZONTAL_ALIGNMENT_CENTER, 88.0, 28 if dyn_btn == 3 else 32, Color.WHITE if ready else Color(0.6, 0.62, 0.68))
+			_ds(font, Vector2(c.x - 44.0, c.y + (2.0 if dyn_btn == 3 else 11.0)), {"dyna": "MAX", "mega": "MEGA", "tera": "TERA"}.get(dyn_kind, "MAX"), HORIZONTAL_ALIGNMENT_CENTER, 88.0, (28 if dyn_btn == 3 else 32) - (4 if dyn_kind != "dyna" else 0), Color.WHITE if ready else Color(0.6, 0.62, 0.68))
 			if dyn_btn == 3:
 				_ds(font, Vector2(c.x - 44.0, c.y + 26.0), "%d:%02d" % [int(dyn_cd) / 60, int(dyn_cd) % 60], HORIZONTAL_ALIGNMENT_CENTER, 88.0, 18, Color(0.85, 0.88, 0.95))
 			elif not ready:
@@ -12322,6 +12735,7 @@ class Hud extends Node2D:
 		draw_rift_notice(font, vp)
 		draw_thief_notice(font, vp)
 		draw_thieves(font, vp)
+		draw_bosses(font, vp)
 		var tw: float = font.get_string_size(str(tickets), HORIZONTAL_ALIGNMENT_LEFT, -1.0, 18).x
 		var t10w: float = font.get_string_size(str(tickets10), HORIZONTAL_ALIGNMENT_LEFT, -1.0, 18).x
 		var cw: float = font.get_string_size(str(coins), HORIZONTAL_ALIGNMENT_LEFT, -1.0, 18).x
