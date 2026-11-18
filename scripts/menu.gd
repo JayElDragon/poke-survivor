@@ -2815,6 +2815,9 @@ func _build_modes() -> void:
 	mp_opts.add_theme_constant_override("separation", 6)
 	mp_opts.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	mp_opts_sc.add_child(mp_opts)
+	# 7.0: texto y opciones (dificultad, poder, equipo...) encima de la vista previa: debajo quedaban escondidos
+	rv.move_child(mp_opts_sc, pfr.get_index())   # botones primero...
+	rv.move_child(mp_stat, pfr.get_index())      # ...y su explicacion debajo
 	mp_play = _btn("Jugar", func(): _modes_play(), Vector2(0, 60))
 	mp_play.add_theme_font_size_override("font_size", 30)
 	_set_btn(mp_play, "gold")
@@ -4398,6 +4401,7 @@ func _stat_bar(title: String, value: String, frac: float, col: Color, icon: Stri
 	row.add_child(bar)
 	var vl := _label(value, 20, Color.WHITE)
 	vl.custom_minimum_size = Vector2(62, 0)
+	vl.autowrap_mode = TextServer.AUTOWRAP_OFF   # el valor nunca se parte en dos lineas (p. ej. «1250/1700»)
 	vl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	row.add_child(vl)
 	return row
@@ -4512,7 +4516,7 @@ func _dex_detail() -> void:
 	var nxt: int = int(SV.MASTERY_LV[mini(mlv + 1, SV.MASTERY_MAX)])
 	var prv: int = int(SV.MASTERY_LV[mlv])
 	var mfr: float = 1.0 if mlv >= SV.MASTERY_MAX else clampf(float(int(ms["pts"]) - prv) / float(maxi(1, nxt - prv)), 0.0, 1.0)
-	mvb.add_child(_stat_bar(L.t("Puntos"), str(int(ms["pts"])) + ("" if mlv >= SV.MASTERY_MAX else " / %d" % nxt), mfr, C_GOLD, "star"))
+	mvb.add_child(_stat_bar(L.t("Puntos"), str(int(ms["pts"])) + ("" if mlv >= SV.MASTERY_MAX else "/%d" % nxt), mfr, C_GOLD, "star"))   # sin espacios: «0 / 150» no cabia
 	var mt: int = int(ms["time"])
 	var mb: int = int(ms["best"])
 	var mtxt := _label(L.t("Partidas %d · Tiempo %d:%02d h · Derrotados %d\nJefes %d · Grietas %d · Llegadas a Arceus %d · Eternatus %d\nMejor tiempo %d:%02d") % [

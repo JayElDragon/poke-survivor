@@ -258,7 +258,7 @@ class Overlay extends Node2D:
 		for e in jd.embers:
 			draw_rect(Rect2(roundf(e["x"]), roundf(e["y"]), e["s"], e["s"]), Color(e["c"].r, e["c"].g, e["c"].b, minf(1.0, e["life"]) * e["a"]))
 		var txt: String = "%s · %02d:%02d · %s %d" % [L.t("SENTENCIA"), int(jd.arena_t) / 60, int(jd.arena_t) % 60, L.t("JEFES"), jd.downs]
-		draw_string(f, Vector2(0.0, 122.0), txt, HORIZONTAL_ALIGNMENT_CENTER, vp.x, 16, GOLD)
+		draw_string(f, Vector2(0.0, 96.0), txt, HORIZONTAL_ALIGNMENT_CENTER, vp.x, 16, GOLD)   # 7.0: mas arriba; en 122 se montaba con los carteles
 		if jd.A == null:
 			return
 		var sp: Vector2 = get_viewport().get_canvas_transform() * (jd.A.global_position + Vector2(0.0, -jd.A.body_h * 0.5))
@@ -335,24 +335,33 @@ class HallDeco extends Node2D:
 
 	func _draw() -> void:
 		# mar de nubes alrededor de la plataforma
-		for i in range(26):
-			var a: float = TAU * float(i) / 26.0 + t * 0.02
-			var rr: float = R * (1.12 + 0.06 * sin(t * 0.5 + float(i)))
-			draw_circle(Vector2(cos(a), sin(a) * 0.85) * rr, R * 0.16, Color(1.0, 0.97, 0.92, 0.10))
-		# plataforma de marmol con anillos de oro
-		draw_circle(Vector2.ZERO, R, Color(0.96, 0.93, 0.86, 0.10))
-		for k in [1.0, 0.82, 0.62, 0.3]:
-			draw_arc(Vector2.ZERO, R * k, 0.0, TAU, 96, Color(1.0, 0.82, 0.37, 0.35), 3.0)
-		for i in range(12):
-			var a2: float = TAU * float(i) / 12.0
-			draw_line(Vector2.from_angle(a2) * R * 0.3, Vector2.from_angle(a2) * R * 0.62, Color(1.0, 0.85, 0.45, 0.16), 2.0)
+		for i in range(30):
+			var a: float = TAU * float(i) / 30.0 + t * 0.02
+			var rr: float = R * (1.1 + 0.05 * sin(t * 0.5 + float(i)))
+			draw_circle(Vector2(cos(a), sin(a)) * rr, R * 0.14, Color(1.0, 0.98, 0.95, 0.55))
+			draw_circle(Vector2(cos(a + 0.1), sin(a + 0.1)) * (rr + R * 0.06), R * 0.1, Color(1.0, 0.92, 0.85, 0.35))
+		# plataforma de marmol (losas) con anillos y vetas de oro
+		draw_circle(Vector2.ZERO, R, Color(0.93, 0.9, 0.84, 0.82))
+		for k in range(1, 9):
+			draw_arc(Vector2.ZERO, R * float(k) / 9.0, 0.0, TAU, 96, Color(0.72, 0.68, 0.62, 0.35), 2.0)   # juntas de las losas
+		for i in range(24):
+			var a2: float = TAU * float(i) / 24.0
+			draw_line(Vector2.from_angle(a2) * R * 0.12, Vector2.from_angle(a2) * R, Color(0.72, 0.68, 0.62, 0.3), 2.0)
+		for k in [1.0, 0.78, 0.55, 0.3, 0.12]:
+			draw_arc(Vector2.ZERO, R * k, 0.0, TAU, 128, Color(0.85, 0.62, 0.14, 0.95), 6.0)
+			draw_arc(Vector2.ZERO, R * k, 0.0, TAU, 128, Color(1.0, 0.88, 0.45, 0.9), 2.0)
+		for i in range(8):
+			var a5: float = TAU * float(i) / 8.0 + PI / 8.0
+			draw_line(Vector2.from_angle(a5) * R * 0.12, Vector2.from_angle(a5) * R * 0.3, Color(0.95, 0.75, 0.25, 0.8), 4.0)
 		# columnas de luz en el borde
-		for i in range(10):
-			var a3: float = TAU * float(i) / 10.0
-			var p: Vector2 = Vector2.from_angle(a3) * R * 0.95
+		for i in range(12):
+			var a3: float = TAU * float(i) / 12.0
+			var p: Vector2 = Vector2.from_angle(a3) * R * 0.97
 			var beat: float = 0.5 + 0.5 * sin(t * 2.0 + float(i))
-			draw_rect(Rect2(p + Vector2(-9.0, -260.0), Vector2(18.0, 260.0)), Color(1.0, 0.95, 0.75, 0.10 + 0.08 * beat))
-			draw_circle(p, 14.0, Color(1.0, 0.88, 0.5, 0.35))
+			draw_rect(Rect2(p + Vector2(-14.0, -420.0), Vector2(28.0, 420.0)), Color(1.0, 0.96, 0.8, 0.22 + 0.12 * beat))
+			draw_rect(Rect2(p + Vector2(-5.0, -420.0), Vector2(10.0, 420.0)), Color(1.0, 1.0, 0.95, 0.35 + 0.15 * beat))
+			draw_circle(p, 22.0, Color(0.85, 0.62, 0.14, 0.95))
+			draw_circle(p, 15.0, Color(1.0, 0.9, 0.55))
 		# estrellas
 		for i in range(30):
 			var a4: float = float(i) * 2.39996
@@ -381,11 +390,11 @@ func blade_lanes() -> Array:
 	var out: Array = []
 	if phase != "fight" or won:
 		return out
-	var R: float = (ARENA_R - 4.0) * ARENA.TS
+	var R: float = (ARENA_R - 1.0) * ARENA.TS
 	if arena_t >= BLADES_AT:
-		out.append([R, blade_a, 1.0])
+		out.append([R * 0.78, blade_a, 1.0])   # cerca del borde (como el original), sobre el anillo de oro
 	if arena_t >= BLADES2_AT:
-		out.append([R * 0.62, -blade_a * 1.15 + 0.5, -1.0])
+		out.append([R * 0.55, -blade_a * 1.15 + 0.5, -1.0])   # mas hacia dentro, al reves
 	return out
 
 
@@ -775,7 +784,7 @@ func cast(id: String) -> void:
 		m._say(L.t("¡Premonición!"), 1.0)
 	elif id == "gravity":
 		# Gravedad: te vuelves pesado unos segundos y caen pilares
-		m.trap_slow_t = maxf(m.trap_slow_t, 3.0)
+		m.trap_slow_t = maxf(m.trap_slow_t, 4.0)   # 4 s, como el original
 		m._ring(m.player.position, 160.0, 20.0, Color("#b9a6ff"), 0.8, 5.0)
 		var pg: Vector2 = m.player.position
 		for i in range(4):
