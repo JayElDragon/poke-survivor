@@ -1,6 +1,7 @@
 extends RefCounted
 const CT = preload("res://scripts/content.gd")
 const SV = preload("res://scripts/save_data.gd")
+const L = preload("res://scripts/lang.gd")
 const AB = preload("res://scripts/abilities.gd")
 const MD = preload("res://scripts/moves_data.gd")
 const ORBS := ["sleep", "slow", "push", "focus", "light", "speed"]
@@ -173,11 +174,11 @@ func input(event: InputEvent) -> bool:
 
 func update_hud() -> void:
 	ui.visible = not m.player.dead and not m.jd.cinematic()
-	status.text = " · ".join(berries.keys())
+	status.text = " · ".join(berries.keys().map(func(b): return L.t(String(b))))
 	eter_bar.visible = m.eterf != null and m.eterf.active()
 	if eter_bar.visible and is_instance_valid(m.eterf.e):
 		eter_bar.value = m.eterf.e.hp / maxf(1.0, m.eterf.e.max_hp) * 100.0
-		status.text = "Eternatus · Fase %d · %d%%" % [m.eterf.phase, ceili(eter_bar.value)]
+		status.text = L.t("Eternatus · Fase %d · %d%%") % [m.eterf.phase, ceili(eter_bar.value)]
 	var signature: String = str(spheres)
 	if String(row.get_meta("sig", "")) == signature:
 		return
@@ -188,7 +189,7 @@ func update_hud() -> void:
 	for id in spheres:
 		var key := String(id)
 		var b := Button.new()
-		b.text = "Shift+%d: %s ×%d" % [5 + idx, ORB_NAMES[key], int(spheres[key])]
+		b.text = "Shift+%d: %s ×%d" % [5 + idx, L.t(String(ORB_NAMES[key])), int(spheres[key])]
 		b.custom_minimum_size = Vector2(100, 44)
 		b.pressed.connect(func(): use_orb(key))
 		row.add_child(b)
@@ -259,7 +260,7 @@ func show(picks: Array, title: String, page: int = 0) -> void:
 	page_title = title
 	var visible_picks: Array = picks.slice(page * 4, page * 4 + 4) if picks.size() > 6 else picks
 	if picks.size() > 6:
-		visible_picks.append(pick("rx_page", str((page + 1) % int(ceilf(float(picks.size()) / 4.0))), "Más opciones", "Página %d" % (page + 1)))
+		visible_picks.append(pick("rx_page", str((page + 1) % int(ceilf(float(picks.size()) / 4.0))), "Más opciones", L.t("Página %d") % (page + 1)))
 	m.choosing = true
 	m.cards.show_cards(visible_picks, title, title, false)
 
