@@ -30,7 +30,7 @@ const FX := {
 	"sandveil": {"name": "Velo Arena", "desc": "Eres inmune al daño del clima (arena y nieve).", "fx": {"wximm": 1}},
 	"technician": {"name": "Experto", "desc": "+10% de daño.", "fx": {"dmg": 0.1}},
 	"ironfist": {"name": "Puño Férreo", "desc": "+20% de daño con movimientos cuerpo a cuerpo.", "fx": {"kind_dmg": ["melee"], "kind_k": 0.2}},
-	"megalauncher": {"name": "Megadisparador", "desc": "+20% de daño con proyectiles y rayos.", "fx": {"kind_dmg": ["projectile", "beam", "boomerang", "cone", "chain", "meteor"], "kind_k": 0.2}},
+	"megalauncher": {"name": "Megadisparador", "desc": "+20% de daño con proyectiles y rayos.", "fx": {"kind_dmg": ["projectile", "beam", "boomerang", "cone", "chain", "meteor", "homing", "bounce"], "kind_k": 0.2}},
 	"adaptability": {"name": "Adaptable", "desc": "+20% de daño con movimientos del tipo de tu Pokémon.", "fx": {"owntype": 0.2}},
 	"compoundeyes": {"name": "Ojo Compuesto", "desc": "+10% de probabilidad de golpe crítico.", "fx": {"crit": 0.1}},
 	"luck": {"name": "Afortunado", "desc": "+8% de crítico y +10% de Pokémonedas.", "fx": {"crit": 0.08, "coin": 0.1}},
@@ -201,7 +201,18 @@ const BY_DEX := {
 }
 
 
+static var form_abilities: Dictionary = {}
 static func of(dex: int) -> String:
+	if form_abilities.is_empty():
+		var parsed = JSON.parse_string(FileAccess.get_file_as_string("res://data/forms.json"))
+		if parsed is Dictionary:
+			form_abilities = parsed
+	if form_abilities.has(str(dex)):
+		var f: Dictionary = form_abilities[str(dex)]
+		var key: String = String(f.get("ab", "")).replace("-", "")
+		if FX.has(key):
+			return key
+		return String(BY_DEX.get(int(f["d"]), "protean"))
 	return String(BY_DEX.get(dex, "protean"))
 
 

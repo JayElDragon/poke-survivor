@@ -1,0 +1,213 @@
+# Créditos
+
+## Sprites
+
+Los sprites estilo *Pokémon Mundo Misterioso* vienen de
+[SpriteCollab](https://github.com/PMDCollab/SpriteCollab), bajo licencia
+[CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/):
+uso **no comercial** y con atribución a sus artistas.
+
+| Artista | Contacto | Sprites (nº de Pokédex) |
+|---|---|---|
+| 3Monika4 | <@270755102178934785> | 20, 61, 63 |
+| 3P1C |  | 27, 498 |
+| <SKREE> | <https://www.tumblr.com/blog/skree-like-a-pterodactyl> | 750, 948 |
+| Adrian | <@218764902913802240> | 120 |
+| AikoMaiko |  | 624 |
+| AllPatchedUp | patchedupgalaxy@gmail.com | 513 |
+| anomalocaris | https://twitter.com/radiodonta_lord | 48, 140, 296, 433 |
+| Anon |  | 194 |
+| Anonymous | <@200318546750865418> | 33, 49, 70, 84, 85, 114, 121, 151, 162, 173, 174, 179, 180, 181, 188, 189, 195, 212, 213, 228, 229, 258, 259, 260, 261, 262, 267, 307, 345, 346, 354, 389, 442, 447, 456, 475, 476, 478, 481, 482, 483, 485, 489 |
+| Ariakyu | https://www.reddit.com/u/SoggyMinimum8386/s/0ULdU1GVNj | 648 |
+| Audino | https://github.com/audinowho | 30, 37, 38, 50, 51, 58, 69, 103, 108, 124, 159, 160, 249, 374, 375, 376, 379, 398, 414, 434, 435, 462, 479, 492, 724 |
+| avalancheman | milesbehemoth@gmail.com | 727 |
+| Avery | <@527611425670037516> | 223, 265 |
+| Axcel |  | 100, 661, 745 |
+| baronessfaron |  | 25, 26, 27, 28, 30, 37, 38, 58, 59, 77, 78, 80, 103, 110, 122, 133, 144, 196, 238, 257, 264, 311, 312, 382, 383, 405, 417, 431, 470, 471, 481, 483, 484, 488, 491, 493, 494, 503, 504, 505, 506, 507, 509, 511, 512, 513, 515, 517, 518, 529, 531, 541, 542, 543, 545, 549, 551, 554, 555, 560, 561, 562, 563, 569, 570, 571, 572, 573, 574, 575, 576, 578, 580, 581, 582, 584, 585, 586, 587, 594, 595, 599, 600, 601, 602, 605, 608, 609, 610, 612, 614, 615, 620, 621, 623, 624, 627, 628, 629, 631, 632, 634, 636, 640, 645, 647, 648, 651, 654, 659, 664, 665, 666, 668, 669, 670, 671, 672, 674, 676, 682, 683, 684, 685, 686, 688, 689, 691, 692, 693, 696, 697, 700, 702, 709, 710, 711, 712, 713, 714, 716, 718, 723, 724, 726, 729, 730, 734, 740, 741, 742, 743, 744, 745, 746, 747, 748, 754, 755, 757, 758, 760, 761, 763, 764, 766, 770, 774, 778, 779, 781, 785, 786, 788, 790, 792, 795, 800, 801, 811, 812, 816, 817, 829, 835, 837, 848, 849, 853, 854, 856, 857, 858, 859, 861, 862, 865, 874, 875, 882, 888, 892, 894, 895, 897, 901, 905, 906, 918, 923, 924, 925, 927, 932, 933, 934, 937, 952, 961, 963, 964, 967, 968, 971, 972, 978, 982, 985, 987, 988, 1000, 1004, 1007, 1009, 1017 |
+| bwappi | https://bsky.app/profile/bwappi.bsky.social | 5, 17, 187, 233, 340, 749, 750, 810 |
+| Caitemis | https://caitemis-art.tumblr.com/ | 52, 132, 145, 157, 194, 198, 220, 236, 263, 269, 273, 310, 328, 341, 343, 353, 388, 392, 399, 404, 412, 421, 430, 434, 453, 474, 477, 497, 502, 508, 517, 518, 519, 524, 527, 528, 531, 540, 542, 547, 556, 566, 568, 578, 596, 609, 610, 620, 624, 628, 630, 633, 637, 638, 641, 657, 667, 678, 682, 703, 705, 714, 742, 755, 757, 762, 768, 786, 791, 801, 802, 807, 813, 821, 828, 846, 854, 857, 873, 876, 885, 886, 894, 909, 1021 |
+| Chesyon | https://linktr.ee/chesyon | 337, 709, 740, 849 |
+| Chi | <@95638225439166464> | 169, 206, 210, 218, 230, 349, 370, 377, 386, 387, 388, 491 |
+| CHUNSOFT | https://www.spike-chunsoft.com/ | 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255, 256, 257, 258, 259, 260, 261, 262, 263, 264, 265, 266, 267, 268, 269, 270, 271, 272, 273, 274, 275, 276, 277, 278, 279, 280, 281, 282, 283, 284, 285, 286, 287, 288, 289, 290, 291, 292, 293, 294, 295, 296, 297, 298, 299, 300, 301, 302, 303, 304, 305, 306, 307, 308, 309, 310, 311, 312, 313, 314, 315, 316, 317, 318, 319, 320, 321, 322, 323, 324, 325, 326, 327, 328, 329, 330, 331, 332, 333, 334, 335, 336, 337, 338, 339, 340, 341, 342, 343, 344, 345, 346, 347, 348, 349, 350, 351, 352, 353, 354, 355, 356, 357, 358, 359, 360, 361, 362, 363, 364, 365, 366, 367, 368, 369, 370, 371, 372, 373, 374, 375, 376, 377, 378, 379, 380, 381, 382, 383, 384, 385, 386, 387, 388, 389, 390, 391, 392, 393, 394, 395, 396, 397, 398, 399, 400, 401, 402, 403, 404, 405, 406, 407, 408, 409, 410, 411, 412, 413, 414, 415, 416, 417, 418, 419, 420, 421, 422, 423, 424, 425, 426, 427, 428, 429, 430, 431, 432, 433, 434, 435, 436, 437, 438, 439, 440, 441, 442, 443, 444, 445, 446, 447, 448, 449, 450, 451, 452, 453, 454, 455, 456, 457, 458, 459, 460, 461, 462, 463, 464, 465, 466, 467, 468, 469, 470, 471, 472, 473, 474, 475, 476, 477, 478, 479, 480, 481, 482, 483, 484, 485, 486, 487, 488, 489, 490, 491, 492 |
+| cyboy_bit |  | 568 |
+| DavKriz |  | 916, 932, 940, 941, 968 |
+| Deeshura | https://bsky.app/profile/deeshura.bsky.social | 149, 154, 157, 250, 253, 330, 359, 503, 571, 612, 621, 635, 638, 640, 718, 800, 892, 1000 |
+| Dejais | <@375676609283358722> | 721, 802 |
+| Deleca7755 | <https://www.deviantart.com/deleca-7755> | 717 |
+| DeltaL | averyderp.sm2@gmail.com | 718, 809, 889, 898, 974, 975, 1004 |
+| dmDash |  | 135 |
+| El_Pangoro_Parse | <@200385851069300736> | 50, 51, 52, 53, 55, 56, 57, 60, 61, 62, 64, 74, 76, 78, 81, 82, 90, 91, 92, 95, 96, 105, 110, 127, 128, 142, 143, 144, 150, 154, 177, 216, 217, 244, 250, 290, 291, 292, 312, 327, 328, 329, 330, 335, 338, 352, 446, 464, 488 |
+| electronvolt | electronvolt@gamepad.club | 101, 536 |
+| Emboarger |  | 6, 27, 50, 66, 88, 94, 100, 151, 191, 200, 211, 215, 240, 262, 304, 396, 470, 493, 496, 498, 499, 500, 540, 613, 633, 649, 710, 714, 720, 725, 743, 773, 774, 789, 800, 803, 831, 840, 856, 915 |
+| Emmuffin | https://twitter.com/Ernmuffin | 5, 6, 8, 12, 23, 28, 31, 38, 39, 45, 48, 58, 59, 63, 65, 71, 75, 76, 77, 79, 80, 88, 91, 100, 104, 105, 110, 115, 122, 128, 130, 133, 134, 140, 144, 145, 146, 153, 157, 161, 164, 167, 176, 179, 180, 197, 199, 200, 203, 209, 216, 226, 232, 234, 235, 236, 243, 244, 251, 254, 260, 263, 264, 274, 277, 286, 290, 296, 303, 305, 311, 314, 316, 317, 322, 323, 328, 332, 333, 334, 336, 350, 355, 357, 361, 364, 365, 373, 380, 385, 396, 397, 398, 399, 405, 407, 416, 417, 433, 439, 441, 448, 453, 457, 461, 463, 465, 473, 477, 479, 483, 484, 487, 489, 490, 492, 493, 495, 501, 512, 525, 526, 530, 531, 533, 534, 539, 546, 548, 550, 551, 552, 555, 570, 573, 577, 578, 579, 580, 582, 585, 593, 594, 597, 599, 600, 601, 603, 604, 607, 614, 617, 618, 625, 627, 628, 629, 637, 639, 645, 646, 648, 650, 651, 652, 653, 654, 655, 656, 658, 660, 662, 663, 664, 665, 666, 670, 672, 673, 675, 678, 679, 680, 686, 687, 694, 695, 696, 698, 699, 701, 704, 705, 706, 707, 708, 711, 713, 718, 719, 722, 724, 731, 734, 736, 737, 741, 742, 745, 748, 753, 757, 758, 760, 766, 767, 769, 775, 776, 777, 780, 782, 793, 795, 807, 809, 811, 812, 813, 814, 819, 822, 823, 824, 825, 826, 829, 830, 831, 833, 834, 835, 840, 841, 842, 843, 844, 845, 847, 849, 850, 851, 852, 855, 860, 862, 863, 869, 871, 873, 874, 875, 877, 878, 879, 880, 881, 882, 883, 887, 888, 890, 898, 899, 901, 902, 903, 906, 907, 910, 911, 913, 918, 925, 926, 928, 930, 932, 934, 935, 936, 938, 946, 951, 953, 955, 959, 960, 965, 966, 968, 972, 977, 978, 982, 985, 988, 989, 994, 996, 997, 1005, 1006, 1010, 1012, 1013, 1016, 1018, 1019, 1021 |
+| FerMrack | https://x.com/FerMrack_FM | 889, 898, 1005 |
+| FissionCube | https://twewyfinalmix.tumblr.com | 79 |
+| FlowerSnek | https://twitter.com/EthanLac13 | 136, 225, 731, 808, 976 |
+| Fresco | marcfreixer@gmail.com | 211 |
+| FrivolousAqua | https://twitter.com/FrivolousAqua | 610 |
+| Gelius | <@276428982683959296> | 101, 948 |
+| Ginnie |  | 136, 301 |
+| Grimlin | https://twitter.com/Griimlin | 5, 26, 215, 385 |
+| Gust | https://twitter.com/Estelaris__ | 632, 1011 |
+| GustavoMusinTG | https://x.com/GustavoMusinTG | 549 |
+| G〜 | https://bsky.app/profile/justtr4sh.pmd.social | 26, 52, 57, 89, 98, 205, 206, 225, 239, 270, 313, 315, 321, 332, 352, 356, 382, 383, 400, 405, 407, 472, 487, 495, 500, 532, 537, 542, 544, 545, 549, 553, 555, 559, 569, 571, 593, 597, 610, 622, 631, 637, 650, 674, 678, 679, 692, 714, 726, 727, 733, 738, 739, 768, 771, 778, 803, 816, 821, 823, 845, 872, 884, 888, 890, 900, 905, 909, 917, 924, 929, 939, 940, 941, 945, 964, 969, 970, 984, 989, 990, 992, 995, 998, 999, 1000, 1003, 1009, 1020, 1024, 1025 |
+| Hanbei | https://twitter.com/Hanbei | 177, 206 |
+| Hemlock | https://baphomets.neocities.org/ | 310, 634 |
+| Ichor |  | 570, 749, 894, 895 |
+| Inv3rse | <@656696412087648257> | 533, 534, 594, 702, 938, 996 |
+| JFain |  | 16, 39, 77, 83, 128, 136, 147, 150, 151, 156, 165, 171, 183, 190, 197, 203, 207, 211, 215, 222, 228, 246, 253, 263, 274, 280, 281, 309, 315, 327, 346, 355, 361, 363, 371, 396, 407, 417, 427, 434, 439, 440, 441, 456, 471, 479, 490, 492, 493, 502, 508, 531, 535, 536, 543, 547, 556, 559, 575, 582, 583, 587, 589, 590, 595, 596, 610, 619, 623, 641, 673, 679, 687, 711, 714, 728, 730, 744, 745, 758, 759, 762, 768, 778, 787, 788, 795, 810, 816, 817, 831, 840, 841, 849, 854, 855, 858, 860, 864, 872, 876, 877, 882, 890, 894, 895, 896, 900, 904, 909, 912, 919, 921, 930, 957, 958, 962, 991, 1015, 1024 |
+| Jhony-Rex | https://www.deviantart.com/jhony-rex | 77, 78, 110, 145, 146, 633, 655, 658, 692, 697, 718, 800, 809, 819, 820, 826, 846, 873, 885, 886, 888 |
+| Johanne2 | https://github.com/Johanne2 | 617, 863, 946, 953 |
+| JuanmaSG | https://twitter.com/JuanmaSG55 | 623, 781, 987 |
+| JustAGunk | <@1377429093997477928> | 58 |
+| Katach314 | katamari.roller.314@gmail.com | 532, 533, 581, 980 |
+| Kawaiitron | <@412938965713158144> | 726 |
+| KCN015 |  | 262, 335 |
+| Keldaan | https://github.com/keldaan-ag | 584, 751, 752, 848 |
+| LazerBlitz | <@585276060136898591> | 908 |
+| Leif |  | 557, 694 |
+| LightBlueBlaze | LightBlueBlaze@gmail.com | 507, 510 |
+| Limomon | https://twitter.com/TheLimomon | 128, 605, 960 |
+| lokatts | https://twitter.com/lokatts | 29, 78, 152, 155, 156, 300, 301, 358, 382, 383, 384, 859, 920, 967 |
+| Lovi | <@95650095034273792> | 37, 40, 83, 97, 122, 126, 133, 135, 148, 161, 163, 172, 184, 196, 199, 208, 215, 219, 232, 238, 240, 241, 242, 245, 246, 254, 318, 319, 343, 344, 366, 390, 391, 392, 393, 394, 395, 396, 397, 398, 399, 401, 402, 408, 409, 412, 413, 418, 419, 421, 422, 423, 427, 428, 429, 431, 432, 436, 437, 438, 440, 443, 444, 449, 450, 455, 458, 467, 700 |
+| metalbear | <@468408733433593856> | 549 |
+| Michael12 | https://www.deviantart.com/michael12dz | 555, 562, 663, 768, 821, 871, 1021 |
+| Mitsubachi |  | 742 |
+| mixy:3 | https://x.com/MixyPurple?s=20 | 593, 684, 685, 727 |
+| Mond |  | 700 |
+| MonochromeKirby |  | 494 |
+| Moo | https://twitter.com/MoonMoonMemes | 17, 24, 158, 193, 233, 255, 256, 257, 273, 275, 276, 277, 280, 281, 283, 284, 287, 288, 289, 293, 294, 295, 297, 299, 342, 347, 454 |
+| Morei | https://bsky.app/profile/murpia57.bsky.social | 24, 40, 50, 65, 66, 74, 75, 76, 83, 88, 89, 133, 135, 145, 146, 178, 182, 188, 222, 224, 227, 228, 229, 252, 253, 256, 261, 271, 272, 275, 276, 277, 279, 280, 281, 282, 302, 304, 306, 308, 341, 348, 385, 398, 403, 404, 411, 418, 451, 452, 471, 479, 484, 486, 492, 493, 499, 506, 509, 535, 551, 560, 570, 571, 575, 586, 613, 647, 648, 649, 669, 670, 671, 718, 720, 795, 877 |
+| mosscoated | <@713792248348672040> | 602 |
+| nataniel-sama | https://pokemon-reloaded.el-foro.net/ | 791, 823, 833, 834, 879 |
+| Neat_Neato | imneatneato@gmail.com | 161, 162 |
+| NeonCityRain | https://neoncityrain.tumblr.com/ | 572 |
+| NeroIntruder | https://twitter.com/NeroIntruder | 19, 20, 37, 38, 51, 74, 75, 76, 89, 280, 495, 496, 497, 498, 499, 500, 527, 528, 677, 678, 696, 705, 813, 815 |
+| NickOnimura | nickonimura.bsky.social | 912 |
+| NikolaP | nikolasnonsense@gmail.com | 498, 718 |
+| Noivern | https://twitter.com/notarealnoivern | 551 |
+| NOLASMOR |  | 331 |
+| Noo | https://artfight.net/~NooNoo_Skidoo | 78, 101, 102, 103, 121, 129, 130, 163, 164, 181, 184, 185, 190, 196, 202, 213, 222, 335, 359, 376, 424, 463, 572, 587, 619, 638, 677, 679, 714, 846, 978 |
+| Pencil | https://twitter.com/Sea_of_Pencils | 147, 164 |
+| pi3.14 | https://twitter.com/Pi_y_ranitas | 128, 543, 637, 645, 659, 660, 687, 910, 911, 930, 948, 951, 952, 971, 974, 975, 982, 992, 994, 996, 997, 998, 1004, 1005, 1010, 1021 |
+| Pink_no_tori | https://twitter.com/pink_avian_poke | 53, 80, 504, 550, 554, 557, 563, 588, 612, 634, 693 |
+| PixlHoopa |  | 310 |
+| Pokejavi. | <@823932975916777512> | 111, 165, 353, 371, 511, 515, 562, 588, 975, 1015 |
+| PoliteHoppip |  | 383 |
+| powercristal | https://www.deviantart.com/powercristal | 519, 524, 549, 568, 572, 578, 603, 630, 637, 638 |
+| Prismatic | prismaticphenomenal@gmail.com | 102, 168, 170, 171, 185, 190, 194, 207, 211, 214, 226, 231, 236, 237, 248, 320, 323, 325, 326, 367, 369, 417, 445, 457, 474 |
+| programmedsleepstate | <@224476380790915072> | 720 |
+| RaoKurai | https://twitter.com/RaoKurai | 131, 175, 315, 406, 468 |
+| Reimu\_needs\_$$$ | <@!378654902181691392> | 418, 722, 723, 724 |
+| RelicCipher | <@739304144552198285> | 835 |
+| Reppamon |  | 116, 187, 263, 264, 304, 313, 324, 332, 381, 403, 404, 405, 463, 469 |
+| rhys | https://bsky.app/profile/geckqua.bsky.social | 28, 101, 702 |
+| Riodise | <@311963515563016193> | 664, 868 |
+| Sceptile |  | 104 |
+| Scizivire | <@207188665959448576> | 125, 129, 130, 198, 221, 239, 351, 399, 400, 424, 425, 426, 430, 448, 459, 460, 466 |
+| SethY | https://linktr.ee/sethyuikora | 149 |
+| Shadowcrafts | shadowcrafts@outlook.com | 871, 1012, 1013 |
+| Shitpost_Sunkern | https://www.youtube.com/channel/UCxyzfFEM6TfgAQ5LIdGtkXw | 598, 606, 841, 980 |
+| ShyStarryRain |  | 1, 4, 5, 7, 13, 19, 20, 25, 26, 27, 47, 51, 52, 53, 54, 58, 79, 92, 103, 124, 132, 136, 215, 218, 231, 298, 351, 407, 408, 427, 437, 456, 481, 483, 488, 491, 496, 509, 510, 517, 527, 541, 549, 554, 559, 562, 567, 574, 575, 576, 583, 590, 608, 613, 640, 676, 691, 703, 708, 711, 716, 721, 727, 729, 744, 745, 747, 749, 754, 759, 762, 778, 785, 787, 788, 801, 815, 854, 858, 864, 872, 876, 895, 897, 904, 909, 912, 915, 919, 921, 922, 923, 925, 957, 958, 963, 964, 991, 1017 |
+| SilverDeoxys563 | https://www.reddit.com/user/SilverDeoxys563 | 2, 3, 6, 7, 9, 10, 11, 14, 15, 16, 18, 20, 21, 22, 25, 26, 28 |
+| Skycloud383 | <@546904324098490368> | 530 |
+| Smalusion | https://twitter.com/Smalusion | 198, 251, 261, 653, 828 |
+| Smingle | https://twitter.com/TheSmingle | 52 |
+| Some_Shinx | <@1519393734008115314> | 25, 104 |
+| Sonikku_A | https://bsky.app/profile/knopguy.bsky.social | 386 |
+| Soulja | https://twitter.com/OlSoulja | 199, 479, 525, 526, 530, 533, 534, 537, 543, 544, 549, 550, 552, 553, 555, 559, 561, 566, 603, 604, 605, 606, 622, 623, 628, 637, 651, 652, 658, 660, 662, 663, 675, 687, 688, 689, 697, 715, 718, 736, 737, 738, 739, 740, 751, 752, 757, 758, 767, 768, 771, 782, 794, 798, 809, 819, 820, 821, 823, 824, 825, 826, 833, 834, 843, 844, 847, 850, 851, 853, 860, 880, 881, 883, 884, 890, 900, 901, 902, 903, 907, 910, 911, 920, 933, 936, 938, 940, 941, 951, 952, 965, 966, 968, 975, 977, 984, 988, 989, 992, 994, 995, 996, 997, 998, 1005, 1009, 1011, 1018, 1019 |
+| Spikey-Valentine | https://twitter.com/spikeyvalentine | 172 |
+| stressparticles | <@416340821617541141> | 599, 683 |
+| Tacocoa | <@234720295292895232> | 32, 34, 35, 36, 41, 42, 43, 44, 45, 46, 48, 59, 63, 66, 67, 68, 72, 73, 77, 80, 86, 87, 93, 94, 98, 99, 100, 101, 106, 107, 109, 111, 112, 113, 117, 118, 119, 123, 136, 137, 138, 139, 141, 165, 166, 183, 186, 191, 192, 201, 202, 203, 204, 205, 220, 235, 247, 266, 268, 278, 285, 309, 339, 351, 360, 362, 363, 368, 372, 378, 410, 415, 441, 480, 492 |
+| Tainted#3886 |  | 696 |
+| TawnySoup | https://linktr.ee/tawnysoup | 334, 672, 818 |
+| teddg | <@255885525204992000> | 101 |
+| Top_Kec | @topkec.bsky.social | 26, 27, 352, 359, 503, 521, 567, 598, 611, 635, 641, 642, 643, 644, 645, 646, 681, 690, 715, 717, 725, 746, 772, 773, 774, 782, 783, 784, 794, 796, 797, 798, 799, 800, 804, 805, 806, 827, 830, 832, 836, 845, 867, 891, 914, 979, 981, 983, 1008 |
+| Uni | https://github.com/ArianaCastro01 | 194, 263, 406, 554, 577, 633, 852, 877 |
+| Vendily | <@329424896927203339> | 744 |
+| VOID | <@224988883182551040> | 899 |
+| Wyvernagon | https://twitter.com/Z_Serpentriss | 508 |
+| XModxGodX |  | 28, 176, 404, 492, 570, 653, 722, 723 |
+| Yari | Yari#1038 | 789 |
+| YoukaiMinori | <@91001329228464128> | 252, 253 |
+| ZoroarkDX |  | 668 |
+| ◥θ┴θ◤ | DC:<@215638650434617345> | 25, 77, 157, 172, 445, 501, 504, 505, 566, 577, 595, 627, 650, 651, 658, 661, 666, 676, 684, 707, 724, 726, 728, 729, 730, 761, 763, 790, 823, 872, 907, 991 |
+
+Formas aparte (también de SpriteCollab, misma licencia):
+
+| Artista | Contacto | Sprites |
+|---|---|---|
+| JFain | <@702275233125630042> | Eternatus Eternamax (890, forma 0001: el jefe del minuto 20) |
+| G〜 | https://bsky.app/profile/justtr4sh.pmd.social | Eternatus Eternamax (890, forma 0001) |
+
+### Sprites hechos para PokéSurvivor
+
+**SrYena** (12-11-2026), sobre los sprites de SpriteCollab de arriba (misma licencia, CC BY-NC 4.0), con
+`tools/import_propios.py`: **Butterfree y Venusaur Gigamax** (`assets/pokemon/150012` y `150003`; los sprites base, de
+CHUNSOFT y de SpriteCollab) y **Calyrex Jinete Glacial y Jinete Espectral** (`500898` y `510898`: Calyrex sobre
+Glastrier y Spectrier, de sus artistas de SpriteCollab). El shiny de Glastrier es provisional (SpriteCollab no lo tiene).
+
+### Skins de la tienda
+
+Hechas por la comunidad de PokéSurvivor sobre los sprites de SpriteCollab de arriba (misma licencia,
+CC BY-NC 4.0), en `assets/pokemon/<número>/k-<skin>/`. La Mega de Baxcalibur Godzilla parte del sprite de
+Pokémon Edición Reloaded (abajo).
+
+| Skin | Hecha por |
+|---|---|
+| Centiskorch fuego azul, Huntail abisal, Pangoro nocturno, Yveltal acuático | Frisma32 |
+| Zygarde neón vivo | SrYena |
+| Las demás (Dragonite cartero, Rayquaza cósmico, Squirtle con gafas de sol, Gengar blanco fucsia, Lickilicky pastelero, Baxcalibur Godzilla, Espeon circense, Scyther sombrío, Braixen épico, Snorlax viajero, Lunala de hielo, Toxtricity infernal, Abra saiyan, Gholdengo de plata, Woobat algodón de azúcar, Tapu Fini lunar, Magearna pastel, Gliscor sombrío, Minccino explorador, Reuniclus de fresa, Excadrill albino, Simisage de la selva, Rayquaza nebuloso, Charizard llama sombría, Deoxys Xenomorfo, Eternatus abismal, Greninja Esmeralda, Mewtwo Obsidiana) | la comunidad de PokéSurvivor |
+
+## Pokémon Edición Reloaded
+
+Material de **Pokémon Edición Reloaded, de F3R y de los dibujantes que han participado en él, como Jhony_Ryu**
+(<https://pokemon-reloaded.blogspot.com>), usado con crédito porque los dueños
+son fans de ese juego y quieren que la gente lo conozca. Sólo contenido oficial
+de Pokémon; se convierte con las herramientas de `tools/` (la carpeta del juego
+no se sube).
+
+- **Colores shiny** de 588 Karrablast, 820 Greedent, 847 Barraskewda, 868 Milcery,
+  896 Glastrier, 916 Oinkologne, 933 Naclstack y 1007 Koraidon: los sprites son los
+  de SpriteCollab (artistas de arriba) recoloreados con los colores de Pokémon
+  Edición Reloaded (`tools/shiny_from_reloaded.py`).
+- **Formas Gigamax** (`assets/pokemon/150xxx` y `160892`): sus sprites de Pokémon Edición Reloaded, salvo las de
+  Butterfree y Venusaur (12-11-2026: su dibujante pidió que no se usaran; ahora son las de SrYena, más abajo).
+- **Gritos de los Pokémon** (`assets/cries/`): los de Pokémon Edición Reloaded,
+  pasados a MP3 ligero con `tools/import_cries.py`. Los cinco que Reloaded no trae (Charizard,
+  Pikachu, Eevee, Riolu y Lucario) son del repositorio de gritos de [PokeAPI](https://github.com/PokeAPI/cries)
+  (`tools/fetch_cries_pokeapi.py`).
+- **Los 59 Pokémon que faltaban en la Pokédex** (514 Simisear, 893 Zarude, 1001-1003, 1008 Miraidon, 1025
+  Pecharunt...): sus sprites de mapa (normal y shiny), convertidos con `tools/import_reloaded.py --faltan`, sus
+  gritos y los huevos de sus familias. Sus datos (tipos, estadísticas, habilidades, MT) son de PokeAPI
+  (`tools/add_pokedex.py`).
+- **Megaevoluciones** (`assets/pokemon/1000xx/`): los sprites de mapa de 81 megas
+  oficiales (normal y shiny), convertidos con `tools/import_reloaded.py --mega N`, y sus
+  gritos. Sus datos (tipos, estadísticas, habilidad) son de PokeAPI (`tools/fetch_megas.py`).
+- **Formas** (`assets/pokemon/5x0xxx/`, 4-11-2026): las que SpriteCollab no tiene, normal y shiny, con
+  `tools/import_reloaded.py --formas2`: Necrozma Melena Crepuscular y Alas del Alba, Calyrex Jinete Glacial
+  y Jinete Espectral (hasta el 12-11-2026: ahora son los de SrYena, más abajo), Tornadus y Thundurus Forma Tótem, Darmanitan de Galar en Modo Daruma, Stunfisk de
+  Galar, Cramorant Tragatodo y Engulletodo, Terapagos Forma Astral, Keldeo Forma Brío, Frillish
+  y Oinkologne hembra, Squawkabilly (plumaje azul, amarillo y blanco), Dudunsparce Forma Trinodular, ocho
+  cortes de Furfrou y Pikachu Rock Star, Belle, Pop Star y Ph.D. Sus datos son de PokeAPI (`tools/fetch_formas.py`).
+- **Huevos** (`assets/eggs/`): uno por familia, normal y shiny, recortados con `tools/import_eggs.py`.
+- **Fondos de caja del PC** (`assets/ui/box/`, uno por región en la colección):
+  `tools/import_visual.py --cajas`.
+- **Suelos de las arenas** (`assets/arenas/`): campos de combate vistos desde arriba, en pixel art
+  (y una playa para el agua), bajo la arena de las grietas de muchos tipos (`tools/import_visual.py --arenas`).
+
+## Datos
+
+Stats base y nombres en español: [PokeAPI](https://pokeapi.co/),
+descargados una vez y guardados en `js/data/pokedex.js`.
+
+## Fuente
+
+[Pixelify Sans](https://github.com/eifetx/Pixelify-Sans) (SIL Open Font License 1.1,
+licencia en `assets/fonts/OFL.txt`). El juego usa una versión modificada,
+"Pixelify PS", con los números redibujados para distinguirlos mejor.
+
+## Marca
+
+Pokémon es propiedad de Nintendo, Creatures Inc. y GAME FREAK.
+Este es un proyecto de fan sin ánimo de lucro.

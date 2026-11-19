@@ -28,7 +28,7 @@ const DIFF_NAMES := ["Normal", "Difícil", "Pesadilla"]
 # 7.0: Vestidor (del original, adaptado): por Pokemon eliges version normal o shiny y una estela, lo que deja al moverse.
 # Las estelas se compran una vez con monedas y valen para todos tus Pokemon. (Sin skins ni formas: el port no tiene esos sprites.)
 # id: [nombre, forma de particula (vfx), paleta, precio]
-const TRAILS := {
+static var TRAILS := {
 	"leaf": ["Hojas", "leaf", "grass", 400], "flake": ["Copos de nieve", "flake", "ice", 400], "star": ["Estrellas", "star", "electric", 500],
 	"heart": ["Corazones", "heart", "fairy", 500], "note": ["Notas musicales", "note", "psychic", 600], "bubble": ["Burbujas", "bubble", "water", 400],
 	"fire": ["Llamas", "fire", "fire", 600], "coin": ["Monedas", "coin", "electric", 900], "feather": ["Plumas", "feather", "flying", 500],
@@ -51,10 +51,14 @@ static func set_dress(dex: int, key: String, val) -> void:
 
 
 static func has_trail(id: String) -> bool:
+	if id == "rocket":
+		return bool(d.get("rocket_trail", false))
 	return (d.get("trails", {}) as Dictionary).has(id)
 
 
 static func buy_trail(id: String) -> bool:
+	if id == "rocket":
+		return false
 	if has_trail(id) or not TRAILS.has(id) or int(d["coins"]) < int(TRAILS[id][3]):
 		return false
 	d["coins"] = int(d["coins"]) - int(TRAILS[id][3])
@@ -142,7 +146,7 @@ static func incubate(secs: float) -> Array:
 
 # 7.0: Maestria de cada Pokemon (del original). Suma puntos por los derrotados y los minutos que juegas con el,
 # y por jefes, grietas, llegar a Arceus y vencer a Eternatus. Al nivel 5 eres Maestro: titulo, marco dorado y aura.
-const MASTERY_LV := [0, 150, 400, 900, 1700, 3000]
+const MASTERY_LV := [0, 10000, 25000, 50000, 75000, 100000]
 const MASTERY_MAX := 5
 
 
@@ -168,9 +172,8 @@ static func add_mastery(dex: int, r: Dictionary) -> Array:
 	var all: Dictionary = d.get("mastery", {})
 	var ms: Dictionary = mastery(dex).duplicate()
 	var before: int = mastery_level(int(ms["pts"]))
-	var mins: int = int(float(r.get("time", 0)) / 60.0)
-	var gain: int = int(int(r.get("kills", 0)) / 10) + mins * 5 + int(r.get("bosses", 0)) * 3 + int(r.get("rifts", 0)) * 5 \
-		+ (20 if bool(r.get("arceus", false)) else 0) + (50 if bool(r.get("eter", false)) else 0)
+	var mins: int = int(minf(2400.0, float(r.get("time", 0))) / 60.0)
+	var gain: int = int(int(r.get("kills", 0)) / 6) + mins * 25
 	ms["pts"] = int(ms["pts"]) + gain
 	ms["runs"] = int(ms["runs"]) + 1
 	ms["time"] = int(ms["time"]) + int(r.get("time", 0))
@@ -282,8 +285,24 @@ static func load_dex() -> void:
 	dex_list = jd.data
 	for p in dex_list:
 		dex_by[int(p["dex"])] = p
+	# Hidden forms are addressable for transformations, but only regional forms join the gacha roster.
+	var form_data = JSON.parse_string(FileAccess.get_file_as_string("res://data/forms.json"))
+	if form_data is Dictionary:
+		for f in form_data.values():
+			var dx: int = int(f["id"])
+			if not dex_by.has(dx):
+				var original: Dictionary = dex_by.get(int(f["d"]), {})
+				var p: Dictionary = original.duplicate(true)
+				p.merge({"dex": dx, "base_dex": int(f["d"]), "name": String(f["n"]), "types": f["t"], "hp": float(f.get("hp", p.get("hp", 100))), "spd": float(f.get("spd", p.get("spd", 100))), "atk": float(f.get("atk", p.get("atk", 1.0)))}, true)
+				dex_by[dx] = p
 	var js: JSON = load("res://data/sprite_meta.json")
 	smeta = js.data
+	var trail_data = JSON.parse_string(FileAccess.get_file_as_string("res://data/trails.json"))
+	if trail_data is Array:
+		for td in trail_data:
+			var key: String = String(td["id"])
+			if not TRAILS.has(key):
+				TRAILS[key] = [String(td["name"]), String(td["s"]), "normal", 300 + int(td.get("r", 1)) * 250]
 	for s in STARTERS_D.STARTERS:
 		starter_by[int(s["dex"])] = s
 
@@ -419,6 +438,8 @@ static func add_owned(dex: int, shiny: bool = false) -> void:
 
 # MT (mejora permanente): el movimiento inicial elegido para este Pokemon, si ya compraste la MT.
 static func start_move_of(dex: int) -> String:
+	if run_mode == "weekly":
+		return natural_start_of(dex)
 	if up_level("tm", dex) > 0:
 		var pick: String = String(d.get("ptm", {}).get(str(dex), ""))
 		if pick != "" and tm_pool(dex).has(pick):
@@ -464,7 +485,9 @@ static func tm_pool(dex: int) -> Array:
 		if String(m["kind"]) == "buff" or not load("res://scripts/gachapon.gd").playable(String(id)):
 			continue
 		var ty: String = String(m["type"])
-		if dex == 151 or ty == "normal" or types.has(ty):
+		if not MDd.allowed(String(id), dex, int(dex_by[dex].get("base_dex", dex))):
+			continue   # 7.1: exclusivos de otro Pokemon
+		if dex == 151 or ty == "normal" or types.has(ty) or MDd.exclusive(String(id)):
 			out.append(String(id))
 	return out
 
@@ -578,6 +601,8 @@ static func buy_upgrade(id: String, dex: int = -1) -> bool:
 
 static func perks() -> Dictionary:
 	var L := func(id: String) -> int:
+		if run_mode == "weekly":
+			return 0
 		return clampi(up_level(id), 0, int(up_def(id)["max"]))
 	return {
 		"hp": float(L.call("hp")) * 8.0,
@@ -664,8 +689,8 @@ static func region_pool(region: int) -> Array:
 static func can_pull(n: int, use: String) -> bool:
 	if use == "candy":
 		return int(d.get("hw_candy", 0)) >= n * HW_PULL
-	if n == 10 and use == "t10":
-		return int(d.get("tickets10", 0)) >= 1
+	if n >= 10 and use == "t10":
+		return int(d.get("tickets10", 0)) >= int(n / 10)
 	return int(d["tickets"]) >= n
 
 
@@ -730,6 +755,16 @@ static var last_crystal := ""
 
 
 static func pull(region: int, n: int = 1, use: String = "t1") -> Array:
+	if n == 100:
+		if not can_pull(100, use):
+			return []
+		var results: Array = []
+		var got_egg := false
+		for batch in range(10):
+			results.append_array(pull(region, 10, use))
+			got_egg = got_egg or last_egg
+		last_egg = got_egg
+		return results
 	last_crystal = ""
 	if not can_pull(n, use):
 		return []
@@ -872,3 +907,22 @@ static func finish_run(r: Dictionary) -> Dictionary:
 	last_run["notes"] = r.get("notes", [])     # 7.0: lineas extra del resumen (maestria...), ya traducidas
 	save()
 	return last_run
+
+
+# 7.1: Pokedex de vistos y derrotados (como el original): {"dex": derrotados}; vistos con 0.
+static func pdex_add(seen: Dictionary, killed: Dictionary) -> void:
+	var pd: Dictionary = d.get("pdex", {})
+	for k in seen:
+		if not pd.has(String(k)):
+			pd[String(k)] = 0
+	for k in killed:
+		pd[String(k)] = int(pd.get(String(k), 0)) + int(killed[k])
+	d["pdex"] = pd
+
+
+static func pdex_seen(dex: int) -> bool:
+	return (d.get("pdex", {}) as Dictionary).has(str(dex))
+
+
+static func pdex_killed(dex: int) -> int:
+	return int((d.get("pdex", {}) as Dictionary).get(str(dex), 0))

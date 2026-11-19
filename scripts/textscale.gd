@@ -42,8 +42,15 @@ static func scale_tree(root: Node) -> void:
 		scale_tree(ch)
 
 
-# Escala tambien los nodos que se crean despues (pantallas que se reconstruyen)
+# Escala tambien los nodos que se crean despues (pantallas que se reconstruyen).
+# 7.0: se desengancha al salir la escena; antes quedaba conectado para siempre (una conexion mas en cada
+# visita al menu) y, ya borrado el menu, cada nodo nuevo de la partida daba "Lambda capture ... was freed".
 static func hook(root: Node) -> void:
-	root.get_tree().node_added.connect(func(n: Node):
-		if k() > 1.0 and root.is_ancestor_of(n):
-			scale_node.call_deferred(n))
+	var tree: SceneTree = root.get_tree()
+	var cb := func(n: Node):
+		if is_instance_valid(root) and k() > 1.0 and root.is_ancestor_of(n):
+			scale_node.call_deferred(n)
+	tree.node_added.connect(cb)
+	root.tree_exiting.connect(func():
+		if tree.node_added.is_connected(cb):
+			tree.node_added.disconnect(cb), CONNECT_ONE_SHOT)

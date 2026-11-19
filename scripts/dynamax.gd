@@ -4,14 +4,14 @@ extends RefCounted
 const ZMS = preload("res://scripts/zmove.gd")
 const Aud = preload("res://scripts/audio.gd")
 
-const COOLDOWN := 240.0   # 4 minutos desde que acaba
-const DUR := 60.0
+const COOLDOWN := 80.0   # 4 minutos desde que acaba
+const DUR := 12.0
 const MIN_LEVEL := 1
 const MIN_TIME := 180.0   # disponible desde el minuto 3
 const GROW := 1.6
 const STAT_K := 1.3   # +30% a todos los atributos mientras dura
-const HP_BONUS := 0.3
-const DMG_K := 1.3
+const HP_BONUS := 1.0
+const DMG_K := 1.4
 const TAKEN := 0.2308   # 1 - 1/1.3: defensa +30%
 const PULSE := 1.5
 # Efecto de estado de la onda segun el tipo: [cc, veneno, lentitud]
@@ -194,9 +194,13 @@ static func unlocked(stats: Dictionary) -> bool:
 const MEGA_DEX := [3, 6, 9, 15, 18, 36, 65, 71, 80, 94, 115, 121, 127, 130, 142, 149, 150, 154, 160, 181, 208, 212, 214, 227, 229, 248,
 	254, 257, 260, 282, 302, 303, 306, 308, 310, 319, 323, 334, 354, 359, 362, 373, 376, 380, 381, 384, 428, 445, 448, 460, 475, 478,
 	500, 530, 531, 545, 560, 604, 609, 652, 655, 658, 668, 670, 687, 689, 691, 701, 718, 719, 780, 870]
-const POWER_NAMES := {"dyna": "Dynamax", "mega": "Megaevolución", "tera": "Teracristal"}
-const POWER_WORD := {"dyna": "DYNAMAX", "mega": "MEGA", "tera": "TERA"}
-const POWER_COL := {"dyna": "#ff3d6e", "mega": "#5fd0ff", "tera": "#7ff0e0"}
+const POWER_DUR := {"dyna": 12.0, "gmax": 12.0, "mega": 40.0, "tera": 30.0, "z": 15.0}
+const POWER_CD := {"dyna": 80.0, "gmax": 80.0, "mega": 90.0, "tera": 75.0, "z": 60.0}
+var original: Dictionary = {}
+
+const POWER_NAMES := {"gmax": "Gigamax", "z": "Pulsera Z", "dyna": "Dynamax", "mega": "Megaevolución", "tera": "Teracristal"}
+const POWER_WORD := {"gmax": "GIGAMAX", "z": "Z", "dyna": "DYNAMAX", "mega": "MEGA", "tera": "TERA"}
+const POWER_COL := {"gmax": "#ff3d6e", "z": "#ffed66", "dyna": "#ff3d6e", "mega": "#5fd0ff", "tera": "#7ff0e0"}
 const MEGA_RIFTS := 5   # grietas ganadas para desbloquear la Megaevolucion
 
 var kind := "dyna"
@@ -214,11 +218,11 @@ static func power_ok(k: String, stats: Dictionary) -> bool:
 
 
 func k_dmg() -> float:
-	return DMG_K if kind == "dyna" else (1.4 if kind == "mega" else 1.0)
+	return DMG_K if ["dyna", "gmax"].has(kind) else 1.0
 
 
 func k_stat() -> float:
-	return STAT_K if kind == "dyna" else (1.15 if kind == "mega" else 1.0)
+	return STAT_K if ["dyna", "gmax"].has(kind) else 1.0
 
 
 func k_taken() -> float:
@@ -288,13 +292,16 @@ class TeraCrown extends Node2D:
 func start(main) -> void:
 	m = main
 	active = true
-	t = DUR
-	total = DUR
+	t = float(POWER_DUR.get(kind, DUR))
+	total = t
+	original = {"dex": m.player.dex, "types": m.player.types.duplicate(), "atk": m.base_atk, "spd": m.base_spd, "ability": m.ab_fx.duplicate()}
 	n = 0
 	pulse = 0.6
 	since = 0.0
-	type = String(m.player.types[0])
-	if kind != "dyna":
+	type = m.selected_tera if m.selected_tera != "" and m.selected_tera != "stellar" else String(m.player.types[0])
+	if kind == "gmax" and m.selected_form > 0:
+		m.runx.transform(m.selected_form, false)
+	if not ["dyna", "gmax"].has(kind):
 		_start_other()
 		return
 	bonus = roundf(m.player.max_hp * HP_BONUS)
@@ -327,6 +334,8 @@ func _start_other() -> void:
 	bonus = 0.0
 	var col := Color(String(POWER_COL[kind]))
 	if kind == "mega":
+		if m.selected_form > 0:
+			m.runx.transform(m.selected_form, true)
 		aura_node = MegaAura.new()
 		var tw = m.create_tween()
 		tw.tween_property(m.player, "scale", Vector2(1.25, 1.25), 0.18).set_trans(Tween.TRANS_SINE)
@@ -341,6 +350,8 @@ func _start_other() -> void:
 		z.boom(z.c, 360.0, 6.0)
 		z.hit(z.c, 360.0, 1.0, 260.0, "", 0, 0.0)
 	else:
+		if kind == "tera" and m.selected_tera != "stellar":
+			m.player.types = [type]
 		aura_node = TeraCrown.new()
 		aura_node.col = Color.html(String(m.MD.TYPE_COLOR.get(type, "#7ff0e0"))).lerp(Color.WHITE, 0.25)
 		m.player.modulate = Color(0.75, 1.05, 1.15).lerp(aura_node.col, 0.25)   # cuerpo de cristal
@@ -372,7 +383,7 @@ func stop() -> void:
 	if not active:
 		return
 	active = false
-	m.dyn_cd = COOLDOWN
+	m.dyn_cd = float(POWER_CD.get(kind, COOLDOWN))
 	var mx: float = m.player.max_hp
 	var nm: float = maxf(1.0, mx - bonus)
 	m.player.hp = maxf(1.0, roundf(m.player.hp * nm / maxf(mx, 1.0))) if m.player.hp > 0.0 else m.player.hp
@@ -383,6 +394,15 @@ func stop() -> void:
 	var tw2 = m.create_tween()
 	tw2.tween_property(m.player, "scale", Vector2.ONE, 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	bonus = 0.0
+	if not original.is_empty():
+		m.player.rebody(int(original["dex"]), m._sm(int(original["dex"])), m.player.shiny)
+		m.player.types = original["types"].duplicate()
+		m.base_atk = float(original["atk"])
+		m.base_spd = float(original["spd"])
+		m.ab_fx = original["ability"].duplicate()
+	if kind == "z" and not m.player.dead:
+		m.z_type = type
+		m._z_start()
 	if kind == "tera":
 		m.player.modulate = Color.WHITE   # se rompe el cristal
 	var col: Color = Color.html(String(m.MD.TYPE_COLOR.get(type, "#ff2a6d")))
@@ -401,10 +421,12 @@ func tick(delta: float) -> void:
 		aura = 0.18
 		m.pfx.burst(m.player.position + Vector2(randf_range(-26.0, 26.0), -20.0), col, 2, 70.0)
 	pulse -= delta
-	if pulse <= 0.0 and kind == "dyna":   # las ondas Max son solo del Dynamax
-		pulse = PULSE
+	if pulse <= 0.0 and ["dyna", "gmax", "z"].has(kind):   # las ondas Max son solo del Dynamax
+		pulse = 3.0 if kind == "gmax" else (0.8 if kind == "z" else PULSE)
 		n += 1
 		_pulse(n % 3 == 0, col)
+		if kind == "gmax":
+			_gmax_effect()
 	if t <= 0.0:
 		stop()
 
@@ -423,3 +445,31 @@ func _pulse(big: bool, col: Color) -> void:
 	z.hit(z.c, r, 1.0, 260.0 if big else 140.0, String(st[0]), int(st[1]), float(st[2]))
 	if big:
 		z.ring_burst("star", 14, 40.0, 520.0, 0.5, 1.6)
+
+
+func _gmax_effect() -> void:
+	var parsed = JSON.parse_string(FileAccess.get_file_as_string("res://data/gmax.json"))
+	if not parsed is Dictionary:
+		return
+	var gd: Dictionary = parsed.get(str(m.runx.species), {})
+	var effect: String = String(gd.get("fx", "slow"))
+	if effect == "heal" and not m.jd.active():
+		m._heal_real(m.player.max_hp * 0.1)
+	if effect == "shield":
+		m.tw_shield = maxf(m.tw_shield, m.player.max_hp * 0.2)
+	if effect == "coin":
+		m.coins += 5
+	for e in m.enemies:
+		if e.dead or e.position.distance_to(m.player.position) > 450.0:
+			continue
+		match effect:
+			"burn": e.apply_burn(2)
+			"poison": e.apply_poison(2)
+			"stun": m._apply_cc(e, "para", 1.0)
+			"sleep": m._apply_cc(e, "sleep", 1.0)
+			"pull": e.knock += (m.player.position - e.position).normalized() * 160.0
+			"chain": m._damage_enemy(e, (12.0 + float(m.player.level) * 3.0) * m._atk(), col_for_type())
+			_: e.apply_slow(0.4)
+
+func col_for_type() -> Color:
+	return Color.html(String(m.MD.TYPE_COLOR.get(type, "#ff3d6e")))

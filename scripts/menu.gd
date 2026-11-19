@@ -1,4 +1,6 @@
 extends Control
+const CT = preload("res://scripts/content.gd")
+const SP = preload("res://scripts/sprites.gd")
 # Menu principal: jugar, Pokemon, mejoras, gacha, misiones y ajustes.
 # Funciona con toque, mando (cruceta + A / B) y teclado (flechas + Enter / Esc).
 
@@ -166,13 +168,22 @@ class Preview extends Control:
 		return {"name": nm, "info": a[nm], "sm": sm}
 
 	static func tex_of(d: int, nm: String, shn: bool) -> Texture2D:
+		var sm: Dictionary = SV.smeta.get(str(d), {})
+		if not sm.is_empty():
+			var animations: Dictionary = sm.get("sa", sm["a"]) if shn else sm["a"]
+			nm = String(animations.get(nm, {}).get("f", nm))
+		var skin: String = CT.skin(d)
+		if skin != "":
+			var skin_path := "res://assets/pokemon/%d/k-%s/%s%s.png" % [d, skin, "s/" if shn else "", nm]
+			if SP.exists(skin_path):
+				return SP.texture(skin_path)
 		if shn:
 			var ps := "res://assets/pokemon/%d/s/%s.png" % [d, nm]
-			if ResourceLoader.exists(ps):
-				return load(ps)
+			if SP.exists(ps):
+				return SP.texture(ps)
 		var p := "res://assets/pokemon/%d/%s.png" % [d, nm]
-		if ResourceLoader.exists(p):
-			return load(p)
+		if SP.exists(p):
+			return SP.texture(p)
 		return null
 
 	func _process(delta: float) -> void:
@@ -1612,6 +1623,8 @@ func _drag_scroll(event: InputEvent) -> bool:
 
 
 func _input(event: InputEvent) -> void:
+	if get_node_or_null("ExpansionUI") != null:
+		return
 	if not is_visible_in_tree():
 		return
 	# v5.2.1: escribiendo en un campo de texto (nombre de entrenador, buscadores) el teclado es del campo:
@@ -2046,11 +2059,11 @@ func _build_main() -> void:
 	var mv := VBoxContainer.new()
 	mv.add_theme_constant_override("separation", 6)
 	p.add_child(mv)
-	var entries := [["Jugar", "play", "flag"], ["Pokémon", "dex", "ball"], ["Mejoras", "up", "up"], ["Gacha", "gacha", "ballLux"], ["TM Gachapon", "gachapon", "gcoin"], ["Misiones y logros", "goals", "trophy"], ["Léxico", "lexicon", "book"], ["Ajustes", "settings", "gear"]]
+	var entries := [["Jugar", "play", "flag"], ["Pokémon", "dex", "ball"], ["Mejoras", "up", "up"], ["Gacha", "gacha", "ballLux"], ["TM Gachapon", "gachapon", "gcoin"], ["Misiones y logros", "goals", "trophy"], ["Mochila y Vestidor", "expanded", "bag"], ["Léxico", "lexicon", "book"], ["Ajustes", "settings", "gear"]]
 	var first := true
 	for e in entries:
 		var key: String = String(e[1])
-		var b := _btn(String(e[0]), func(): _menu_pick(key), Vector2(0, 50))
+		var b := _btn(String(e[0]), func(): _menu_pick(key), Vector2(0, 42))
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		b.icon = IC.btn_tex(String(e[2]), 36)
 		b.add_theme_constant_override("icon_max_width", 40)
@@ -2277,6 +2290,9 @@ var last_pick := "play"
 
 
 func _menu_pick(key: String) -> void:
+	if key == "expanded":
+		load("res://scripts/expansion_ui.gd").open(self)
+		return
 	last_pick = key
 	if key == "goals" and goals_tab == "p":
 		goals_tab = "m"
@@ -2329,7 +2345,7 @@ const DIFF_INFO := [
 ]
 # id, nombre, icono, grupo, reglas
 const MODE_LIST := [
-	["normal", "Partida normal", "flag", "Clásicos", ["Sobrevive mientras llegan enemigos sin parar.", "Sube de nivel y elige movimientos y objetos.", "Vence a los jefes que aparecen cada pocos minutos.", "Al terminar ganas Pokémonedas y, a veces, tickets.", "Dura 60 minutos: Arceus llega en el minuto 30 y Eternatus en el 60."]],
+	["normal", "Partida normal", "flag", "Clásicos", ["Sobrevive mientras llegan enemigos sin parar.", "Sube de nivel y elige movimientos y objetos.", "Vence a los jefes que aparecen cada pocos minutos.", "Al terminar ganas Pokémonedas y, a veces, tickets.", "Eternatus llega en el minuto 20 y entrega un poder; Arceus llega en el 30."]],
 	["daily", "Desafío diario", "m_daily", "Clásicos", ["El Pokémon y la regla de hoy cambian cada día y son iguales para todos.", "Intenta mejorar tu mejor tiempo del día.", "+25% de monedas."]],
 	["rush", "Rush de Jefes", "m_rush", "Clásicos", ["Solo jefes y legendarios, uno tras otro.", "Cada jefe es más fuerte que el anterior.", "Tu récord cuenta cuántos jefes derrotas."]],
 	["tower", "La torre", "m_tower", "Clásicos", ["60 pisos, cada uno con un jefe fijo y un jefe grande cada 5.", "Entre pisos eliges descanso o pactos de riesgo.", "Cada 5 pisos ganas una reliquia permanente.", "No hay movimientos Z ni Dynamax."]],
@@ -2371,7 +2387,7 @@ class ModePrev extends Control:
 		vp.position = (size - vp.size) * 0.5
 
 	static func sprite_dex(d: int) -> int:
-		return d if ResourceLoader.exists("res://assets/pokemon/%d/Idle.png" % d) or ResourceLoader.exists("res://assets/pokemon/%d/Walk.png" % d) else 4
+		return d if SP.exists("res://assets/pokemon/%d/Idle.png" % d) or SP.exists("res://assets/pokemon/%d/Walk.png" % d) else 4
 
 	func setup(m: String, inf: Dictionary) -> void:
 		mode = m
@@ -2890,18 +2906,7 @@ var _warmed: Dictionary = {}
 # Carga en segundo plano las hojas de sprites que usan las vistas previas, para que al cambiar de modo
 # no haya un tirón (y la música no se corte) la primera vez que se ve cada uno.
 func _warm_previews() -> void:
-	var ds: Array = [int(SV.d["selected"]), SV.daily_dex(SV.daily_seed()), int(SV.d.get("coop_dex", 133)), 133, 248, 19, 16, 41, 10, 21, 74, 25, 150, 144, 145, 146]
-	for x in SV.team_list():
-		ds.append(int(x))
-	for d in ds:
-		if d <= 0 or _warmed.has(d):
-			continue
-		_warmed[d] = true
-		for sub in ["s/", ""]:
-			for nm in ["Idle", "Walk"]:
-				var path := "res://assets/pokemon/%d/%s%s.png" % [d, sub, nm]
-				if ResourceLoader.exists(path):
-					ResourceLoader.load_threaded_request(path)
+	SP.texture("res://assets/pokemon/%d/Idle.png" % int(SV.d["selected"]))
 
 
 func _refresh_modes() -> void:
@@ -3432,6 +3437,24 @@ func _refresh_main() -> void:
 	var st: Dictionary = SV.d["stats"]
 	var stx: String = L.t("Partidas %d · Mejor tiempo %d:%02d\nMejor nivel %d · Derrotados %d\nPokémon %d / %d") % [int(st["runs"]), int(st["best_time"]) / 60, int(st["best_time"]) % 60, int(st["best_level"]), int(st["kills"]), SV.owned_count(), SV.dex_list.size()]
 	_clear(main_stats)
+	var art = load("res://scripts/profile_art.gd")
+	var photo_path: String = String(SV.d.get("photo", ""))
+	if photo_path != "" and art.has(photo_path):
+		var portrait := TextureRect.new()
+		portrait.texture = art.texture(photo_path)
+		portrait.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		portrait.custom_minimum_size = Vector2(56, 56)
+		portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		main_stats.add_child(portrait)
+		var frame_path: String = String(SV.d.get("frame", ""))
+		if art.has(frame_path):
+			var frame := TextureRect.new()
+			frame.texture = art.texture(frame_path)
+			frame.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+			frame.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			frame.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			portrait.add_child(frame)
 	var sln: PackedStringArray = stx.split("\n")
 	for si in range(sln.size()):
 		var sr := HBoxContainer.new()
@@ -4259,7 +4282,7 @@ func _dex_card(p: Dictionary, owned: bool) -> Button:
 	if not show:
 		tr.modulate = Color(0, 0, 0, 0.85)
 	vb.add_child(tr)
-	var nl := _label(("#%03d %s" % [dx, L.t(String(p["name"]))]) if show else "#%03d ???" % dx, 13)
+	var nl := _label(("#%03d %s" % [dx, L.t(String(p["name"]))]) if (show or SV.pdex_seen(dx)) else "#%03d ???" % dx, 13)   # 7.1: los vistos ya muestran su nombre
 	nl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	nl.clip_text = true
 	nl.autowrap_mode = TextServer.AUTOWRAP_OFF
@@ -4458,11 +4481,16 @@ func _dex_detail() -> void:
 		dex_pv_box.add_child(bdg)
 	# barra de nombre
 	dex_namebar.add_child(IC.rect("ball", 36))
-	var nm := _label(("#%03d  %s" % [dx, L.t(String(p["name"]))]) if owned else "#%03d  ???" % dx, 26, C_GOLD)
+	var nm := _label(("#%03d  %s" % [dx, L.t(String(p["name"]))]) if (owned or SV.pdex_seen(dx)) else "#%03d  ???" % dx, 26, C_GOLD)
 	nm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	nm.clip_text = true
 	nm.autowrap_mode = TextServer.AUTOWRAP_OFF
 	dex_namebar.add_child(nm)
+	if SV.pdex_seen(dx):
+		# 7.1: Pokedex de vistos y derrotados (como el original)
+		var kl := _label(L.t("Derrotados: %d") % SV.pdex_killed(dx), 18, Color("#c8d6ee"))
+		kl.autowrap_mode = TextServer.AUTOWRAP_OFF
+		dex_namebar.add_child(kl)
 	if owned:
 		if SV.is_master(dx):
 			dex_namebar.add_child(IC.rect("crown", 30))   # 7.0: maestro
@@ -5498,7 +5526,9 @@ func _refresh_gacha() -> void:
 	var b1 := _cost_btn(L.t("Tirada ×1"), "1", "", "ticket", func(): _do_pull(1, "t1"), Vector2(0, 64), SV.can_pull(1, "t1"), false, true)
 	var b10 := _cost_btn(L.t("Tirada ×10"), "10", "", "ticket", func(): _do_pull(10, "t1"), Vector2(0, 64), SV.can_pull(10, "t1"), false, true)
 	var bt := _cost_btn(L.t("Tirada ×10"), "1", "", "ticket10", func(): _do_pull(10, "t10"), Vector2(0, 64), SV.can_pull(10, "t10"), false, true)
-	for b in [b1, b10, bt]:
+	var b100 := _cost_btn(L.t("Tirada ×100"), "100", "", "ticket", func(): _do_pull(100, "t1"), Vector2(0, 64), SV.can_pull(100, "t1"), false, true)
+	var bt100 := _cost_btn(L.t("Tirada ×100"), "10", "", "ticket10", func(): _do_pull(100, "t10"), Vector2(0, 64), SV.can_pull(100, "t10"), false, true)
+	for b in [b1, b10, bt, b100, bt100]:
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		brow.add_child(b)
 	var have := HBoxContainer.new()
@@ -5680,7 +5710,14 @@ func _play_slots(results: Array) -> void:
 		slots_ui.visible = false
 		add_child(slots_ui)
 	slots_busy = true
-	slots_ui.play(results)
+	var animation_results: Array = results
+	if results.size() > 10:
+		animation_results = []
+		for batch in range(int(results.size() / 10)):
+			var group: Array = results.slice(batch * 10, batch * 10 + 10)
+			group.sort_custom(func(a, b): return (10 if bool(a.get("shiny", false)) else int(a["rarity"])) > (10 if bool(b.get("shiny", false)) else int(b["rarity"])))
+			animation_results.append(group[0])
+	slots_ui.play(animation_results)
 	await slots_ui.finished
 	slots_busy = false
 	slots_ui.visible = false

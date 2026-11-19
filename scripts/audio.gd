@@ -5,6 +5,27 @@ extends Node
 static var inst = null
 static var wanted: String = ""
 
+static func shutdown() -> void:
+	wanted = ""
+	if inst != null and is_instance_valid(inst):
+		inst.stop_all()
+		inst.queue_free()
+	inst = null
+
+func stop_all() -> void:
+	if tw != null and tw.is_valid():
+		tw.kill()
+	for player in players + [mus_a, mus_b]:
+		if player != null and is_instance_valid(player):
+			player.stop()
+			player.stream = null
+	cache.clear()
+
+func _exit_tree() -> void:
+	stop_all()
+	if inst == self:
+		inst = null
+
 const MIN_GAP := {"hit": 45, "faint": 60, "xp": 35, "coin": 50, "grass": 70, "hover": 40, "break": 60, "shot": 70}
 const POOL := 14
 

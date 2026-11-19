@@ -1,4 +1,5 @@
 extends Node2D
+const SP = preload("res://scripts/sprites.gd")
 # main.gd - Etapa 6: tabla de tipos, clima, objetos y estados (sobre la etapa 5: 64 movimientos).
 # Teclado (WASD / flechas), mando (stick izquierdo / cruceta) o joystick tactil.
 # Movimientos: teclas 1-4 / Q / E, LB / RB del mando, o toca el icono abajo a la derecha.
@@ -45,6 +46,14 @@ const PG = preload("res://scripts/progress.gd")
 const CH = preload("res://scripts/challenges.gd")
 const VFX = preload("res://scripts/vfx.gd")
 const PFX = preload("res://scripts/pfx.gd")
+const CT = preload("res://scripts/content.gd")
+const RUNX = preload("res://scripts/run_expansion.gd")
+var runx = null
+var selected_power := ""
+var selected_form := 0
+var selected_tera := ""
+var power_pending := false
+
 const PAUSEUI = preload("res://scripts/pause_ui.gd")
 
 
@@ -82,8 +91,8 @@ const WALLS := {
 const WALL_NAMES := ["wall_a", "wall_af", "wall_b", "wall_c", "wall_cf"]
 
 const MULT_KEYS := ["dmg", "cd", "speed", "radius", "dur", "amount", "arc", "width", "spread", "life", "size", "rate"]
-const ADD_KEYS := ["count", "pierce", "stacks"]
-const TARGETED := ["melee", "beam", "projectile", "boomerang", "chain", "meteor", "dash", "cone"]
+const ADD_KEYS := ["count", "pierce", "stacks", "bounce", "knock_k"]
+const TARGETED := ["melee", "beam", "projectile", "boomerang", "chain", "meteor", "dash", "cone", "punch", "homing", "bounce", "cross", "leap", "blitz", "scissor", "wave"]
 
 const FLASH_SHADER := "shader_type canvas_item;\nuniform float flash : hint_range(0.0, 1.0) = 0.0;\nvoid fragment() {\n\tvec4 m = COLOR;\n\tvec4 c = texture(TEXTURE, UV);\n\tCOLOR = vec4(mix(c.rgb, vec3(1.0), flash), c.a) * m;\n}\n"
 
@@ -93,6 +102,9 @@ const ANIM_FOR := {
 	"melee": "Attack", "beam": "Shoot", "projectile": "Shoot", "nova": "Attack", "aura": "Charge",
 	"buff": "Charge", "orbit": "Charge", "boomerang": "Shoot", "chain": "Shoot", "mine": "Charge",
 	"meteor": "Charge", "turret": "Charge", "dash": "Attack", "trail": "Walk", "cone": "Shoot",
+	"punch": "Attack", "shove": "Attack", "spin": "Attack", "homing": "Shoot", "bounce": "Shoot",
+	"storm": "Charge", "tremor": "Attack", "wave": "Shoot", "blitz": "Attack", "leap": "Attack", "scissor": "Attack", "cross": "Shoot",
+	"guard": "Charge", "decoy": "Charge", "weather": "Charge", "rest": "Charge",
 }
 
 # Tramos de enemigos (enemies.js): minuto de entrada (en segundos), rango de stats base y plantilla.
@@ -177,8 +189,10 @@ const CRIT_CAP := 0.95   # tope de critico de siempre del port (el 60% del origi
 const CARD_N := 4       # 7.0: cartas por nivel (antes 3)
 # 7.0: dificultades de la Partida normal (como el original): Normal, Dificil, Pesadilla.
 # Vencer a Eternatus en una desbloquea la siguiente. Dan mas monedas y tickets.
-const DIFF_HP := [1.0, 1.5, 2.2]
-const DIFF_DMG := [1.0, 1.3, 1.7]
+const DIFF_HP := [0.9, 1.4, 2.2]     # 7.1: como el original (Normal un poco mas facil)
+const DIFF_BOSS := [0.85, 1.4, 2.2]   # 7.1: vida de los jefes por dificultad
+const DIFF_HIT := [0.25, 0.3, 0.33]   # 7.1: ningun golpe normal te quita mas de esta parte de la vida (Arceus aparte)
+const DIFF_DMG := [0.85, 1.25, 1.65]
 const DIFF_SPAWN := [1.0, 1.0, 1.25]
 const DIFF_REWARD := [1.0, 1.5, 2.0]
 var diff := 0
@@ -186,14 +200,14 @@ var run_eter := false   # 7.0: Eternatus vencido en esta partida (maestria)
 var run_notes: Array = []   # 7.0: lineas extra del resumen de la partida (maestria, huevos encontrados...)
 const STATS := {
 	"hp": {"title": "Vigor", "desc": "+20 de vida máxima (y la recupera).", "max": 9999},
-	"atk": {"title": "Potencia", "desc": "+10% de daño con todos los movimientos.", "max": 40},
-	"spd": {"title": "Carrera", "desc": "+7% de velocidad de movimiento.", "max": 8},
-	"cd": {"title": "Reflejos", "desc": "-8% de recarga en todos los movimientos.", "max": 10},
-	"def": {"title": "Coraza", "desc": "+6% de reducción de daño recibido.", "max": 12},
+	"atk": {"title": "Potencia", "desc": "+10% de daño con todos los movimientos.", "max": 9999},
+	"spd": {"title": "Carrera", "desc": "+7% de velocidad de movimiento.", "max": 9999},
+	"cd": {"title": "Reflejos", "desc": "-8% de recarga en todos los movimientos.", "max": 9999},
+	"def": {"title": "Coraza", "desc": "+6% de reducción de daño recibido.", "max": 9999},
 	"rgn": {"title": "Síntesis", "desc": "+0.9 de vida regenerada por segundo.", "max": 9999},
-	"mag": {"title": "Imán", "desc": "+30% de radio de recogida de experiencia.", "max": 6},
-	"xp": {"title": "Aprendizaje", "desc": "+12% de experiencia ganada.", "max": 8},
-	"size": {"title": "Calibre", "desc": "+12% de tamaño de proyectiles, orbes y áreas.", "max": 6},
+	"mag": {"title": "Imán", "desc": "+30% de radio de recogida de experiencia.", "max": 9999},
+	"xp": {"title": "Aprendizaje", "desc": "+12% de experiencia ganada.", "max": 15},
+	"size": {"title": "Calibre", "desc": "+12% de tamaño de proyectiles, orbes y áreas.", "max": 9999},
 	"heal": {"title": "Baya Zidra", "desc": "Recupera el 45% de tu vida ahora mismo.", "max": 99999},
 	"mult": {"title": "Multiplicador", "desc": "+1 proyectil en movimientos de disparo, cono y bumerán (cada nivel rinde menos).", "max": 99999},
 	"pierce": {"title": "Fuerza Perforante", "desc": "+1 perforación en disparos, conos y ondas (cada nivel rinde menos).", "max": 99999},
@@ -408,7 +422,7 @@ var cast_run: Array = []
 var boss_run: Array = []
 var boss_idx := 0
 # S63: director de hitos de la Normal Run (un solo dueño, banderas de un disparo, cola de pendientes)
-const DIR_MS := [["wave", 30.0], ["rift", 60.0], ["meowth", 120.0], ["boss", 180.0], ["map", 240.0]]
+const DIR_MS := [["wave", 30.0], ["rift", 60.0], ["meowth", 120.0], ["boss", 180.0], ["map", 240.0], ["eter", 1200.0]]
 const ETERNATUS_DEX := 890
 const MINI_DEXES := [248, 321, 95, 208, 143, 130, 464, 306, 376, 76, 131, 149]   # Tyranitar, Wailord, Onix, Steelix + v5.3: Snorlax, Gyarados, Rhyperior, Aggron, Metagross, Golem, Lapras, Dragonite
 var dir_done := {}
@@ -470,6 +484,13 @@ var run_dmg := {}
 var sitrus_t := -999.0
 var wp_t := 0.0
 var run_kills_by := {}
+var self_sleep_t := 0.0   # 7.1: Descanso
+var decoy_t := 0.0        # 7.1: Doble Equipo
+var decoy_pos := Vector2.ZERO
+var decoy_r := 260.0
+var decoy_node: Node2D = null
+var run_pdex_s := {}   # 7.1: especies vistas en la partida
+var run_pdex_k := {}   # 7.1: especies derrotadas en la partida (cuantas)
 var dmg_src := ""
 var bans := 0
 var banned := {}
@@ -565,10 +586,18 @@ func _ready() -> void:
 
 	_load_data()
 	mode = SV.run_mode
+	_cand_cache.clear()
 	diff = mini(clampi(int(SV.d.get("difficulty", 0)), 0, 2), SV.diff_unlocked()) if mode == "normal" else 0
 	mods = SV.run_mods.duplicate()
 	PG.off = mode == "party"
-	if mode == "daily":
+	if mode == "weekly":
+		var weekly: Dictionary = CT.weekly()
+		SV.run_seed = int(weekly["seed"])
+		SV.run_dex = int(weekly["dex"])
+		mods = []
+		SV.run_type = String(weekly["type"])
+		seed(SV.run_seed)
+	elif mode == "daily":
 		SV.run_seed = SV.daily_seed()
 		mods = [SV.daily_mod(SV.run_seed)]
 		SV.run_dex = SV.daily_dex(SV.run_seed)
@@ -586,7 +615,7 @@ func _ready() -> void:
 		biome_off = randi() % ground.count()
 		biome_idx = biome_off
 		ground.set_biome(biome_off, true)
-	if mode != "daily" and mode != "party" and mode != "rush" and mode != "chal" and not SV.run_mods.is_empty():
+	if mode != "weekly" and mode != "daily" and mode != "party" and mode != "rush" and mode != "chal" and not SV.run_mods.is_empty():
 		mods = SV.run_mods.duplicate()
 	if mode == "chal":
 		_ch_setup()
@@ -615,6 +644,10 @@ func _ready() -> void:
 	SV.d.erase("item_block")   # v6.1: limpia los objetos que versiones anteriores vetaban para siempre
 	has_bag = SV.up_level("bag") > 0
 	has_bag3 = has_bag and SV.up_level("bag3") > 0
+	if mode == "weekly":
+		revives = 0
+		has_bag = false
+		has_bag3 = false
 	# Veto como en el original: los movimientos vetados se eligen en Mejoras (por Pokemon).
 	bans = 0
 	var _bl: Array = SV.ban_list(SV.run_dex)
@@ -692,6 +725,8 @@ func _ready() -> void:
 	munch.m = self
 	munch.poi = poi
 	eterf = ETF.new()
+	runx = RUNX.new()
+	runx.setup(self)
 	alpha = ALP.new()
 	alpha.m = self
 	alpha.poi = poi
@@ -869,6 +904,11 @@ func _aim_input(event: InputEvent) -> void:
 
 
 func _input(event: InputEvent) -> void:
+	if get_node_or_null("ExpansionUI") != null:
+		return
+	if runx != null and runx.input(event):
+		get_viewport().set_input_as_handled()
+		return
 	_aim_input(event)
 
 
@@ -880,6 +920,8 @@ func _pad_slot(bi: int) -> int:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if get_node_or_null("ExpansionUI") != null:
+		return
 	if settings_open:
 		return
 	if shop_open:
@@ -1046,6 +1088,14 @@ func _finish_run() -> void:
 	if run_saved:
 		return
 	run_saved = true
+	SV.pdex_add(run_pdex_s, run_pdex_k)   # 7.1: Pokedex de vistos y derrotados
+	if runx != null and mode != "party":
+		var inv_data: Dictionary = SV.d.get("inventory", {})
+		for key in runx.saved_items:
+			inv_data[key] = int(inv_data.get(key, 0)) + int(runx.saved_items[key])
+		SV.d["inventory"] = inv_data
+	if mode == "weekly":
+		CT.record_weekly(run_time)
 	var js: Dictionary = jd.summary()
 	if not js.is_empty():
 		var stt: Dictionary = SV.d["stats"]
@@ -1101,8 +1151,12 @@ func _finish_run() -> void:
 		tickets = roundi(float(tickets) * float(DIFF_REWARD[diff]))
 		tickets10 = roundi(float(tickets10) * float(DIFF_REWARD[diff]))
 		extra += " · " + L.t(String(SV.DIFF_NAMES[diff]))
-	if _has_item("amuletcoin"):
+	if _has_item("amuletcoin") or jd.broken.has("amuletcoin"):   # 7.0: aunque Arceus la rompa, sigue pagando
 		mul *= 1.5   # Moneda Amuleto: +50% de Pokemonedas al acabar la run
+	if _has_item("expcharm") or jd.broken.has("expcharm"):
+		mul *= 1.1
+	if _has_item("luckincense") or jd.broken.has("luckincense"):
+		mul *= 1.6
 	mul *= 1.0 + _abn("coin")
 	mul *= _treasure_k()   # Iman del Tesoro: solo el botin normal de fin de partida (no los premios unicos de los retos)
 	if mode == "type":
@@ -1126,7 +1180,7 @@ func _finish_run() -> void:
 		SV.d["rifts_best"] = maxi(rbest, run_rifts)
 		extra = " · " + L.t("Contrarreloj de grietas: %d") % run_rifts + ((" · " + L.t("¡Récord!")) if run_rifts > rbest else "")
 	# 7.0: maestria del Pokemon elegido (no en el Modo Fiesta)
-	if mode != "party" and SV.dex_by.has(int(SV.run_dex)):
+	if mode != "party" and mode != "weekly" and SV.dex_by.has(int(SV.run_dex)):
 		var mres: Array = SV.add_mastery(int(SV.run_dex), {"time": run_time, "kills": kills, "bosses": run_bosses, "rifts": run_rifts,
 			"arceus": not js.is_empty(), "eter": run_eter})
 		run_notes.append(L.t("Maestría +%d") % int(mres[2]))
@@ -1321,7 +1375,8 @@ func _process(delta: float) -> void:
 	elif jd.cinematic() and not paused:
 		jd.cine_tick(delta)
 	elif not choosing and not paused and not shop_open and ret_cd <= 0.0:
-		run_time += delta
+		if not (eterf != null and eterf.active()):
+			run_time += delta
 		if mode == "chal":
 			_ch_tick(delta)
 		if mode == "rifts" and run_time >= RIFTS_LIMIT and arena == null and not timeup:
@@ -1347,6 +1402,7 @@ func _process(delta: float) -> void:
 			_update_down(delta)
 		else:
 			_update_player(delta)
+		runx.tick(delta)
 		_update_partner(delta)
 		_z_poll()
 		_cooldowns(delta)
@@ -1405,6 +1461,8 @@ func _process(delta: float) -> void:
 		# v6.1: ninguna eleccion interrumpe un Movimiento Z: las subidas de nivel y objetos esperan a que termine
 		if z_state != "":
 			pass
+		elif power_pending and not choosing:
+			runx.offer_power()
 		elif _pevo_ready() and not choosing:
 			_offer_pevo()   # 7.0: evolucion en plena partida (niveles 20 y 40), antes de las cartas de nivel
 		elif pending_levels > 0 and not choosing:
@@ -1429,7 +1487,7 @@ func _process(delta: float) -> void:
 	hud.join_col = join_col
 	hud.z_name = L.t(String(ZM.DEF[z_type]["name"])) if z_type != "" else ""
 	hud.z_type = z_type
-	hud.z_btn = 0 if (mode == "tower" or z_type == "" or z_state != "") else (3 if z_used else (2 if run_time >= ZM.MIN_TIME else 0))
+	hud.z_btn = 0   # Z now uses the shared power button after Eternatus.
 	hud.z_cd = z_cd
 	hud.adapt_pct = roundi(adapt_k * 100.0) if _adapt_on() else 0
 	hud.dyn_left = maxf(0.0, dyn.t) if _dyn_on() else -1.0
@@ -1690,7 +1748,7 @@ func _cooldowns(delta: float) -> void:
 
 
 func _z_can() -> bool:
-	return mode != "tower" and z_type != "" and not z_used and z_state == "" and run_time >= ZM.MIN_TIME and not player.dead and not down and not paused and not choosing and arena == null and not jd.active() and not timeup
+	return false and mode != "tower" and z_type != "" and not z_used and z_state == "" and run_time >= ZM.MIN_TIME and not player.dead and not down and not paused and not choosing and arena == null and not timeup
 
 
 # Gatillo derecho del mando (ademas del boton configurable).
@@ -1714,19 +1772,13 @@ func _dyn_on() -> bool:
 
 
 func _dyn_can() -> bool:
-	return mode != "tower" and _power_kind() != "" and not dyn_used and not _dyn_on() and z_state != "cine" and run_time >= DYN.MIN_TIME and not player.dead and not down and not paused and not choosing and not jd.active() and not timeup
+	return mode != "tower" and _power_kind() != "" and not dyn_used and not _dyn_on() and z_state != "cine" and run_time >= DYN.MIN_TIME and not player.dead and not down and not paused and not choosing and not timeup
 
 
 # 7.0: poder de la partida elegido en el menu (Dynamax, Megaevolucion o Teracristal). Si el elegido no vale
 # (bloqueado, o tu Pokemon de ahora no tiene Mega) se usa el Dynamax si lo tienes. "" = ninguno.
 func _power_kind() -> String:
-	var st: Dictionary = SV.d["stats"]
-	var want: String = String(SV.d.get("power", "dyna"))
-	if want == "mega" and DYN.power_ok("mega", st) and DYN.MEGA_DEX.has(int(player.dex)):
-		return "mega"
-	if want == "tera" and DYN.power_ok("tera", st):
-		return "tera"
-	return "dyna" if DYN.unlocked(st) else ""
+	return selected_power
 
 
 func _dyn_start() -> void:
@@ -1809,14 +1861,14 @@ func _atk() -> float:
 		k *= 1.4
 	if _has_item("lifeorb"):
 		k *= 1.3   # antes, con las dos a la vez (Doble equipaje) la Vidasfera no sumaba daño pero seguía quitando vida
-	return (1.0 + float(rc_bonus["atk"])) * base_atk * pow(1.10, float(_lv("atk"))) * (1.0 + _buff_mul("atk")) * k * (1.5 if _pw("fury") else 1.0) * (1.5 if wp_t > 0.0 else 1.0) * _rk("atk") * (1.0 + 0.003 * float(reap_kills)) * (1.0 + _abn("dmg") + _moxie() + (_abn("defiant") if defiant_t > 0.0 else 0.0)) * (dyn.k_dmg() if _dyn_on() else 1.0)
+	return (runx.attack_mul() if runx != null else 1.0) * (1.0 + float(rc_bonus["atk"])) * base_atk * pow(1.10, float(_lv("atk"))) * (1.0 + _buff_mul("atk")) * k * (1.5 if _pw("fury") else 1.0) * (1.5 if wp_t > 0.0 else 1.0) * _rk("atk") * (1.0 + 0.003 * float(reap_kills)) * (1.0 + _abn("dmg") + _moxie() + (_abn("defiant") if defiant_t > 0.0 else 0.0)) * (dyn.k_dmg() if _dyn_on() else 1.0)
 
 
 func _spd() -> float:
 	if mode == "chal" and _ch_rs("no_move"):
 		return 0.0
 	var k: float = (1.35 if _has_item("choicescarf") else 1.0) * (1.1 if _has_item("ti_flying") else 1.0)
-	return (1.0 + float(rc_bonus["spd"])) * base_spd * pow(1.07, float(_lv("spd"))) * (1.0 + _buff_mul("spd")) * k * (1.4 if _pw("haste") else 1.0) * (0.8 if _has_mod("slow") else 1.0) * _rk("spd") * (1.0 + _abn("spd") + _ab_wspd()) * (dyn.k_stat() if _dyn_on() else 1.0) * (kec.spd_mul() if kec != null else 1.0)
+	return (runx.speed_mul() if runx != null else 1.0) * (1.0 + float(rc_bonus["spd"])) * base_spd * pow(1.07, _soft_lv("spd", 8)) * (1.0 + _buff_mul("spd")) * k * (1.4 if _pw("haste") else 1.0) * (0.8 if _has_mod("slow") else 1.0) * _rk("spd") * (1.0 + _abn("spd") + _ab_wspd()) * (dyn.k_stat() if _dyn_on() else 1.0) * (kec.spd_mul() if kec != null else 1.0)
 
 
 func _cd_mul() -> float:
@@ -1825,12 +1877,12 @@ func _cd_mul() -> float:
 
 func _cd_mul_raw() -> float:
 	var k: float = 0.8 if _has_item("quickclaw") else 1.0
-	return (1.0 - float(rc_bonus["cd"])) * pow(0.92, float(_lv("cd"))) * k * float(perks["cd"]) * (0.65 if _pw("frenzy") else 1.0) * _rk("cd") * (1.0 - _abn("cd")) / (dyn.k_stat() if _dyn_on() else 1.0) * (kec.cd_mul() if kec != null else 1.0)
+	return (1.0 - float(rc_bonus["cd"])) * pow(0.92, _soft_lv("cd", 10)) * k * float(perks["cd"]) * (0.65 if _pw("frenzy") else 1.0) * _rk("cd") * (1.0 - _abn("cd")) / (dyn.k_stat() if _dyn_on() else 1.0) * (kec.cd_mul() if kec != null else 1.0)
 
 
 func _reduction() -> float:
 	var vest: float = (0.2 if _has_item("assaultvest") else 0.0) + (0.08 if _has_item("ti_rock") else 0.0)
-	return minf(0.8, minf(0.7, 0.06 * float(_lv("def"))) + vest + float(perks["def"]) + _buff_mul("def") + _rk_add("def") + _abn("taken") + (kec.def_add() if kec != null else 0.0) + (0.4 if _pw("aegis") else 0.0) + (dyn.k_taken() if _dyn_on() else 0.0))
+	return minf(0.8, minf(0.8, 0.06 * _soft_lv("def", 12)) + vest + float(perks["def"]) + _buff_mul("def") + _rk_add("def") + _abn("taken") + (kec.def_add() if kec != null else 0.0) + (0.4 if _pw("aegis") else 0.0) + (dyn.k_taken() if _dyn_on() else 0.0))
 
 
 func _regen() -> float:
@@ -1839,12 +1891,12 @@ func _regen() -> float:
 
 
 func _magnet() -> float:
-	return BASE_MAGNET * pow(1.30, float(_lv("mag"))) * float(perks["magnet"]) * (1.0 + _abn("magnet")) * (kec.mag_mul() if kec != null else 1.0)
+	return BASE_MAGNET * pow(1.30, _soft_lv("mag", 6)) * float(perks["magnet"]) * (1.0 + _abn("magnet")) * (kec.mag_mul() if kec != null else 1.0)
 
 
 func _xp_mul() -> float:
 	var k: float = 1.3 if _has_item("luckyegg") else 1.0
-	return pow(1.12, float(_lv("xp"))) * k * (1.15 if _lv("wis") > 0 else 1.0) * (1.5 if _has_mod("brainy") else 1.0) * float(perks["xp"]) * _rk("xp") * (1.0 + _abn("xp")) * (kec.xp_mul() if kec != null else 1.0)
+	return (1.2 if _has_item("expcharm") else 1.0) * pow(1.12, float(_lv("xp"))) * k * (1.15 if _lv("wis") > 0 else 1.0) * (1.5 if _has_mod("brainy") else 1.0) * float(perks["xp"]) * _rk("xp") * (1.0 + _abn("xp")) * (kec.xp_mul() if kec != null else 1.0)
 
 
 func _buff_text() -> String:
@@ -1862,10 +1914,10 @@ func _buff_text() -> String:
 # ---------------------------------------------------------------
 # Multiplicador de tamano: mejora permanente Calibre x carta Calibre x objeto Esfera Colosal.
 func _size_k() -> float:
-	return float(perks.get("size", 1.0)) * pow(1.12, float(_lv("size"))) * (1.3 if _has_item("bigorb") else 1.0) * (kec.range_mul() if kec != null else 1.0)
+	return float(perks.get("size", 1.0)) * pow(1.12, _soft_lv("size", 6)) * (1.3 if _has_item("bigorb") else 1.0) * (kec.range_mul() if kec != null else 1.0)
 
 
-const SIZE_AREA := ["aura", "melee", "mine", "meteor", "cone", "chain", "trail", "beam", "boomerang", "dash"]
+const SIZE_AREA := ["aura", "melee", "mine", "meteor", "cone", "chain", "trail", "beam", "boomerang", "dash", "punch", "shove", "spin"]
 
 
 func _f(m: Dictionary, key: String, def: float = 0.0) -> float:
@@ -1890,12 +1942,14 @@ func _f(m: Dictionary, key: String, def: float = 0.0) -> float:
 	elif key == "size" or key == "width":
 		v *= _size_k()   # proyectiles, orbes, bumeranes y rayos
 	elif key == "count":
+		if _has_item("loadeddice") and v > 1.0:
+			v += 1.0
 		var kc: String = String(m.get("kind", ""))
-		if kc == "projectile" or kc == "cone" or kc == "boomerang":
+		if kc == "projectile" or kc == "cone" or kc == "boomerang" or kc == "homing" or kc == "bounce":
 			v = minf(v + float(_mult_extra()), 16.0)   # Multiplicador (con tope por rendimiento)
 	elif key == "pierce":
 		var kp: String = String(m.get("kind", ""))
-		if kp == "projectile" or kp == "cone" or kp == "nova":
+		if kp == "projectile" or kp == "cone" or kp == "nova" or kp == "homing":
 			v += float(_pierce_extra())   # Fuerza Perforante
 	return v
 
@@ -1950,6 +2004,8 @@ func _treasure_k() -> float:
 
 # Cura real (sin sobrecuracion). Devuelve lo recuperado.
 func _heal_real(amount: float) -> float:
+	if _has_mod("nohealing") or jd.active():
+		return 0.0
 	if amount <= 0.0 or player.dead:
 		return 0.0
 	var before: float = player.hp
@@ -1961,7 +2017,7 @@ func _heal_real(amount: float) -> float:
 func _pdex() -> int:
 	if mode == "team" and not team.is_empty():
 		return int(team[team_cur]["dex"])
-	return int(SV.run_dex)
+	return runx.species if runx != null else int(SV.run_dex)
 
 
 # Los objetos exclusivos de especie solo salen a quien puede usarlos.
@@ -2111,16 +2167,13 @@ var trail_id := ""
 
 
 func _dress_trail(delta: float, moving: bool) -> void:
-	if trail_id == "" or not moving or perf_lv >= 2 or player_vel.length() < 20.0:
+	if trail_id == "" or not moving or perf_lv >= 2 or player_vel.length() < 20.0 or runx == null:
 		return
 	trail_cd -= delta
 	if trail_cd > 0.0:
 		return
 	trail_cd = 0.09 if perf_lv == 0 else 0.16
-	var td: Array = SV.TRAILS[trail_id]
-	var back: Vector2 = -player_vel.normalized()
-	pfx.sp(String(td[1]), String(td[2]), player.position + back * player.radius * 0.6 + Vector2(randf_range(-6.0, 6.0), -4.0 + randf_range(-4.0, 4.0)),
-		{"v": back * 18.0 + Vector2(0.0, -14.0), "life": 0.7, "scale": 0.8, "spin": randf_range(-3.0, 3.0), "force": true})
+	runx.trail_node.add(trail_id, player.position + Vector2(0, -4), -player_vel.normalized() * 100.0)
 
 
 func _update_player(delta: float) -> void:
@@ -2136,6 +2189,16 @@ func _update_player(delta: float) -> void:
 	if root_t > 0.0:
 		root_t -= delta
 		spd = 0.0
+	if self_sleep_t > 0.0:
+		self_sleep_t -= delta   # 7.1: Descanso: dormido, sin moverte
+		spd = 0.0
+	if decoy_t > 0.0:
+		decoy_t -= delta
+		if decoy_node != null and is_instance_valid(decoy_node):
+			decoy_node.modulate.a = clampf(decoy_t * 2.0, 0.0, 0.55)
+			if decoy_t <= 0.0:
+				decoy_node.queue_free()
+				decoy_node = null
 	if trap_freeze_t > 0.0:
 		spd = 0.0
 	elif trap_para_t > 0.0:
@@ -2217,13 +2280,13 @@ func _partner_move_for(dex: int, lvl: int) -> Dictionary:
 	var pick := ""
 	for mid in MD.ORDER:
 		var md: Dictionary = MD.MOVES[mid]
-		if String(md["kind"]) == "projectile" and String(md["type"]) == ty:
+		if String(md["kind"]) == "projectile" and String(md["type"]) == ty and not md.has("only"):
 			pick = mid
 			break
 	if pick == "":
 		for mid in MD.ORDER:
 			var md2: Dictionary = MD.MOVES[mid]
-			if String(md2["kind"]) == "projectile" and String(md2["type"]) == "normal":
+			if String(md2["kind"]) == "projectile" and String(md2["type"]) == "normal" and not md2.has("only"):
 				pick = mid
 				break
 	if pick == "":
@@ -2325,7 +2388,7 @@ func _start_moves(dex: int, types: Array) -> Array:
 		for mid in MD.ORDER:
 			var md: Dictionary = MD.MOVES[mid]
 			var ty: String = String(md["type"])
-			if mid != first_move and String(md["kind"]) != "buff" and GPM.playable(String(mid)) and (ty == "normal" or types.has(ty)):
+			if mid != first_move and String(md["kind"]) != "buff" and GPM.playable(String(mid)) and (ty == "normal" or types.has(ty)) and MD.allowed(String(mid), dex, CT.base_dex(dex)):
 				cands.append(mid)
 		if not cands.is_empty():
 			var okc: Array = []
@@ -2385,6 +2448,16 @@ func _swap_team(i: int, auto: bool = false) -> void:
 	team_cur = i
 	ab_fx = AB.fx_of(_pdex())
 	var dx: int = int(nx["dex"])
+	runx.species = dx
+	player.skin = CT.skin(dx)
+	trail_id = String(SV.dress(dx).get("trail", ""))
+	if selected_power == "mega" or selected_power == "gmax":
+		var opts: Array = CT.options(CT.base_dex(dx), ["mega", "power"] if selected_power == "mega" else ["gmax"])
+		if opts.is_empty():
+			selected_power = "dyna"
+			selected_form = 0
+		else:
+			selected_form = int(opts[0]["id"])
 	var shn: bool = SV.show_shiny(dx)
 	player.rebody(dx, _sm(dx), shn)
 	player.max_hp = float(nx["base"]) + team_bonus
@@ -2429,7 +2502,7 @@ func _team_tick(delta: float) -> void:
 	hud.swap_cd = swap_cd
 
 
-func _hurt_player(amount: float, atk_type: String = "", pure: bool = false) -> void:
+func _hurt_player(amount: float, atk_type: String = "", pure: bool = false, exact: bool = false) -> void:
 	if player.dead:
 		return
 	if down:
@@ -2437,6 +2510,8 @@ func _hurt_player(amount: float, atk_type: String = "", pure: bool = false) -> v
 		return
 	if player.invuln > 0.0:
 		return
+	if not pure:
+		amount *= runx.taken_mul()
 	if kec.dodge() or (not pure and _lv("dodge") > 0 and randf() < 0.03 * float(_lv("dodge"))):   # Kecleon o carta Esquiva
 		player.invuln = 0.3
 		add_text(player.position + Vector2(0.0, -player.body_h - 4.0), L.t("¡Esquivado!"), Color("#7fe0ff"), 18)
@@ -2463,6 +2538,13 @@ func _hurt_player(amount: float, atk_type: String = "", pure: bool = false) -> v
 	var d: float = maxf(1.0, amount * (1.0 - _reduction()) * close * _rk("taken"))
 	if pure:
 		d = maxf(1.0, amount)
+		if jd.active() and not exact:
+			# 7.1: contra Arceus la reduccion de dano tambien protege, pero poco: como mucho un 30 % (con el 80 % al maximo)
+			d = maxf(1.0, amount * (1.0 - minf(0.3, _reduction() * 0.375)))
+	elif not jd.active() and (diff > 0 or mode == "normal"):
+		d = minf(d, player.max_hp * float(DIFF_HIT[diff]))   # 7.1: ningun golpe te quita mas de un 25/30/33 % de la vida
+	if eterf != null and eterf.active():
+		d = minf(d, player.max_hp * 0.3)
 	if tw_shield > 0.0:
 		var ab: float = minf(tw_shield, d)
 		tw_shield -= ab
@@ -2500,14 +2582,14 @@ func _hurt_player(amount: float, atk_type: String = "", pure: bool = false) -> v
 		add_text(player.position + Vector2(0.0, -player.body_h - 22.0), L.t("¡Baya Zidra!"), Color("#ffd83d"), 22)
 		_ring(player.position, 6.0, 80.0, Color("#ffd83d"), 0.5)
 	# Banda Focus: aguanta el golpe con 1 de vida (una vez cada 60 s).
-	if player.hp <= 0.0 and _has_item("focussash") and run_time - sash_t > 60.0:
+	if player.hp <= 0.0 and _has_item("focussash") and run_time - sash_t > 60.0 and not jd.active():   # 7.0: contra Arceus no vale
 		sash_t = run_time
 		player.hp = 1.0
 		player.invuln = 1.2
 		add_text(player.position + Vector2(0.0, -player.body_h - 20.0), L.t("¡Banda Focus!"), Color("#ff9a3d"), 24)
 		_ring(player.position, 6.0, 70.0, Color("#ff9a3d"), 0.5)
 	# Habilidad Robustez: aguanta un golpe mortal con 1 de vida.
-	if player.hp <= 0.0 and ab_fx.has("sturdy") and run_time - ab_sturdy_t > _abn("sturdy"):
+	if player.hp <= 0.0 and ab_fx.has("sturdy") and run_time - ab_sturdy_t > _abn("sturdy") and not jd.active():   # 7.0: contra Arceus no vale
 		ab_sturdy_t = run_time
 		player.hp = 1.0
 		player.invuln = 1.2
@@ -2534,7 +2616,9 @@ func _hurt_player(amount: float, atk_type: String = "", pure: bool = false) -> v
 		if nxt >= 0:
 			_swap_team(nxt, true)
 			return
-	if player.hp <= 0.0 and arena != null and String(ainfo.get("phase", "")) != "fight":
+	# 7.0: la Sentencia de Arceus tambien usa una arena, pero en ella SI se puede caer (fin de la partida, como el original);
+	# antes este caso de las grietas te dejaba con 1 de vida para siempre y la Sentencia no se podia perder.
+	if player.hp <= 0.0 and arena != null and String(ainfo.get("phase", "")) != "fight" and not (jd.phase == "fight" and String(ainfo.get("phase", "")) == "jd") and String(ainfo.get("phase", "")) != "eternatus":
 		# Fuera de la pelea (intro, caida, expulsion, victoria): nunca hay Game Over dentro de una grieta
 		if String(ainfo.get("phase", "")) != "down":
 			player.hp = 1.0
@@ -2637,6 +2721,8 @@ func _hurt_partner(amount: float, atk_type: String, pure: bool) -> void:
 	var d: float = maxf(1.0, amount * 0.8)
 	if pure:
 		d = maxf(1.0, amount)
+	if eterf != null and eterf.active():
+		d = minf(d, player.max_hp * 0.3)
 	partner_hp -= d
 	partner_inv = 0.45
 	partner.flash = 0.6
@@ -2670,6 +2756,18 @@ func _reach(m: Dictionary) -> float:
 		return _f(m, "radius") + 60.0
 	if k == "cone":
 		return _f(m, "speed") * _f(m, "life") + 30.0
+	if k == "punch":
+		return _f(m, "radius") + 34.0
+	if k == "homing" or k == "bounce":
+		return minf(360.0, _f(m, "speed") * _f(m, "life") * 0.8)
+	if k == "cross" or k == "leap":
+		return maxf(220.0, _f(m, "range", 260.0))
+	if k == "blitz":
+		return _f(m, "radius", 220.0)
+	if k == "scissor":
+		return _f(m, "radius") + 30.0
+	if k == "wave":
+		return _f(m, "radius") * 0.8
 	return 520.0
 
 
@@ -2723,6 +2821,7 @@ func _tick_move(m: Dictionary, delta: float) -> void:
 		if bool(m.get("evolved", false)) and not bool(m.get("lite", false)):
 			evab.cast(m)
 		return
+	_seq_tick(m, delta)
 	m["t"] = _f(m, "t") - delta
 	if _f(m, "t") > 0.0:
 		return
@@ -2732,6 +2831,11 @@ func _tick_move(m: Dictionary, delta: float) -> void:
 			m["t"] = 0.05
 			return
 	var cd: float = maxf(0.05, _f(m, "cd") * _cd_mul() * (0.92 if (String(m["type"]) == "steel" and _has_item("ti_steel")) else 1.0))
+	if m.has("min_cd"):
+		cd = maxf(cd, float(m["min_cd"]))   # 7.1: Proteccion nunca baja de 5 s
+	if self_sleep_t > 0.0:
+		m["t"] = 0.05   # 7.1: dormido por Descanso: no atacas
+		return
 	var evolved_now: bool = bool(m.get("evolved", false))
 	var icy: bool = evolved_now and String(m["id"]) == "powder-snow"
 	var cc: bool = evolved_now and String(m["id"]) == "karate-chop"
@@ -2809,6 +2913,189 @@ func _tick_move(m: Dictionary, delta: float) -> void:
 			_trail_patch(m)
 		"cone":
 			_cone(m)
+		"homing":
+			_fire_projectiles(m)   # 7.1: el proyectil persigue solo al enemigo (homing alto)
+		"bounce":
+			_bounce(m)
+		"shove":
+			_shove(m)
+		"storm":
+			_storm(m)
+		"tremor":
+			_tremor(m)
+		"wave":
+			_wave(m)
+		"leap":
+			_leap(m)
+		"scissor":
+			_scissor(m)
+		"cross":
+			_cross(m)
+		"guard":
+			_guard(m)
+		"decoy":
+			_decoy(m)
+		"weather":
+			_start_weather(String(m.get("wx", "rain")), _f(m, "dur", 20.0))
+			_ring(player.position, player.radius, player.radius * 4.0, _col(m), 0.5, 3.0)
+		"rest":
+			_rest(m)
+		"punch", "spin", "blitz":
+			# 7.1: varios golpes seguidos (directos o vueltas); el primero ya, el resto en _seq_tick
+			m["_seq_total"] = maxi(1, int(_f(m, "count", 3.0)))
+			m["_seq_n"] = int(m["_seq_total"]) - 1
+			m["_seq_t"] = SEQ_GAP
+			_seq_step(m, 0)
+
+
+# ---------------------------------------------------------------
+# 7.1: tipos de ataque nuevos del juego original
+# ---------------------------------------------------------------
+const SEQ_GAP := 0.11
+
+
+# Golpes encadenados de Punetazo y Giro (se llama en cada fotograma del movimiento).
+func _seq_tick(m: Dictionary, delta: float) -> void:
+	if int(m.get("_seq_n", 0)) <= 0:
+		return
+	m["_seq_t"] = float(m["_seq_t"]) - delta
+	if float(m["_seq_t"]) > 0.0:
+		return
+	m["_seq_t"] = SEQ_GAP
+	m["_seq_n"] = int(m["_seq_n"]) - 1
+	_seq_step(m, int(m["_seq_total"]) - 1 - int(m["_seq_n"]))
+
+
+func _seq_step(m: Dictionary, idx: int) -> void:
+	if player.dead:
+		m["_seq_n"] = 0
+		return
+	if String(m["kind"]) == "spin":
+		_spin_hit(m, idx)
+	elif String(m["kind"]) == "blitz":
+		_blitz_hit(m, idx)
+	else:
+		_punch_hit(m, idx, idx >= int(m["_seq_total"]) - 1)
+
+
+# Punetazo: directos rapidos al frente; el ultimo aplica el extra del movimiento (congelar, rayo o curar).
+func _punch_hit(m: Dictionary, idx: int, last: bool) -> void:
+	var rad: float = _f(m, "radius")
+	var half: float = _f(m, "arc", 1.0) * 0.5
+	var side: float = (-1.0 if idx % 2 == 0 else 1.0) * 10.0
+	var d: Vector2 = Vector2.from_angle(player.aim)
+	var hit_pos: Vector2 = player.position + d * rad * 0.75 + d.orthogonal() * side + Vector2(0.0, -LIFT * 0.5)
+	var vis: Dictionary = VFX.for_move(String(m["id"]), String(m["type"]))
+	pfx.sp("fist", String(vis["pal"]), hit_pos, {"life": 0.22, "scale": 1.5 if last else 1.15, "fade": false})
+	pfx.burst(hit_pos, _col(m), 5 if last else 3, 90.0)
+	if idx > 0:
+		player.play_attack("Attack", SEQ_GAP * 1.6)
+		Aud.shot("melee", String(m.get("type", "normal")))
+	var k: float = 1.5 if last else 1.0
+	var first_hit: Node2D = null
+	var dealt := 0.0
+	for e in enemies:
+		if e.dead:
+			continue
+		if e.position.distance_to(player.position) > rad + e.radius * 0.5:
+			continue
+		if not _in_arc(player.position, e.position, player.aim, half):
+			continue
+		var dm: float = _f(m, "dmg") * _atk() * k
+		_hit_move(e, dm, d, m)
+		dealt += dm
+		if first_hit == null:
+			first_hit = e
+		if last and m.has("stun") and not e.dead:
+			_apply_cc(e, "freeze", _f(m, "stun") * 2.0)
+	if m.has("drain") and dealt > 0.0:
+		_drain_heal(dealt * 0.05 * _f(m, "drain"))
+	if last:
+		shake = maxf(shake, 2.0)
+		if m.has("zap") and first_hit != null:
+			_zap_from(m, first_hit, int(_f(m, "zap")))
+
+
+# Rayo que salta desde un enemigo a otros n cercanos (Puno Trueno).
+func _zap_from(m: Dictionary, from_e: Node2D, n: int) -> void:
+	var done := {from_e.get_instance_id(): true}
+	var cur: Node2D = from_e
+	for i in range(n):
+		var best: Node2D = null
+		var bd: float = 150.0 * 150.0
+		for e in enemies:
+			if e.dead or done.has(e.get_instance_id()):
+				continue
+			var d2: float = cur.position.distance_squared_to(e.position)
+			if d2 < bd:
+				bd = d2
+				best = e
+		if best == null:
+			return
+		done[best.get_instance_id()] = true
+		var a: Vector2 = cur.position + Vector2(0.0, -cur.body_h * 0.5)
+		var b: Vector2 = best.position + Vector2(0.0, -best.body_h * 0.5)
+		pfx.beam(a, (b - a).angle(), (b - a).length(), 8.0, VFX.for_move("thunderbolt", "electric"))
+		_hit_move(best, _f(m, "dmg") * _atk() * 0.8, b - a, m)
+		cur = best
+
+
+func _drain_heal(amount: float) -> void:
+	var hv: float = _heal_real(amount)
+	if hv >= 1.0:
+		add_text(player.position + Vector2(randf_range(-10.0, 10.0), -player.body_h - 8.0), "+%d" % roundi(hv), Color("#7dffb0"), 14)
+
+
+# Giro: una vuelta completa golpeando todo lo que te rodea; se repite "count" veces.
+func _spin_hit(m: Dictionary, idx: int) -> void:
+	var rad: float = _f(m, "radius")
+	var vis: Dictionary = VFX.for_move(String(m["id"]), String(m["type"]))
+	pfx.slash(player.position + Vector2(0.0, -LIFT * 0.5), player.aim + float(idx) * 2.1, rad, TAU * 0.8, vis)
+	if idx > 0:
+		player.play_attack("Attack", SEQ_GAP * 1.6)
+		Aud.shot("melee", String(m.get("type", "normal")))
+	for e in enemies:
+		if e.dead:
+			continue
+		if e.position.distance_to(player.position) > rad + e.radius * 0.5:
+			continue
+		_hit_move(e, _f(m, "dmg") * _atk(), e.position - player.position, m)
+
+
+# Empuje: una onda a tu alrededor que dana y aparta con fuerza a todos los que tienes cerca.
+func _shove(m: Dictionary) -> void:
+	var rad: float = _f(m, "radius")
+	_ring(player.position, player.radius, rad, _col(m), 0.32, 4.0)
+	_ring(player.position, player.radius * 0.5, rad * 0.7, _col(m).lightened(0.3), 0.24, 2.0)
+	pfx.burst(player.position + Vector2(0.0, -LIFT * 0.5), _col(m), [10, 6, 3][perf_lv], 200.0)
+	shake = maxf(shake, 2.5)
+	var kk: float = 1.0 + _f(m, "knock_k")
+	for e in enemies:
+		if e.dead:
+			continue
+		if e.position.distance_to(player.position) > rad + e.radius * 0.5:
+			continue
+		dmg_src = String(m["id"])
+		cur_kind = "shove"
+		_hit_enemy(e, _f(m, "dmg") * _atk(), _col(m), e.position - player.position, _f(m, "knock") * kk, String(m["type"]),
+			int(_f(m, "burn")), int(_f(m, "poison")), _f(m, "slow"), String(m.get("cc", "")), _f(m, "ccp"))
+		dmg_src = ""
+		cur_kind = ""
+
+
+# Rebote: proyectiles que, al dar, saltan al enemigo mas cercano tantas veces como rebotes tenga.
+func _bounce(m: Dictionary) -> void:
+	var n: int = maxi(1, int(_f(m, "count", 1.0)))
+	var spread: float = _f(m, "spread", 0.3)
+	for i in range(n):
+		var off: float = 0.0
+		if n > 1:
+			off = (float(i) / float(n - 1) - 0.5) * spread * float(n)
+		var d: Vector2 = Vector2.from_angle(player.aim + off + randf_range(-0.03, 0.03))
+		var b: Bullet = _make_bullet(m, player.position + d * 3.0, d * _f(m, "speed"), _f(m, "life", 1.6), 0)
+		b.ric = int(_f(m, "bounce", 3.0))
+		b.life += 0.35 * float(b.ric)   # tiempo para llegar a todos los rebotes
+	pfx.spark(player.position + Vector2(0.0, -LIFT) + Vector2.from_angle(player.aim) * player.radius, _col(m), Vector2.from_angle(player.aim), 3)
 
 
 # Tope de disparos del jugador en pantalla (evita tirones): al pasarlo, se descarta el disparo mas viejo que no sea un orbe.
@@ -3945,6 +4232,8 @@ func _type_mult(mtype: String, e) -> float:
 
 
 func _hit_move(e, dmg: float, dir: Vector2, m: Dictionary) -> void:
+	if m.has("shred") and is_instance_valid(e):
+		e.set_meta("shred", run_time + float(m["shred"]))
 	dmg_src = String(m["id"])
 	cur_kind = String(m["kind"])
 	_hit_enemy(e, dmg, _col(m), dir, _f(m, "knock"), String(m["type"]),
@@ -4009,11 +4298,18 @@ func _hit_enemy(e, dmg: float, col: Color, dir: Vector2, knock: float, mtype: St
 			d_final *= 1.0 + _abn("boss_dmg")
 		if eff == "weak":
 			d_final *= 1.0 + _abn("tinted")
+	if _has_item("punchingglove") and ["melee", "dash", "swing", "punch"].has(cur_kind):
+		d_final *= 1.3
 	if e.boss and _lv("hunt") > 0:
 		d_final *= 1.0 + 0.1 * float(_lv("hunt"))   # carta Cazador
-	if _dyn_on() and dyn.kind == "tera" and mtype == String(dyn.type):
-		d_final *= 1.5   # Teracristal: +50% con los movimientos de su tipo
-	var crit_p: float = minf(CRIT_CAP, float(perks["crit"]) + (0.15 if _has_item("scopelens") else 0.0) + (0.05 if _has_item("ti_normal") else 0.0) + _lens_add() + _abn("crit"))
+	if e.has_meta("shred") and run_time < float(e.get_meta("shred")):
+		d_final *= 1.25   # 7.1: Triturar deja al enemigo debil a tus golpes
+	if _dyn_on() and dyn.kind == "tera":
+		if selected_tera == "stellar":
+			d_final *= 1.3
+		elif mtype == String(dyn.type):
+			d_final *= 1.8 if (dyn.original.get("types", []) as Array).has(mtype) else 1.5   # Teracristal: +50% con los movimientos de su tipo
+	var crit_p: float = minf(CRIT_CAP, (0.25 if runx.has_buff("focus") else 0.0) + float(perks["crit"]) + (0.15 if _has_item("scopelens") else 0.0) + (0.05 if _has_item("ti_normal") else 0.0) + _lens_add() + _abn("crit"))
 	if crit_p > 0.0 and randf() < crit_p:
 		d_final *= _edge_mul()
 		if _ch_on() and not _ch_rs("no_crit"):
@@ -4036,6 +4332,7 @@ func _hit_enemy(e, dmg: float, col: Color, dir: Vector2, knock: float, mtype: St
 			poison += 1
 	d_final *= kec.dmg_mul(e) * kec.echo_take()
 	_damage_enemy(e, d_final, col, dir, knock, eff)
+	runx.damage_splash(e, d_final, col)
 	kec.on_hit(e, d_final)
 	# Colmillo Vampirico (y Hechizo): solo cuenta la vida realmente recuperada; la cura no dispara nada mas.
 	var fang: float = _fang_pct() + (0.03 if (mtype == "ghost" and _has_item("ti_ghost")) else 0.0)
@@ -4344,7 +4641,7 @@ func _pevo_targets(dex: int) -> Array:
 
 
 func _pevo_ready() -> bool:
-	return mode != "team" and pevo_done < PEVO_LV.size() and player.level >= int(PEVO_LV[pevo_done]) and not player.dead
+	return not _dyn_on() and mode != "team" and pevo_done < PEVO_LV.size() and player.level >= int(PEVO_LV[pevo_done]) and not player.dead
 
 
 func _offer_pevo() -> void:
@@ -4391,11 +4688,12 @@ func _apply_pevo(id: String) -> void:
 	base_atk = player.atk * float(perks["atk"])
 	nh_max = player.max_hp
 	nh_last = player.hp
+	runx.species = nd
 	pevo_dex = nd
 	pevo_done += 1
 	var nm: String = L.t(String(n["name"]))
 	if not keep:
-		player.rebody(nd, _sm(nd), player.shiny)
+		player.rebody(CT.display_dex(nd), _sm(CT.display_dex(nd)), player.shiny)
 		player.types = (n["types"] as Array).duplicate()
 		ab_fx = AB.fx_of(nd)
 		hud.poke_name = nm
@@ -4554,7 +4852,7 @@ func _candidates(ti: int) -> Array:
 	for p in _dex_list:
 		if int(p["rarity"]) < 5 and float(p["bst"]) >= lo and float(p["bst"]) <= hi and _smeta.has(str(int(p["dex"]))):
 			out.append(p)
-	if mode == "type":
+	if mode == "type" or (mode == "weekly" and CT.weekly()["rule"] == "type"):
 		var only: Array = []
 		for p in out:
 			if (p["types"] as Array).has(SV.run_type):
@@ -4704,11 +5002,11 @@ func _ch_kill(e, src: String) -> void:
 		ch_m["kt_" + ty] = int(ch_m.get("kt_" + ty, 0)) + 1
 		ch_src_kills[src] = int(ch_src_kills.get(src, 0)) + 1
 		var kd: String = String(md["kind"])
-		if ["projectile", "boomerang", "turret", "chain", "beam"].has(kd):
+		if ["projectile", "boomerang", "turret", "chain", "beam", "homing", "bounce"].has(kd):
 			ch_m["kills_proj"] = int(ch_m["kills_proj"]) + 1
-		elif ["melee", "dash", "orbit"].has(kd):
+		elif ["melee", "dash", "orbit", "punch", "spin"].has(kd):
 			ch_m["kills_melee"] = int(ch_m["kills_melee"]) + 1
-		elif ["aura", "nova", "meteor", "mine", "cone", "trail"].has(kd):
+		elif ["aura", "nova", "meteor", "mine", "cone", "trail", "shove"].has(kd):
 			ch_m["kills_aoe"] = int(ch_m["kills_aoe"]) + 1
 		var m20 := 0
 		for k in ch_src_kills:
@@ -4868,7 +5166,7 @@ func _roll_run() -> void:
 			var dx: int = int(p["dex"])
 			if bool(p.get("leg", false)) or not _smeta.has(str(dx)) or used.has(dx):
 				continue
-			if mode == "type" and not (p["types"] as Array).has(SV.run_type):
+			if (mode == "type" or (mode == "weekly" and CT.weekly()["rule"] == "type")) and not (p["types"] as Array).has(SV.run_type):
 				continue
 			if float(p["bst"]) >= float(slot["bst"][0]) and float(p["bst"]) <= float(slot["bst"][1]):
 				pool.append(p)
@@ -5052,8 +5350,8 @@ func _make_enemy(def: Dictionary, pos: Vector2, sc: Dictionary, boss: bool = fal
 		if hpk != 1.0:
 			e.max_hp = roundf(e.max_hp * hpk)
 			e.hp = e.max_hp
-	if diff > 0:   # Dificil / Pesadilla
-		e.max_hp = roundf(e.max_hp * float(DIFF_HP[diff]))
+	if diff > 0 or mode == "normal":   # 7.1: Normal (algo mas facil), Dificil y Pesadilla, como el original
+		e.max_hp = roundf(e.max_hp * float((DIFF_BOSS if boss else DIFF_HP)[diff]))
 		e.hp = e.max_hp
 		e.dmg *= float(DIFF_DMG[diff])
 	if mode == "tower":
@@ -5075,6 +5373,7 @@ func _make_enemy(def: Dictionary, pos: Vector2, sc: Dictionary, boss: bool = fal
 	e.position = pos
 	world.add_child(e)
 	enemies.append(e)
+	run_pdex_s[str(int(e.dex))] = true   # 7.1: Pokedex de vistos
 	return e
 
 
@@ -5158,7 +5457,7 @@ func _spawn_one(angle: float = -999.0, near: bool = false) -> Enemy:
 		e.max_hp = roundf(e.max_hp * 1.3)
 		e.hp = e.max_hp
 		e.xp_val = roundf(e.xp_val * 1.5)
-	if bool(_sm(e.dex).get("sh", 0)) and randf() < SHINY_RATE:
+	if bool(_sm(e.dex).get("sh", 0)) and randf() < SHINY_RATE * (2.0 if _has_item("rareincense") else 1.0):
 		e.make_shiny()
 		Aud.sfx("shiny")
 		_say(L.t("¡Un %s shiny anda cerca!") % e.enemy_name, 3.4)
@@ -5212,7 +5511,7 @@ func _spawn_boss(b: Dictionary, t_v: float = -1.0):
 	var t: float = run_time if t_v < 0.0 else t_v
 	var sc := {"hp": (1.0 + t / 600.0) * _adapt_k(), "dmg": (1.0 + t / 600.0) * pow(_adapt_k(), 0.7), "spd": 1.0}
 	var e: Enemy = _make_enemy(b, _ring_point(randf() * TAU), sc, true)
-	if bool(_sm(e.dex).get("sh", 0)) and randf() < SHINY_RATE:
+	if bool(_sm(e.dex).get("sh", 0)) and randf() < SHINY_RATE * (2.0 if _has_item("rareincense") else 1.0):
 		e.make_shiny()
 	Aud.sfx("boss")
 	_say(L.t("¡%s%s salvaje apareció!") % [e.enemy_name, " shiny" if e.shiny else ""], 3.2)
@@ -5380,38 +5679,63 @@ func _dir_try(id: String) -> bool:
 
 func _spawn_eternatus() -> void:
 	dir_finale = true
+	var ar = ARENA.new()
+	ar.r = 16.0
+	ar.setup("dragon", world_seed + 890)
+	ar.th = ar.th.duplicate(true)
+	ar.th["floor"] = "#777c8e"
+	ar.th["wall"] = "#343746"
+	ar.palette = ARENA.make_palette(ar.th)
+	_jd_port(ar)
+	ainfo["phase"] = "eternatus"
+	player.position = ARENA_POS + Vector2(0, 250)
 	var p: Dictionary = _dex_by[ETERNATUS_DEX]
 	var bb := "ranged" if _behavior_of(p) == "ranged" else "chase"
-	var def := {"at": 3600.0, "dex": ETERNATUS_DEX, "name": String(p["name"]), "hp": 7000.0, "spd": 58.0, "dmg": 40.0, "xp": 6000.0,
+	var def := {"at": 1200.0, "dex": ETERNATUS_DEX, "name": String(p["name"]), "hp": 7000.0, "spd": 58.0, "dmg": 40.0, "xp": 6000.0,
 		"behavior": bb, "shotDmg": 28.0, "shotCd": 1.0, "range": 300.0}
 	_preload_dex(ETERNATUS_DEX)
-	var e = _spawn_boss(def, 3600.0)
+	var e = _spawn_boss(def, 1200.0)
 	e.set_meta("enc", "eternatus")
 	dir_eter = e
+	e.position = ARENA_POS + Vector2(0, -180)
+	if _smeta.has("200890"):
+		e.rebody(200890, _sm(200890), false)
+		e.radius = minf(120.0, e.radius)
+	cam.top_level = true
+	cam.global_position = ARENA_POS
+	cam.zoom = Vector2.ONE * 0.85
 	eterf.start(self, e)
 	_say(L.t("¡ETERNATUS ha despertado!"), 4.0)
 	shake = 20.0
 
 
 func _eternatus_win() -> void:
-	if timeup or player.dead:
+	if timeup or player.dead or run_eter:
 		return
 	var st: Dictionary = SV.d["stats"]
 	st["eternatusKills"] = int(st.get("eternatusKills", 0)) + 1
 	run_eter = true
-	if mode == "normal" and diff + 1 > SV.diff_unlocked() and diff < 2:
-		SV.d["diff_unlock"] = diff + 1   # 7.0: desbloquea la siguiente dificultad
+	if mode == "normal" and diff < 2:
+		SV.d["diff_unlock"] = maxi(int(SV.d.get("diff_unlock", 0)), diff + 1)
 		_say(L.t("¡Nueva dificultad desbloqueada: %s!") % L.t(String(SV.DIFF_NAMES[diff + 1])), 4.0)
-	timeup = true
-	hud.timeup = true
-	hud.end_big = L.t("¡ETERNATUS DERROTADO!")
-	hud.end_l1 = L.t("Tiempo: %d min") % int(run_time / 60.0)
-	hud.end_l2 = L.t("Derrotaste %d Pokémon") % kills
-	player.dead = true
-	player.active = false
-	_clear_orbit_orbs()
-	for en in enemies:
-		en.active = false
+	var eter_loot: Array = []
+	for orb in orbs:
+		if is_instance_valid(orb):
+			eter_loot.append([orb.kind, orb.value])
+	eterf.stop()
+	if arena != null and String(ainfo.get("phase", "")) == "eternatus":
+		_arena_end(true)
+	cam.top_level = false
+	cam.position = Vector2.ZERO
+	_apply_fov()
+	for loot in eter_loot:
+		_spawn_orb(player.position + Vector2.from_angle(randf() * TAU) * 40.0, String(loot[0]), float(loot[1]))
+	dir_finale = false
+	coins += 600
+	tickets10 += 1
+	power_pending = true
+	SV.save()
+	_say("¡Eternatus derrotado! Elige un poder", 4.0)
 
 
 # S63.3: mini-jefes grandes y raros (Tyranitar, Wailord, Onix, Steelix)
@@ -5849,10 +6173,7 @@ func _preload_upcoming(until: float) -> void:
 
 
 func _preload_dex(dex: int) -> void:
-	for a in ANIMS:
-		var path: String = "res://assets/pokemon/%d/%s.png" % [dex, a]
-		if ResourceLoader.exists(path) and not ResourceLoader.has_cached(path):
-			ResourceLoader.load_threaded_request(path)
+	SP.texture("res://assets/pokemon/%d/Idle.png" % dex)
 
 
 # ---------------------------------------------------------------
@@ -6073,6 +6394,8 @@ func _enemy_step(e: Enemy, delta: float, kn_decay: float) -> void:
 	if bool(e.def.get("scripted", false)):
 		return   # Arceus en la Sentencia: lo mueve judgment.gd
 	var to: Vector2 = player.position - e.position
+	if decoy_t > 0.0 and not e.boss and e.position.distance_to(decoy_pos) < decoy_r:
+		to = decoy_pos - e.position   # 7.1: Doble Equipo: la copia atrae a los enemigos cercanos
 	var dist: float = to.length()
 	var dirv: Vector2 = Vector2.ZERO
 	if dist > 0.001:
@@ -6314,6 +6637,8 @@ func _cast_shields(e: Enemy) -> void:
 		if given >= 5:
 			break
 		var o2 = near[i]
+		if _has_item("covertcloak") and o2.position.distance_to(player.position) < 160.0:
+			continue
 		if o2.shield > 0.0 or o2.shield_lock > 0.0:
 			continue
 		o2.shield = o2.max_hp * 0.30
@@ -6737,9 +7062,9 @@ func _update_hazards(delta: float) -> void:
 			elif not player.dead and _hazard_inside(h):
 				player.invuln = 0.0
 				if h.pct > 0.0:
-					_hurt_player(maxf(h.dmg, player.max_hp * h.pct), "", h.pure)
+					_hurt_player(maxf(h.dmg, player.max_hp * h.pct) * (0.7 if _has_item("earplugs") and not h.pure else 1.0), "", h.pure)
 				else:
-					_hurt_player(h.dmg, h.mtype)
+					_hurt_player(h.dmg * (0.7 if _has_item("earplugs") else 1.0), h.mtype)
 				if h.slows:
 					trap_slow_t = 2.0
 		if h.hit and h.t >= h.delay + 0.3:
@@ -6783,6 +7108,10 @@ func _damage_enemy(e, amount: float, col: Color = Color.WHITE, dir: Vector2 = Ve
 	if e.frozen_t > 0.0:
 		amount *= 1.25
 	var d: float = maxf(1.0, roundf(amount))
+	if eterf != null and eterf.active() and e == eterf.e:
+		d = eterf.limit_damage(d)
+		if d <= 0.0:
+			return
 	jd.note_dmg(d, e)
 	_cut_grass(e.position, 34.0)
 	# Escudo: absorbe primero.
@@ -6811,6 +7140,7 @@ func _damage_enemy(e, amount: float, col: Color = Color.WHITE, dir: Vector2 = Ve
 	Aud.sfx("hit")
 	if e.hurt_by(d):
 		kills += 1
+		run_pdex_k[str(int(e.dex))] = int(run_pdex_k.get(str(int(e.dex)), 0)) + 1   # 7.1: Pokedex de derrotados
 		if hw:
 			_hw_kill(e)
 		run_kills_by[src_k] = int(run_kills_by.get(src_k, 0)) + 1
@@ -7772,7 +8102,7 @@ func _use_altar(p: Prop) -> void:
 	for pw in POWERS:
 		if String(pw["id"]) == p.power:
 			power_kind = p.power
-			power_t = 25.0
+			power_t = 50.0 if _has_item("mirrorherb") else 25.0
 			_say(L.t("Altar: %s. %s (25 s)") % [L.t(String(pw["name"])), L.t(String(pw["desc"]))], 3.0)
 			Aud.sfx("legend")
 	_ring(p.position, 6.0, 90.0, p.color, 0.6)
@@ -7797,6 +8127,18 @@ func _bullet_hit(b, e) -> void:
 	if MD.MOVES.has(b.src) and MD.MOVES[b.src].has("coin") and randf() < 0.5:
 		coins += 1   # Día de Pago: solo moneda normal
 		Aud.sfx("coin")
+	if MD.MOVES.has(b.src) and not b.orb:
+		var bmd: Dictionary = MD.MOVES[b.src]
+		if bmd.has("drain"):
+			_drain_heal(b.dmg * 0.06 * float(bmd["drain"]))   # 7.1: Beso Drenaje
+		if bmd.has("splash"):
+			# 7.1: Fuerza Lunar estalla alrededor del enemigo al que alcanza
+			var sr: float = float(bmd["splash"]) * _size_k()
+			_ring(e.position, 6.0, sr, b.color, 0.25, 2.5)
+			for e2 in enemies:
+				if e2 == e or e2.dead or e2.position.distance_to(e.position) > sr + e2.radius * 0.5:
+					continue
+				_hit_enemy(e2, b.dmg * 0.5, b.color, e2.position - e.position, 0.0, b.mtype, 0, 0, 0.0)
 	dmg_src = ""
 
 
@@ -7949,6 +8291,11 @@ func _spawn_orb(pos: Vector2, kind: String, value: float):
 
 
 func _drop(e) -> void:
+	if runx != null:
+		runx.on_drop(e)
+	if e.has_meta("enc") and String(e.get_meta("enc")) == "eter_core":
+		_spawn_orb(e.position, "heal", 0.0)
+		return
 	if e.has_meta("jd_arceus"):
 		jd.arceus_down(e)
 		return
@@ -8056,6 +8403,8 @@ func _update_orbs(delta: float) -> void:
 
 
 func _collect(kind: String, value: float) -> void:
+	if runx.collect(kind):
+		return
 	if kind == "xp" or kind == "xpBig":
 		_gain_xp(value)
 		Aud.xp()
@@ -8135,7 +8484,9 @@ func _new_move_cards(n: int) -> Array:
 	for id in MD.ORDER:
 		var d: Dictionary = MD.MOVES[id]
 		var ty: String = String(d["type"])
-		if ty != "normal" and not player.types.has(ty):
+		if not _move_ok(String(id)):
+			continue   # 7.1: exclusivo de otro Pokemon
+		if ty != "normal" and not player.types.has(ty) and not d.has("only"):
 			continue
 		if not GPM.playable(String(id)):
 			continue
@@ -8148,6 +8499,8 @@ func _new_move_cards(n: int) -> Array:
 	var keyed: Array = []
 	for id in cand:
 		var wgt: float = NORMAL_MOVE_W if String(MD.MOVES[id]["type"]) == "normal" else 1.0
+		if MD.exclusive(String(id)):
+			wgt = 1.6   # 7.1: el movimiento exclusivo de tu Pokemon sale algo mas a menudo
 		keyed.append([pow(maxf(0.0001, randf()), 1.0 / wgt), id])
 	keyed.sort_custom(func(a, b): return a[0] > b[0])
 	cand = keyed.map(func(x): return x[1])
@@ -8708,10 +9061,12 @@ func _unlearn_open() -> void:
 	cards.show_cards(picks, L.t("Elige el movimiento que olvidas"), L.t("Quitamovimientos"), false)
 
 
-func _unlearn_pick(gi: int) -> void:
+# Quita del todo el hueco gi (un vinculo o una fusion, entero) y devuelve los nombres olvidados.
+# Lo usan el Quitamovimientos y Arceus cuando te arranca el ataque con el que huyes.
+func _forget_slot(gi: int) -> Array:
 	var sl: Array = _slot_list()
 	if gi < 0 or gi >= sl.size():
-		return
+		return []
 	var g: Array = sl[gi]
 	var ids := {}
 	var names: Array = []
@@ -8729,6 +9084,13 @@ func _unlearn_pick(gi: int) -> void:
 			bullets[i].queue_free()
 			bullets.remove_at(i)
 	player.slot = clampi(player.slot, 0, maxi(0, _slot_list().size() - 1))
+	return names
+
+
+func _unlearn_pick(gi: int) -> void:
+	var names: Array = _forget_slot(gi)
+	if names.is_empty():
+		return
 	add_text(player.position + Vector2(0.0, -player.body_h - 8.0), L.t("Olvidado: %s") % " + ".join(names), Color("#c49bff"), 20)
 	Aud.sfx("confirm")
 	var picks: Array = _new_move_cards(CARD_N - 1)
@@ -8823,6 +9185,8 @@ func _on_card_chosen(idx: int) -> void:
 		choosing = false
 		if id == "yes":
 			_do_fuse()
+		return
+	if runx.card(c):
 		return
 	if cat == "pevo":
 		cards.hide_cards()
@@ -9144,6 +9508,11 @@ func _rift_drop_arena() -> void:
 func _exit_tree() -> void:
 	Engine.time_scale = 1.0
 	_rift_drop_arena()
+	# 7.0: la arena de la Sentencia tambien se hornea en un hilo; si se cierra el juego (o se vuelve al menu) a mitad,
+	# hay que esperarla: si no, el hilo sigue tras descargarse el script y falla ("Nonexistent function 'hsh'").
+	if jd != null and jd.pending_arena != null and is_instance_valid(jd.pending_arena):
+		jd.pending_arena.dispose()
+		jd.pending_arena = null
 
 
 func _update_thief_hud() -> void:
@@ -9323,6 +9692,8 @@ func _arena_expel() -> void:
 
 func _update_arena(delta: float) -> void:
 	var ph: String = String(ainfo.get("phase", ""))
+	if ph == "eternatus":
+		return
 	if ph == "fight":
 		ainfo["t"] = float(ainfo["t"]) + delta
 		var b = ainfo["boss"]
@@ -9614,6 +9985,7 @@ class Actor extends Node2D:
 	var dex := 0
 	var smeta: Dictionary = {}
 	var meta: Dictionary = {}     # animacion -> geometria
+	var skin := ""
 	var shiny := false
 	var scl := 1.0
 	var sprite := Sprite2D.new()
@@ -9701,6 +10073,11 @@ class Actor extends Node2D:
 		return meta[a]
 
 	func _tex_path(a: String, shn: bool) -> String:
+		a = String(_am(a).get("f", a))
+		if skin != "":
+			var skin_path: String = "res://assets/pokemon/%d/k-%s/%s%s.png" % [dex, skin, "s/" if shn else "", a]
+			if SP.exists(skin_path):
+				return skin_path
 		if shn:
 			return "res://assets/pokemon/%d/s/%s.png" % [dex, a]
 		return "res://assets/pokemon/%d/%s.png" % [dex, a]
@@ -9710,12 +10087,12 @@ class Actor extends Node2D:
 			var tx: Texture2D = null
 			if shiny:
 				var ps: String = _tex_path(a, true)
-				if ResourceLoader.exists(ps):
-					tx = load(ps)
+				if SP.exists(ps):
+					tx = SP.texture(ps)
 			if tx == null:
 				var p: String = _tex_path(a, false)
-				if ResourceLoader.exists(p):
-					tx = load(p)
+				if SP.exists(p):
+					tx = SP.texture(p)
 			textures[a] = tx
 		return textures[a]
 
@@ -12555,7 +12932,7 @@ class Hud extends Node2D:
 				draw_circle(c, 52.0 + beat * 6.0, Color(tcol.r, tcol.g, tcol.b, 0.25 + beat * 0.25))
 			draw_circle(c, 46.0, Color(0.14, 0.03, 0.07, 0.88))
 			draw_arc(c, 46.0, 0.0, TAU, 40, tcol if ready else Color(0.5, 0.52, 0.58), 4.0)
-			_ds(font, Vector2(c.x - 44.0, c.y + (2.0 if dyn_btn == 3 else 11.0)), {"dyna": "MAX", "mega": "MEGA", "tera": "TERA"}.get(dyn_kind, "MAX"), HORIZONTAL_ALIGNMENT_CENTER, 88.0, (28 if dyn_btn == 3 else 32) - (4 if dyn_kind != "dyna" else 0), Color.WHITE if ready else Color(0.6, 0.62, 0.68))
+			_ds(font, Vector2(c.x - 44.0, c.y + (2.0 if dyn_btn == 3 else 11.0)), {"dyna": "MAX", "gmax": "GMAX", "mega": "MEGA", "tera": "TERA", "z": "Z"}.get(dyn_kind, "MAX"), HORIZONTAL_ALIGNMENT_CENTER, 88.0, (28 if dyn_btn == 3 else 32) - (4 if dyn_kind != "dyna" else 0), Color.WHITE if ready else Color(0.6, 0.62, 0.68))
 			if dyn_btn == 3:
 				_ds(font, Vector2(c.x - 44.0, c.y + 26.0), "%d:%02d" % [int(dyn_cd) / 60, int(dyn_cd) % 60], HORIZONTAL_ALIGNMENT_CENTER, 88.0, 18, Color(0.85, 0.88, 0.95))
 			elif not ready:
@@ -13136,3 +13513,189 @@ class HWHat extends Node2D:
 		_b(2, -12, 3, 2, Color("#3a2458"))
 		_b(4, -11, 1, 1, Color("#3a2458"))
 
+
+
+# 7.1: puede tu Pokemon (o su especie, si es una forma) aprender este movimiento?
+func _move_ok(id: String) -> bool:
+	return MD.allowed(id, int(player.dex), CT.base_dex(int(player.dex)))
+
+
+# 7.1: cartas de nivel sin tope (como el original): pasado el tope de antes, cada carta rinde la mitad,
+# asi la recarga nunca llega a cero y la velocidad no se dispara.
+func _soft_lv(id: String, soft: int) -> float:
+	var lv: int = _lv(id)
+	return float(lv) if lv <= soft else float(soft) + float(lv - soft) * 0.5
+
+
+# ---------------------------------------------------------------
+# 7.1: mas tipos de ataque del juego original (Trueno, Terremoto, Surf, Velocidad Extrema, Acrobata,
+# Tijera X, Llamarada, Proteccion, Doble Equipo, climas y Descanso)
+# ---------------------------------------------------------------
+# Tormenta: caen rayos sobre enemigos al azar de la pantalla.
+func _storm(m: Dictionary) -> void:
+	var pool: Array = []
+	for e in enemies:
+		if not e.dead and e.position.distance_to(player.position) < 560.0:
+			pool.append(e)
+	pool.shuffle()
+	var rad: float = _f(m, "radius", 34.0)
+	var vis: Dictionary = VFX.for_move(String(m["id"]), String(m["type"]))
+	for i in range(mini(int(_f(m, "count", 5.0)), pool.size())):
+		var p: Vector2 = pool[i].position
+		pfx.beam(p + Vector2(0.0, -420.0), PI * 0.5, 420.0, 12.0, vis)
+		_ring(p, 4.0, rad * 1.4, _col(m), 0.3, 3.0)
+		for e in enemies:
+			if not e.dead and e.position.distance_to(p) <= rad + e.radius * 0.5:
+				_hit_move(e, _f(m, "dmg") * _atk(), e.position - p, m)
+	shake = maxf(shake, 2.0)
+
+
+# Temblor: un anillo que sale de ti y golpea a todo lo que alcanza.
+func _tremor(m: Dictionary) -> void:
+	var rad: float = _f(m, "radius")
+	_ring(player.position, player.radius, rad, _col(m), 0.45, 6.0)
+	_ring(player.position, player.radius, rad * 0.65, _col(m).darkened(0.2), 0.35, 4.0)
+	pfx.burst(player.position, _col(m), [12, 7, 3][perf_lv], 220.0)
+	shake = maxf(shake, 5.0)
+	for e in enemies:
+		if not e.dead and e.position.distance_to(player.position) <= rad + e.radius * 0.5:
+			_hit_move(e, _f(m, "dmg") * _atk(), e.position - player.position, m)
+
+
+# Ola: una ola ancha que avanza hacia donde apuntas y arrastra a los enemigos.
+func _wave(m: Dictionary) -> void:
+	var d: Vector2 = Vector2.from_angle(player.aim)
+	var sp: float = _f(m, "speed", 500.0)
+	var b: Bullet = _make_bullet(m, player.position + d * 10.0, d * sp, _f(m, "radius") / maxf(1.0, sp), 9999)
+	b.r = _f(m, "width", 120.0) * 0.5
+	shake = maxf(shake, 2.0)
+
+
+# Velocidad Extrema: varias embestidas seguidas, cada una al enemigo mas cercano.
+func _blitz_hit(m: Dictionary, idx: int) -> void:
+	var tg: Node2D = _nearest_enemy(player.position, _f(m, "radius", 220.0))
+	if tg == null:
+		m["_seq_n"] = 0
+		return
+	var start: Vector2 = player.position
+	var d: Vector2 = (tg.position - start).normalized()
+	var dest: Vector2 = tg.position + d * (tg.radius + 14.0)
+	var dv: Dictionary = VFX.for_move(String(m["id"]), String(m["type"]))
+	for s in range(0, int(start.distance_to(dest)) + 1, 26):
+		pfx.sp(String(dv.get("proj", "streak")), String(dv["pal"]), start + d * float(s) + Vector2(0.0, -LIFT * 0.6), {"life": 0.2, "angle": d.angle()})
+	player.position = _collide(dest, player.radius * 0.55)
+	player.aim = d.angle()
+	player.invuln = maxf(player.invuln, 0.35)
+	if idx > 0:
+		player.play_attack("Attack", SEQ_GAP * 1.6)
+		Aud.shot("melee", String(m.get("type", "normal")))
+	for e in enemies:
+		if e.dead:
+			continue
+		var cp: Vector2 = Geometry2D.get_closest_point_to_segment(e.position, start, dest)
+		if cp.distance_to(e.position) <= 30.0 + e.radius:
+			_hit_move(e, _f(m, "dmg") * _atk(), d, m)
+
+
+# Salto (Acrobata): saltas sobre el enemigo y haces una onda al caer; sin objeto pega x1,5.
+func _leap(m: Dictionary) -> void:
+	var tg: Node2D = target if (target != null and not target.dead) else _nearest_enemy(player.position, _f(m, "range", 220.0))
+	if tg == null or tg.position.distance_to(player.position) > _f(m, "range", 220.0) + 40.0:
+		return
+	var land: Vector2 = _collide(tg.position + (player.position - tg.position).normalized() * 20.0, player.radius * 0.55)
+	player.position = land
+	player.invuln = maxf(player.invuln, 0.5)
+	var rad: float = _f(m, "radius", 70.0)
+	_ring(land, 6.0, rad, _col(m), 0.3, 4.0)
+	pfx.burst(land, _col(m), [8, 5, 2][perf_lv], 160.0)
+	shake = maxf(shake, 3.0)
+	var k: float = float(m.get("no_item", 1.0)) if item == "" else 1.0
+	for e in enemies:
+		if not e.dead and e.position.distance_to(land) <= rad + e.radius * 0.5:
+			_hit_move(e, _f(m, "dmg") * _atk() * k, e.position - land, m)
+
+
+# Tijera: dos tajos cruzados en X; lo que esta en el centro recibe los dos.
+func _scissor(m: Dictionary) -> void:
+	var rad: float = _f(m, "radius")
+	var half: float = _f(m, "arc", 1.3) * 0.5
+	var vis: Dictionary = VFX.for_move(String(m["id"]), String(m["type"]))
+	for off in [-0.35, 0.35]:
+		var a: float = player.aim + float(off)
+		pfx.slash(player.position + Vector2(0.0, -LIFT * 0.5), a, rad, half * 2.0, vis)
+		for e in enemies:
+			if e.dead or e.position.distance_to(player.position) > rad + e.radius * 0.5:
+				continue
+			if _in_arc(player.position, e.position, a, half):
+				_hit_move(e, _f(m, "dmg") * _atk(), e.position - player.position, m)
+
+
+# Cruz (Llamarada): una explosion en cruz sobre el enemigo.
+func _cross(m: Dictionary) -> void:
+	var tg: Node2D = target if (target != null and not target.dead) else _nearest_enemy(player.position, 300.0)
+	if tg == null:
+		return
+	var c: Vector2 = tg.position
+	var ln: float = _f(m, "radius", 90.0)
+	var w: float = _f(m, "width", 26.0)
+	var vis: Dictionary = VFX.for_move(String(m["id"]), String(m["type"]))
+	for a in [0.0, PI * 0.5]:
+		var d: Vector2 = Vector2.from_angle(float(a))
+		pfx.beam(c - d * ln + Vector2(0.0, -LIFT * 0.5), float(a), ln * 2.0, w, vis)
+	_ring(c, 4.0, w * 1.5, _col(m), 0.3, 3.0)
+	for e in enemies:
+		if e.dead:
+			continue
+		var rel: Vector2 = e.position - c
+		var in_h: bool = absf(rel.x) <= ln + e.radius and absf(rel.y) <= w * 0.5 + e.radius
+		var in_v: bool = absf(rel.y) <= ln + e.radius and absf(rel.x) <= w * 0.5 + e.radius
+		if in_h or in_v:
+			_hit_move(e, _f(m, "dmg") * _atk(), rel, m)
+
+
+# Proteccion: un escudo te hace intocable un momento.
+func _guard(m: Dictionary) -> void:
+	var dur: float = _f(m, "dur", 1.5)
+	player.invuln = maxf(player.invuln, dur)
+	_ring(player.position, player.radius * 2.8, player.radius * 2.2, Color("#9ff0ff"), dur, 4.0)
+	_ring(player.position, player.radius, player.radius * 2.8, Color("#e6fbff"), 0.3, 3.0)
+	add_text(player.position + Vector2(0.0, -player.body_h - 8.0), L.t("¡Protección!"), Color("#9ff0ff"), 16)
+
+
+# Doble Equipo: dejas una copia tuya que atrae a los enemigos cercanos.
+func _decoy(m: Dictionary) -> void:
+	decoy_t = _f(m, "dur", 4.0)
+	decoy_r = _f(m, "radius", 260.0)
+	decoy_pos = player.position
+	if decoy_node != null and is_instance_valid(decoy_node):
+		decoy_node.queue_free()
+	var ghost := Sprite2D.new()
+	var src: Sprite2D = player.sprite
+	ghost.texture = src.texture
+	ghost.region_enabled = src.region_enabled
+	ghost.region_rect = src.region_rect
+	ghost.hframes = src.hframes
+	ghost.vframes = src.vframes
+	ghost.frame = src.frame
+	ghost.flip_h = src.flip_h
+	ghost.offset = src.offset
+	ghost.centered = src.centered
+	ghost.scale = src.scale * player.scale
+	ghost.position = player.position + src.position * player.scale
+	ghost.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	ghost.modulate = Color(0.75, 0.85, 1.0, 0.55)
+	world.add_child(ghost)
+	decoy_node = ghost
+	_ring(decoy_pos, 6.0, 60.0, Color("#c8d6ff"), 0.4, 3.0)
+	add_text(decoy_pos + Vector2(0.0, -player.body_h - 8.0), L.t("¡Doble Equipo!"), Color("#c8d6ff"), 16)
+
+
+# Descanso: te cura mucho, pero te quedas dormido un rato sin moverte ni atacar.
+func _rest(m: Dictionary) -> void:
+	var hv: float = _heal_real(player.max_hp * _f(m, "amount", 0.6))
+	self_sleep_t = _f(m, "dur", 2.0)
+	if hv >= 1.0:
+		add_text(player.position + Vector2(0.0, -player.body_h - 4.0), "+%d" % roundi(hv), Color("#7dffb0"), 18)
+	add_text(player.position + Vector2(0.0, -player.body_h - 24.0), "Zzz", Color("#c8d6ff"), 18)
+	_ring(player.position, player.radius * 2.4, player.radius * 1.1, _col(m), 0.5, 2.5)
+	Aud.sfx("heal")

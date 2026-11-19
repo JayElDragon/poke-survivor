@@ -9,6 +9,30 @@ const UPD = preload("res://scripts/updater.gd")
 
 const ENTRIES := [
 	{
+		"ver": "7.1",
+		"date": "2026-11-19",
+		"title": "Poke Survivors 7.1: una aventura más completa",
+		"new": [
+			"Catálogo ampliado: 1025 Pokémon y 57 formas regionales.",
+			"Eternatus llega al minuto 20: pelea por fases y, al vencerlo, elige un poder para continuar la partida.",
+			"Megaevoluciones, Gigamax, formas especiales y Teracristal con cambio de tipo.",
+			"Vestidor con aspectos, skins, estelas y perfil con fotos y marcos.",
+			"Mochila, esferas, Mochis y desafío semanal con récord local.",
+			"Casino Rocket con cuatro minijuegos y gacha con tiradas ×100.",
+			"21 movimientos nuevos del juego original con cinco tipos de ataque nuevos: puñetazos, empujes, teledirigidos, giros y rebotes.",
+			"36 movimientos exclusivos: cada legendario y Pokémon especial tiene el suyo (Placaje Eléctrico, Fuego Sagrado, Distorsión...).",
+			"17 movimientos MT nuevos del juego original (Garra Dragón, Pulso Dragón, Megacuerno, Poder Pasado, Explosión...).",
+			"16 movimientos más copiados del original, con formas de atacar nuevas: Terremoto, Surf, Trueno, Velocidad Extrema, Acróbata, Tijera X, Llamarada, Triturar, Ventisca, Vendaval, Escaldar, Protección (te hace intocable), Doble Equipo (una copia que atrae a los enemigos) y los climas Danza Lluvia, Día Soleado y Tormenta Arena. Descanso ahora te cura mucho pero te duerme un momento.",
+			"Pokédex de vistos y derrotados: los Pokémon que has visto ya muestran su nombre y cuántos has derrotado.",
+			"Casino Rocket nuevo, como el original: en 1 de cada 3 partidas que llegan a la Sentencia, el Team Rocket se lleva a tu Pokémon a su casino. Tragaperras, Voltorb escondido, Carrera Rocket y ¡Atrapa a Pikachu! (tres planes; premio: la skin Mewtwo Obsidiana).",
+		],
+		"changes": [
+			"Dificultad como el original: Normal algo más fácil y Pesadilla más dura, y ningún golpe te quita más de un 25, 30 o 33 % de la vida según la dificultad (Arceus aparte).",
+			"Contra Arceus la reducción de daño también protege, como mucho un 30 %; tocarle sigue quitando lo mismo. Durante la Gravedad, Arceus se queda quieto.",
+			"Cartas de nivel sin tope: Potencia, Carrera, Reflejos, Coraza, Imán y Calibre salen siempre (pasado el tope de antes rinden la mitad) y Aprendizaje llega a 15.","Maestría con premios de foto, título, marco y aura.", "Arceus rompe también el cuarto objeto; el suelo empieza a agrietarse antes."],
+		"fixes": ["La victoria sobre Eternatus permite seguir jugando.", "Las animaciones compartidas usan sus metadatos correctos."],
+	},
+	{
 		"ver": "7.0",
 		"date": "2026-11-18",
 		"title": "Poke Survivors 7.0: la gran actualización",
@@ -29,6 +53,11 @@ const ENTRIES := [
 		],
 		"changes": [
 			"Al subir de nivel eliges entre 4 cartas en vez de 3.",
+			"Sentencia de Arceus más dura: te rompe los objetos a los 2, 4 y 6 minutos (la Moneda Amuleto sigue pagando), si huyes aparece delante de ti y a la tercera te arranca el ataque con el que huyes, el suelo se agrieta y se abre en agujeros que no se pueden pisar, y contra él no valen la Banda Focus ni Robustez.",
+		],
+		"fixes": [
+			"Arreglado: en la Sentencia de Arceus no se podía caer (la vida se quedaba en 1 para siempre). Ahora, si caes, se acaba la partida.",
+			"Arreglado: un error al cerrar el juego o volver al menú mientras se preparaba la Sentencia de Arceus.",
 		],
 	},
 	{

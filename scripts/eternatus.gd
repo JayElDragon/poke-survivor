@@ -22,6 +22,26 @@ var pull_t := 0.0
 var beam_done := false
 var tint_on := false
 var log: Array = []
+var elapsed := 0.0
+var last_hp := 0.0
+var safe_t := 0.0
+var safe_points: Array = []
+var safe_radius := 100.0
+var eternal = null
+var beam_t := 0.0
+var stun_t := 0.0
+var safe_visual: Node2D = null
+
+class SafeZones extends Node2D:
+	var owner_fight
+	func _process(_dt: float) -> void:
+		queue_redraw()
+	func _draw() -> void:
+		for point in owner_fight.safe_points:
+			var p: Vector2 = point - global_position
+			draw_circle(p, owner_fight.safe_radius, Color(0.2, 1.0, 0.5, 0.2))
+			draw_arc(p, owner_fight.safe_radius, 0, TAU, 64, Color(0.5, 1.0, 0.7), 4.0)
+
 
 
 # Barrera de laseres entre los nucleos (en orden, cerrando el anillo).
@@ -50,6 +70,18 @@ func start(main, boss) -> void:
 	m = main
 	e = boss
 	phase = 1
+	elapsed = 0.0
+	last_hp = e.hp
+	cores_done = false
+	beam_done = false
+	alt = 0
+	beam_t = 0.0
+	stun_t = 0.0
+	safe_t = 0.0
+	safe_visual = SafeZones.new()
+	safe_visual.owner_fight = self
+	safe_visual.z_index = 12
+	m.world.add_child(safe_visual)
 	atk_t = 4.0
 	_tint(true)
 	log.append(["start"])
@@ -65,13 +97,45 @@ func update(delta: float) -> void:
 	if not is_instance_valid(e) or e.dead or m.player.dead or m.timeup:
 		stop()
 		return
+	elapsed += delta
+	var reach: float = (float(m.arena.r) - 2.0) * m.ARENA.TS if m.arena != null else 700.0
+	var center: Vector2 = m.ARENA_POS if m.arena != null else e.position
+	var pp_delta: Vector2 = m.player.position - center
+	if pp_delta.length() > reach:
+		m.player.position = center + pp_delta.normalized() * reach
+	if elapsed > 300.0:
+		e.dmg = maxf(e.dmg, 90.0)
+	if stun_t > 0.0:
+		stun_t -= delta
+		return
+	if safe_t > 0.0:
+		safe_t -= delta
+		if safe_t <= 0.0:
+			var safe := false
+			for point in safe_points:
+				if m.player.position.distance_to(point) <= safe_radius:
+					safe = true
+			if not safe:
+				m._hurt_player(m.player.max_hp * 0.3, "dragon")
+			safe_points.clear()
+	if beam_t > 0.0:
+		beam_t -= delta
+		if eternal != null and is_instance_valid(eternal) and eternal.dead:
+			beam_t = 0.0
+			stun_t = 6.0
+			safe_t = 0.0
+			safe_points.clear()
+			m._say("¡Núcleo Eterno roto! Eternatus queda aturdido", 3.0)
+		elif beam_t <= 0.0:
+			_safe_attack(2, 1.0)
+		return
 	var fr: float = e.hp / maxf(e.max_hp, 1.0)
 	# cambios de fase
-	if phase == 1 and fr <= 0.66:
+	if phase == 1 and fr <= 0.66001:
 		phase = 2
 		_spawn_cores()
 		m._say(m.L.t("¡Eternatus se protege con sus núcleos! Destrúyelos"), 3.0)
-	elif phase == 2 and cores_done and fr <= 0.33:
+	elif phase == 2 and cores_done and fr <= 0.33001:
 		phase = 3
 		atk_t = 1.5
 		m._say(m.L.t("¡Remolino Infinito!"), 2.4)
@@ -90,9 +154,9 @@ func update(delta: float) -> void:
 			m._ring(e.position, 10.0, 220.0, RED, 0.5, 6.0)
 			m.shake = maxf(m.shake, 9.0)
 	# Rayo Eternamax: una vez, desde el 15% de vida
-	if phase == 3 and not beam_done and fr <= 0.15 and pull_t <= 0.0:
+	if phase == 3 and not beam_done and fr <= 0.10001 and pull_t <= 0.0:
 		beam_done = true
-		_eternabeam()
+		_charge_final()
 		atk_t = 4.0
 	atk_t -= delta
 	if atk_t <= 0.0 and pull_t <= 0.0:
@@ -104,16 +168,28 @@ func _attack() -> void:
 	var d: float = float(e.dmg)
 	match phase:
 		1:
-			if alt % 2 == 0:
+			if alt % 4 == 3:
+				_orbs(d)
+			elif alt % 4 == 2:
+				_sweep(d)
+			elif alt % 2 == 0:
 				_toxic(pp, d)
 			else:
 				_cannon(pp, d)
 			atk_t = 3.4
 		2:
 			_toxic(pp, d)
+			_orbs(d)
 			atk_t = 4.2
 		_:
-			if alt % 3 == 2:
+			if alt % 5 == 4:
+				_safe_attack(3, 2.5)
+				atk_t = 4.0
+			elif alt % 5 == 3:
+				_sweep(d)
+				_sweep(d)
+				atk_t = 3.6
+			elif alt % 3 == 2:
 				pull_t = 2.2
 				m._say(m.L.t("¡Remolino Infinito! Aléjate del centro"), 1.6)
 				m._ring(e.position, 260.0, 30.0, RED, 0.9, 5.0)
@@ -131,14 +207,16 @@ func _attack() -> void:
 func _toxic(pp: Vector2, d: float) -> void:
 	for i in range(5):
 		var c: Vector2 = pp if i == 0 else m._free_spot(pp + Vector2.from_angle(randf() * TAU) * randf_range(90.0, 230.0), 14.0)
-		m._hazard_zone(c, 72.0, 1.3 + 0.1 * float(i), d * 1.0, "poison", TOX)
+		var h = m._hazard_zone(c, 72.0, 1.3 + 0.1 * float(i), d * 1.0, "poison", TOX)
+		h.pct = 0.18
 	m._say(m.L.t("¡Tóxico!"), 1.0)
 
 
 # Cañon Dinamax: rayo avisado desde Eternatus hacia ti
 func _cannon(pp: Vector2, d: float) -> void:
 	var a: float = (pp - e.position).angle()
-	m._hazard_beam(e.position + Vector2(0, -40), a, 900.0, 60.0, 1.1, d * 1.4, "dragon", RED)
+	var h = m._hazard_beam(e.position + Vector2(0, -40), a, 900.0, 60.0, 1.1, d * 1.4, "dragon", RED)
+	h.pct = 0.25
 	m._say(m.L.t("¡Cañón Dinamax!"), 1.0)
 
 
@@ -211,7 +289,7 @@ func _tint(on: bool) -> void:
 	if on == tint_on:
 		return
 	tint_on = on
-	m.ground.modulate = Color(1.0, 0.62, 0.62) if on else Color.WHITE   # cielo rojo de Eternamax
+	(m.arena if m.arena != null else m.ground).modulate = Color(1.0, 0.62, 0.62) if on else Color.WHITE
 
 
 func stop() -> void:
@@ -226,5 +304,58 @@ func stop() -> void:
 	barrier = null
 	pull_t = 0.0
 	_tint(false)
+	if safe_visual != null and is_instance_valid(safe_visual):
+		safe_visual.queue_free()
+	safe_visual = null
+	safe_points.clear()
 	e = null
 	log.append(["stop"])
+
+
+func limit_damage(amount: float) -> float:
+	if e == null or e.dead:
+		return 0.0
+	var cap: float = e.max_hp * 0.1
+	var floor_hp := 0.0
+	if phase == 1:
+		floor_hp = e.max_hp * 0.66
+	elif phase == 2:
+		if not cores_done:
+			return 0.0
+		floor_hp = e.max_hp * 0.33
+	elif not beam_done:
+		floor_hp = e.max_hp * 0.1
+	if beam_t > 0.0:
+		return 0.0
+	return minf(minf(amount * (1.5 if stun_t > 0.0 else 1.0), cap), maxf(0.0, e.hp - floor_hp))
+
+func _sweep(d: float) -> void:
+	var a: float = (m.player.position - e.position).angle()
+	for i in range(9):
+		var h = m._hazard_beam(e.position, a - 0.9 + float(i) * 0.225, 1400.0, 36.0, 1.0 + float(i) * 0.13, d, "dragon", RED)
+		h.pct = 0.22
+
+func _orbs(d: float) -> void:
+	for i in range(12):
+		var a: float = TAU * float(i) / 12.0 + elapsed * 0.15
+		var h = m._hazard_zone(e.position + Vector2.from_angle(a) * 260.0, 50.0, 1.1 + float(i) * 0.03, d, "dragon", TOX)
+		h.pct = 0.2
+
+func _safe_attack(n: int, delay: float) -> void:
+	safe_points.clear()
+	var center: Vector2 = m.ARENA_POS if m.arena != null else e.position
+	for i in range(n):
+		safe_points.append(center + Vector2.from_angle(float(i) * TAU / float(n) + elapsed) * 350.0)
+	safe_t = delay
+	m._say("¡Noche Oscura! Entra en un círculo verde", delay)
+
+func _charge_final() -> void:
+	beam_t = 8.0
+	eternal = m._spawn_dex_at(890, e.position + Vector2(0, 160))
+	eternal.max_hp = e.max_hp * 0.05
+	eternal.hp = eternal.max_hp
+	eternal.spd = 0.0
+	eternal.scale = Vector2(0.4, 0.4)
+	eternal.set_meta("enc", "eter_core")
+	cores.append(eternal)
+	m._say("¡Rayo Eternamax! Rompe el Núcleo Eterno antes de 8 segundos", 4.0)

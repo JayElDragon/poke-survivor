@@ -20,7 +20,7 @@ var last_phase := ""
 
 
 func phase_at(t: float) -> String:
-	if m != null and bool(m.hw):
+	if m != null and (bool(m.hw) or (m.mode == "weekly" and load("res://scripts/content.gd").weekly()["rule"] == "night")):
 		return "night"   # v6.2: en Halloween siempre es de noche
 	var c: float = fposmod(t, CYCLE)
 	if c < P_DAY:

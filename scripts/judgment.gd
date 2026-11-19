@@ -1,4 +1,5 @@
 extends RefCounted
+const SP = preload("res://scripts/sprites.gd")
 # La Sentencia de Arceus (judgment.js): al llegar al minuto 30 acaba la partida
 # "normal". Animacion -> arena enorme -> Arceus invencible + un legendario cada
 # 5 s con el doble de vida y dano que el anterior. Sin limite de tiempo.
@@ -6,7 +7,7 @@ extends RefCounted
 const ARC_AT := 1800.0
 const ARENA_R := 24.0
 const BOSS_EVERY := 5.0
-const TOUCH := 0.4
+const TOUCH := 0.45
 const SCALE := 1.5
 const SPD_SOFT := 130.0
 const SPD_OVER := 0.25
@@ -75,8 +76,8 @@ class Sil extends Node2D:
 		mat.shader = sh
 		material = mat
 		var path := "res://assets/pokemon/493/Idle.png"
-		if ResourceLoader.exists(path):
-			tex = load(path)
+		if SP.exists(path):
+			tex = SP.texture(path)
 
 	func _draw() -> void:
 		if tex == null or p.is_empty() or meta.is_empty():
@@ -315,9 +316,27 @@ const BLADES2_AT := 420.0
 const BLADE_N := 6
 const BLADE_PCT := 0.35
 const EXTRA := ["extreme", "future", "gravity", "hyper", "tablets"]
+var grav_hold := 0.0
 const EXTRA_EVERY := 30.0
 const TYPE_COLS := ["#ff6a1f", "#3d8bff", "#45b23c", "#ffd21a", "#62d2ea", "#e04a2e", "#a043d0", "#aa7c3c", "#93b2ff", "#ff4f9a", "#90b82a", "#8e7a5a", "#5c48aa", "#5a3cff", "#463840", "#8c9caf", "#ff8acb", "#c4bcb0"]
 var deco: Node2D = null
+# 7.0 (del original): objetos rotos, teletransporte y ataque arrancado, suelo que se agrieta
+const BREAK_AT := [120.0, 240.0, 360.0, 480.0]   # rompe un objeto a los 2, 4 y 6 minutos
+const TP_DIST := 560.0                    # si huyes mas lejos, aparece delante de ti
+const TP_RIP := 3                         # a la tercera, te arranca el ataque con el que huyes
+const ESCAPE_IDS := ["quick-attack", "agility", "extreme-speed", "aerial-ace", "bolt-beak"]
+const HOLE_FROM := 4.0
+const HOLE_EVERY := 4.0
+const HOLE_WARN := 2.5
+const HOLE_MAX := 0.3                     # el suelo se rompe hasta el 30%
+var broken: Array = []
+var break_n := 0
+var tp_cd := 0.0
+var tp_n := 0
+var tp_times: Array = []
+var tp_last := 0.0
+var holes: Array = []                     # {c: Vector2 (respecto al centro), r, t}
+var hole_t := 0.0
 var blade_a := 0.0
 var blade_cd := 0.0
 var extra_i := 0
@@ -368,6 +387,31 @@ class HallDeco extends Node2D:
 			var sp: Vector2 = Vector2.from_angle(a4) * R * (0.2 + fposmod(float(i) * 0.37, 1.0) * 1.1)
 			var tw: float = 0.5 + 0.5 * sin(t * 3.0 + float(i) * 1.7)
 			draw_rect(Rect2(sp - Vector2(1.5, 1.5), Vector2(3.0, 3.0)), Color(1, 1, 1, 0.25 + 0.5 * tw))
+		# suelo que se rompe: primero grietas de luz dorada, luego un agujero a las nubes con losas que caen
+		if jd != null:
+			for h in jd.holes:
+				var hc: Vector2 = h["c"]
+				var hr: float = float(h["r"])
+				var ht: float = float(h["t"])
+				var warn: float = clampf(ht / 2.5, 0.0, 1.0)
+				if ht < 2.5:
+					for i in range(7):
+						var ca: float = float(i) * 0.9 + hc.x * 0.01
+						var cl: Vector2 = Vector2.from_angle(ca) * hr * warn
+						draw_line(hc, hc + cl, Color(1.0, 0.85, 0.35, 0.5 + 0.5 * warn), 3.0)
+						draw_line(hc + cl * 0.6, hc + cl * 0.6 + Vector2.from_angle(ca + 0.8) * hr * 0.3 * warn, Color(1.0, 0.85, 0.35, 0.6 * warn), 2.0)
+					draw_arc(hc, hr, 0.0, TAU, 40, Color(1.0, 0.85, 0.35, 0.25 * warn), 2.0)
+				else:
+					draw_circle(hc, hr + 6.0, Color(0.85, 0.62, 0.14, 0.95))
+					draw_circle(hc, hr, Color(0.55, 0.72, 0.95))
+					for j in range(5):
+						draw_circle(hc + Vector2.from_angle(float(j) * 1.3 + t * 0.2) * hr * 0.45, hr * 0.32, Color(1, 1, 1, 0.55))
+					var fall: float = clampf((ht - 2.5) / 1.2, 0.0, 1.0)
+					if fall < 1.0:
+						for j in range(5):
+							var sp: Vector2 = hc + Vector2.from_angle(float(j) * 1.25) * hr * 0.6 * (1.0 - fall)
+							var ss: float = 26.0 * (1.0 - fall)
+							draw_rect(Rect2(sp - Vector2(ss, ss) * 0.5, Vector2(ss, ss)), Color(0.93, 0.9, 0.84, 1.0 - fall))
 		# Aspas Doradas: ruedas que dan vueltas por su carril, con huecos para cruzar
 		if jd != null:
 			for lane in jd.blade_lanes():
@@ -421,6 +465,108 @@ func blades_tick(dt: float) -> void:
 				m.shake = maxf(m.shake, 10.0)
 				m._ring(m.player.position, 6.0, 90.0, GOLD, 0.4)
 				return
+
+
+# Te rompe los objetos de uno en uno (a los 2, 4 y 6 minutos).
+func break_tick() -> void:
+	if break_n >= BREAK_AT.size() or arena_t < float(BREAK_AT[break_n]):
+		return
+	break_n += 1
+	for slot in ["item4", "item3", "item2", "item"]:
+		var id: String = String(m.get(slot))
+		if id != "":
+			m.set(slot, "")
+			broken.append(id)
+			m._say(L.t("¡Arceus ha roto tu %s!") % L.t(m._item_name_of(id)), 2.6)
+			m._ring(m.player.position, 6.0, 120.0, GOLD, 0.5, 5.0)
+			m.shake = maxf(m.shake, 8.0)
+			Aud.sfx("toll")
+			return
+
+
+# Si huyes, se teletransporta delante de ti; a la tercera, te arranca el ataque con el que huyes y te sujeta un momento.
+func teleport_tick(dt: float) -> void:
+	tp_cd -= dt
+	if A == null or A.dead or not casting.is_empty() or tp_cd > 0.0 or m.player.dead:
+		return
+	if A.position.distance_to(m.player.position) < TP_DIST and arena_t - tp_last < 20.0:
+		return
+	tp_cd = 5.0
+	tp_last = arena_t
+	var dir: Vector2 = m.player_vel.normalized() if m.player_vel.length() > 20.0 else (m.player.position - A.position).normalized()
+	m._ring(A.position, A.radius, A.radius * 3.0, GOLD, 0.35, 4.0)
+	A.position = m.player.position + dir * 190.0
+	keep_inside()
+	m._ring(A.position, A.radius * 3.0, A.radius, GOLD, 0.35, 4.0)
+	A.play("Attack", 1.2)
+	m.shake = maxf(m.shake, 6.0)
+	tp_times.append(arena_t)
+	tp_times = tp_times.filter(func(t): return arena_t - float(t) <= 45.0)
+	tp_n = tp_times.size()
+	if tp_n < TP_RIP:
+		m._say(L.t("¡Arceus aparece delante de ti!"), 1.4)
+		return
+	tp_n = 0
+	tp_times.clear()
+	var sl: Array = m._slot_list()
+	for gi in range(sl.size()):
+		for mv in (sl[gi] as Array):
+			if ESCAPE_IDS.has(String(mv["id"])) or String(mv["kind"]) == "dash":
+				var names: Array = m._forget_slot(gi)
+				m.root_t = maxf(m.root_t, 2.5)   # un rayo dorado te sujeta mientras lo rompe
+				m._ring(m.player.position, 140.0, 10.0, GOLD, 0.8, 6.0)
+				m._say(L.t("¡Arceus te ha arrancado %s!") % " + ".join(names), 3.0)
+				Aud.sfx("toll")
+				return
+	m._say(L.t("¡Arceus aparece delante de ti!"), 1.4)
+
+
+# El suelo de la Sala del Origen se agrieta (aviso de luz dorada) y se abre en agujeros que no se pueden pisar.
+func holes_tick(dt: float) -> void:
+	for h in holes:
+		h["t"] = float(h["t"]) + dt
+	if arena_t < HOLE_FROM:
+		return
+	hole_t -= dt
+	if hole_t > 0.0:
+		return
+	hole_t = HOLE_EVERY
+	var R: float = (ARENA_R - 2.0) * ARENA.TS
+	var area := 0.0
+	for h in holes:
+		area += PI * float(h["r"]) * float(h["r"])
+	if area >= HOLE_MAX * PI * R * R:
+		return
+	for k in range(12):
+		var c: Vector2 = Vector2.from_angle(randf() * TAU) * randf_range(0.25, 0.9) * R
+		var r: float = randf_range(80.0, 140.0)
+		if (center + c).distance_to(m.player.position) < r + 220.0:
+			continue
+		var ok := true
+		for h in holes:
+			if c.distance_to(h["c"]) < r + float(h["r"]) + 40.0:
+				ok = false
+				break
+		if ok:
+			holes.append({"c": c, "r": r, "t": 0.0})
+			return
+
+
+func hole_open(h: Dictionary) -> bool:
+	return float(h["t"]) >= HOLE_WARN
+
+
+# No se puede pisar un agujero abierto: te deja en su borde.
+func holes_push() -> void:
+	for h in holes:
+		if not hole_open(h):
+			continue
+		var c: Vector2 = center + (h["c"] as Vector2)
+		var d: Vector2 = m.player.position - c
+		var lim: float = float(h["r"]) + m.player.radius * 0.4
+		if d.length() < lim:
+			m._hurt_player(m.player.max_hp * 0.18, "", true)
+			m.player.position = c + (d.normalized() if d.length() > 0.1 else Vector2.RIGHT) * lim
 
 
 func _hall_on() -> void:
@@ -625,6 +771,14 @@ func fight() -> void:
 	m.enemies.append(A)
 	m.ainfo = {"phase": "jd", "back": m.player.position, "stash_e": m.ainfo.get("stash_e", []), "stash_o": m.ainfo.get("stash_o", []), "boss": A}
 	_hall_on()   # 7.0: Sala del Origen
+	broken.clear()
+	break_n = 0
+	tp_cd = 0.0
+	tp_n = 0
+	tp_times.clear()
+	tp_last = 0.0
+	holes.clear()
+	hole_t = 0.0
 	blade_a = 0.0
 	blades_said = 0
 	extra_i = 0
@@ -686,11 +840,14 @@ func update(dt: float) -> void:
 	spin += dt
 	arceus_tick(dt)
 	blades_tick(dt)   # 7.0: Aspas Doradas
+	break_tick()
+	teleport_tick(dt)
+	holes_tick(dt)
 	keep_inside()
+	holes_push()
 	boss_t -= dt
 	if boss_t <= 0.0:
 		boss_t = BOSS_EVERY
-		spawn_boss()
 	touch()
 	ember(dt)
 
@@ -704,6 +861,10 @@ func arceus_tick(dt: float) -> void:
 		return
 	if not casting.is_empty():
 		cast_tick(dt)
+		return
+	if grav_hold > 0.0:
+		grav_hold -= dt   # 7.1: durante la Gravedad Arceus se queda quieto (antes te alcanzaba mientras ibas lento)
+		A.loop_anim("Idle", 1.0)
 		return
 	var tg: Vector2 = m.player.position
 	var dv: Vector2 = tg - A.position
@@ -785,6 +946,7 @@ func cast(id: String) -> void:
 	elif id == "gravity":
 		# Gravedad: te vuelves pesado unos segundos y caen pilares
 		m.trap_slow_t = maxf(m.trap_slow_t, 4.0)   # 4 s, como el original
+		grav_hold = 4.0
 		m._ring(m.player.position, 160.0, 20.0, Color("#b9a6ff"), 0.8, 5.0)
 		var pg: Vector2 = m.player.position
 		for i in range(4):
@@ -853,7 +1015,7 @@ func touch() -> void:
 		return
 	touch_cd = 0.9
 	pl.invuln = 0.0
-	m._hurt_player(pl.max_hp * touch_pct(), "", true)
+	m._hurt_player(pl.max_hp * touch_pct(), "", true, true)   # 7.1: tocarle quita siempre lo mismo
 	m.shake = 9.0
 	m._ring(pl.position, 6.0, 70.0, GOLD, 0.4)
 	A.play("Attack", 1.4)

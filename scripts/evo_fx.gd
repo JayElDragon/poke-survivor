@@ -24,7 +24,7 @@ const THEME := {
 	"ghost": ["wisp", "wisp", "ring"], "dragon": ["crescent", "ember", "crescent"], "dark": ["slash", "wisp", "slash"],
 	"steel": ["glint", "shard", "glint"], "fairy": ["star", "heart", "star"], "normal": ["star", "ring", "spark"],
 }
-const DIRKINDS := ["projectile", "cone", "beam", "melee", "dash", "boomerang", "chain", "turret"]
+const DIRKINDS := ["projectile", "cone", "beam", "melee", "dash", "boomerang", "chain", "turret", "punch", "homing", "bounce"]
 
 var main = null
 var ps: Array = []          # particulas
